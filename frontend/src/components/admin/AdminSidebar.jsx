@@ -1,5 +1,7 @@
 import {
+  FiBookOpen,
   FiBox,
+  FiCpu,
   FiGrid,
   FiHome,
   FiImage,
@@ -23,6 +25,8 @@ const links = [
   { to: '/admin/customers', label: 'Khách hàng', icon: FiUsers },
   { to: '/admin/contacts', label: 'Liên hệ hỗ trợ', icon: FiMessageSquare },
   { to: '/admin/reviews', label: 'Đánh giá', icon: FiMessageSquare },
+  { to: '/admin/chatbot', label: 'Chatbot AI', icon: FiCpu },
+  { to: '/admin/knowledge', label: 'Kho kiến thức AI', icon: FiBookOpen },
   { to: '/admin/banners', label: 'Banner', icon: FiImage },
   { to: '/admin/vouchers', label: 'Voucher', icon: FiTag },
   { to: '/admin/categories', label: 'Danh mục', icon: FiLayers },

@@ -70,7 +70,7 @@ const declarations = [
   },
   {
     name: 'lookup_order',
-    description: 'Tra cứu trạng thái đơn hàng. Bắt buộc có mã đơn (dạng TP + 10 số) và số điện thoại người nhận.',
+    description: 'Tra cứu trạng thái đơn hàng. Bắt buộc có mã đơn (bắt đầu bằng TP) và số điện thoại người nhận.',
     parameters: {
       type: 'object',
       properties: {

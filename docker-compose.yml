@@ -1,7 +1,7 @@
 services:
   mongodb:
     image: mongo:7
-    container_name: techphone-mongodb
+    container_name: phoneshopai-mongodb
     restart: unless-stopped
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     ports:
@@ -24,7 +24,7 @@ services:
   backend:
     build:
       context: ./backend
-    container_name: techphone-backend
+    container_name: phoneshopai-backend
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -38,6 +38,13 @@ services:
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Set JWT_ACCESS_SECRET in your environment or root .env file}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET in your environment or root .env file}
       SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      SEPAY_WEBHOOK_API_KEY: ${SEPAY_WEBHOOK_API_KEY:-}
+      BANK_NAME: ${BANK_NAME:-}
+      BANK_BIN: ${BANK_BIN:-}
+      BANK_ACCOUNT_NUMBER: ${BANK_ACCOUNT_NUMBER:-}
+      BANK_ACCOUNT_NAME: ${BANK_ACCOUNT_NAME:-}
     ports:
       - "5000:5000"
     volumes:
@@ -59,7 +66,7 @@ services:
         VITE_USE_MOCK: "false"
         VITE_SITE_URL: http://localhost:3000
         VITE_DEPLOYMENT_TARGET: docker
-    container_name: techphone-frontend
+    container_name: phoneshopai-frontend
     restart: unless-stopped
     ports:
       - "3000:80"

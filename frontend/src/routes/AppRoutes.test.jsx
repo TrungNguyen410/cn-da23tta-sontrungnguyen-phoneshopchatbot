@@ -6,6 +6,7 @@ import AppRoutes from './AppRoutes';
 
 vi.mock('../components/common/Header', () => ({ default: () => <header>Store header</header> }));
 vi.mock('../components/common/Footer', () => ({ default: () => <footer>Store footer</footer> }));
+vi.mock('../components/chat/ChatWidget', () => ({ default: () => <aside>Chat widget</aside> }));
 vi.mock('../pages/ProductDetail', () => ({ default: () => <h1>Product detail route</h1> }));
 vi.mock('../pages/Login', () => ({ default: () => <h1>Login route</h1> }));
 

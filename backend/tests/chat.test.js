@@ -152,6 +152,21 @@ describe('AI chatbot', () => {
       const wrongPhone = await send({ message: 'Đơn TP2610200007 sđt 0999999999', visitorId: VISITOR }).expect(201);
       expect(wrongPhone.body.data.message.content).toContain('không tìm thấy');
     });
+
+    it('recognises legacy short order numbers', async () => {
+      await Order.create({
+        orderNumber: 'TP260601',
+        subtotal: 100,
+        total: 100,
+        status: 'delivered',
+        items: [{ name: 'Case', price: 100, quantity: 1 }],
+        customer: { fullName: 'C', email: 'c@example.com', phone: '0911111111', address: 'HCM' },
+      });
+
+      const found = await send({ message: 'Đơn TP260601 sđt 0911111111', visitorId: VISITOR }).expect(201);
+      expect(found.body.data.message.toolCalls[0].name).toBe('lookup_order');
+      expect(found.body.data.message.content).toContain('Đã giao hàng');
+    });
   });
 
   describe('Gemini mode', () => {

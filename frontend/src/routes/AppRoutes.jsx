@@ -7,6 +7,7 @@ import Header from '../components/common/Header';
 import Loading from '../components/common/Loading';
 import RouteMeta from '../components/common/RouteMeta';
 import SupportLauncher from '../components/common/SupportLauncher';
+import ChatWidget from '../components/chat/ChatWidget';
 import AdminLayout from '../pages/admin/AdminLayout';
 
 const Accessories = lazy(() => import('../pages/Accessories'));
@@ -41,6 +42,8 @@ const ProductManagement = lazy(() => import('../pages/admin/ProductManagement'))
 const ReviewManagement = lazy(() => import('../pages/admin/ReviewManagement'));
 const SettingManagement = lazy(() => import('../pages/admin/SettingManagement'));
 const VoucherManagement = lazy(() => import('../pages/admin/VoucherManagement'));
+const ChatbotManagement = lazy(() => import('../pages/admin/ChatbotManagement'));
+const KnowledgeManagement = lazy(() => import('../pages/admin/KnowledgeManagement'));
 
 function StoreLayout() {
   return (
@@ -49,6 +52,7 @@ function StoreLayout() {
       <div className="store-content"><Outlet /></div>
       <Footer />
       <SupportLauncher />
+      <ChatWidget />
     </div>
   );
 }
@@ -97,6 +101,8 @@ export default function AppRoutes() {
           <Route path="categories" element={<CategoryManagement />} />
           <Route path="brands" element={<BrandManagement />} />
           <Route path="settings" element={<SettingManagement />} />
+          <Route path="chatbot" element={<ChatbotManagement />} />
+          <Route path="knowledge" element={<KnowledgeManagement />} />
         </Route>
       </Routes>
     </Suspense>

@@ -17,6 +17,8 @@ const titles = {
   categories: 'Quản lý danh mục',
   brands: 'Quản lý thương hiệu',
   settings: 'Cài đặt hệ thống',
+  chatbot: 'Chatbot AI tư vấn',
+  knowledge: 'Kho kiến thức chatbot',
 };
 
 const adminPages = Object.entries(titles).map(([path, label]) => ({
