@@ -382,6 +382,19 @@ const swaggerDocument = {
         },
       },
     },
+    '/chat/messages/stream': {
+      post: {
+        tags: ['Chatbot'],
+        summary: 'Same as /chat/messages but streams the answer as Server-Sent Events (session, delta, reset, done, error)',
+      },
+    },
+    '/chat/config': {
+      get: { tags: ['Chatbot'], summary: 'Public chatbot settings: enabled, greeting, quick questions' },
+    },
+    '/admin/chat/config': {
+      get: { tags: ['Chatbot'], security: [{ bearerAuth: [] }], summary: 'Get chatbot settings' },
+      put: { tags: ['Chatbot'], security: [{ bearerAuth: [] }], summary: 'Update chatbot settings' },
+    },
     '/chat/sessions/{id}': {
       get: { tags: ['Chatbot'], summary: 'Get a chat session and its messages (owner or matching visitorId)' },
     },

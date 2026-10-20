@@ -13,7 +13,9 @@ const chatIpLimit = rateLimit({
   namespace: 'chat-ip',
 });
 
+router.get('/config', chatController.getConfig);
 router.post('/messages', chatIpLimit, optionalProtect, chatValidators.sendMessage, validate, chatController.sendMessage);
+router.post('/messages/stream', chatIpLimit, optionalProtect, chatValidators.sendMessage, validate, chatController.streamMessage);
 router.get('/sessions/:id', optionalProtect, chatValidators.getSession, validate, chatController.getSession);
 router.post('/messages/:id/feedback', optionalProtect, chatValidators.feedback, validate, chatController.feedback);
 

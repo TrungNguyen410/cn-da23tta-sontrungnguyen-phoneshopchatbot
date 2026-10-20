@@ -1,5 +1,6 @@
 jest.mock('../src/services/aiProviders/geminiProvider', () => ({
   generate: jest.fn(),
+  stream: jest.fn(),
   isConfigured: jest.fn(() => false),
 }));
 
@@ -80,6 +81,7 @@ describe('AI chatbot', () => {
   beforeEach(async () => {
     geminiProvider.isConfigured.mockReturnValue(false);
     geminiProvider.generate.mockReset();
+    geminiProvider.stream.mockReset();
     await seedCatalog();
   });
 
@@ -322,6 +324,97 @@ describe('AI chatbot', () => {
 
       await request(app).post('/api/admin/knowledge').set('Authorization', `Bearer ${adminToken}`).send({ title: 'x' }).expect(422);
       await request(app).delete(`/api/admin/knowledge/${created.body.data.id}`).set('Authorization', `Bearer ${adminToken}`).expect(200);
+    });
+  });
+
+  describe('streaming and configuration', () => {
+    const parseEvents = (text) => text.split('\n\n')
+      .filter((block) => block.startsWith('data: '))
+      .map((block) => JSON.parse(block.slice(6)));
+
+    it('streams offline answers as server-sent events', async () => {
+      const response = await request(app)
+        .post('/api/chat/messages/stream')
+        .send({ message: 'Tư vấn điện thoại dưới 10 triệu', visitorId: VISITOR })
+        .expect(200)
+        .expect('Content-Type', /text\/event-stream/);
+
+      const events = parseEvents(response.text);
+      expect(events[0]).toMatchObject({ type: 'session' });
+      const deltas = events.filter((event) => event.type === 'delta').map((event) => event.text).join('');
+      const done = events.at(-1);
+      expect(done.type).toBe('done');
+      expect(done.sessionId).toBe(events[0].sessionId);
+      expect(deltas).toBe(done.message.content);
+      expect(done.message.products.length).toBeGreaterThan(0);
+    });
+
+    it('streams Gemini text deltas across function calls', async () => {
+      geminiProvider.isConfigured.mockReturnValue(true);
+      geminiProvider.stream
+        .mockImplementationOnce(async () => ({
+          content: { role: 'model', parts: [{ functionCall: { name: 'search_products', args: { brand: 'Xiaomi' } } }] },
+        }))
+        .mockImplementationOnce(async (_request, onText) => {
+          onText('Bạn nên chọn ');
+          onText('**Redmi Note 14**.');
+          return { content: { role: 'model', parts: [{ text: 'Bạn nên chọn **Redmi Note 14**.' }] } };
+        });
+
+      const response = await request(app)
+        .post('/api/chat/messages/stream')
+        .send({ message: 'Xiaomi nào tốt', visitorId: VISITOR })
+        .expect(200);
+
+      const events = parseEvents(response.text);
+      expect(events.filter((event) => event.type === 'delta').map((event) => event.text)).toEqual(['Bạn nên chọn ', '**Redmi Note 14**.']);
+      const done = events.at(-1);
+      expect(done.message).toMatchObject({ source: 'gemini', content: 'Bạn nên chọn **Redmi Note 14**.' });
+      expect(done.message.products.map((item) => item.id)).toEqual(['p-redmi']);
+      expect(geminiProvider.generate).not.toHaveBeenCalled();
+    });
+
+    it('resets partial Gemini output before falling back', async () => {
+      geminiProvider.isConfigured.mockReturnValue(true);
+      geminiProvider.stream.mockImplementationOnce(async (_request, onText) => {
+        onText('Đang trả lời');
+        throw new Error('stream broken');
+      });
+
+      const response = await request(app)
+        .post('/api/chat/messages/stream')
+        .send({ message: 'điện thoại dưới 10 triệu', visitorId: VISITOR })
+        .expect(200);
+
+      const types = parseEvents(response.text).map((event) => event.type);
+      expect(types.indexOf('reset')).toBeGreaterThan(types.indexOf('delta'));
+      expect(parseEvents(response.text).at(-1).message.source).toBe('fallback');
+    });
+
+    it('returns JSON errors before streaming starts', async () => {
+      await request(app).post('/api/chat/messages/stream').send({ message: '' , visitorId: VISITOR }).expect(422);
+    });
+
+    it('exposes default config and lets admins change it', async () => {
+      const defaults = await request(app).get('/api/chat/config').expect(200);
+      expect(defaults.body.data).toMatchObject({ enabled: true });
+      expect(defaults.body.data.quickQuestions.length).toBeGreaterThan(0);
+
+      await createUser({ email: 'admin-config@test.com', phone: '0966666666', role: 'admin' });
+      const token = await login('admin-config@test.com');
+      await request(app).put('/api/admin/chat/config').send({ enabled: false }).expect(401);
+      await request(app).put('/api/admin/chat/config').set('Authorization', `Bearer ${token}`)
+        .send({ quickQuestions: Array(7).fill('x') }).expect(422);
+
+      const updated = await request(app)
+        .put('/api/admin/chat/config')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ enabled: false, greeting: 'Chào bạn!', quickQuestions: ['Máy nào pin trâu?', '  '] })
+        .expect(200);
+      expect(updated.body.data).toEqual({ enabled: false, greeting: 'Chào bạn!', quickQuestions: ['Máy nào pin trâu?'] });
+
+      await send({ message: 'Xin chào', visitorId: VISITOR }).expect(503);
+      await request(app).post('/api/chat/messages/stream').send({ message: 'Xin chào', visitorId: VISITOR }).expect(503);
     });
   });
 });

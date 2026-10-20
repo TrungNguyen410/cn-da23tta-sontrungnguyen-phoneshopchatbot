@@ -43,8 +43,16 @@ const adminList = [
   query('search').optional().trim().isLength({ max: 100 }),
 ];
 
+const updateConfig = [
+  body('enabled').optional().isBoolean().withMessage('Trạng thái bật/tắt không hợp lệ'),
+  body('greeting').optional().isString().isLength({ max: 500 }).withMessage('Lời chào tối đa 500 ký tự'),
+  body('quickQuestions').optional().isArray({ max: 6 }).withMessage('Tối đa 6 câu hỏi gợi ý'),
+  body('quickQuestions.*').optional().isString().isLength({ max: 120 }).withMessage('Mỗi câu hỏi tối đa 120 ký tự'),
+];
+
 module.exports = {
   sendMessage,
+  updateConfig,
   getSession,
   feedback,
   createKnowledge: knowledgeFields(false),
