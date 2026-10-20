@@ -8,6 +8,21 @@ describe('Gemini provider', () => {
   afterEach(() => {
     Object.assign(env.gemini, original);
     global.fetch = originalFetch;
+    geminiProvider.resetCooldowns();
+  });
+
+  it('skips a model whose quota is exhausted instead of retrying it', async () => {
+    Object.assign(env.gemini, { apiKey: 'test-key', model: 'primary-model', fallbackModel: 'backup-model' });
+    const quota = { ok: false, status: 429, text: async () => 'RESOURCE_EXHAUSTED' };
+    global.fetch = jest.fn().mockResolvedValue(quota);
+
+    await expect(geminiProvider.generate({ systemInstruction: '', contents: [] })).rejects.toMatchObject({ statusCode: 502 });
+    expect(global.fetch.mock.calls.map(([url]) => url.match(/models\/([^:]+)/)[1])).toEqual(['primary-model', 'backup-model']);
+    expect(geminiProvider.status().quotaExhausted).toEqual(['primary-model', 'backup-model']);
+
+    global.fetch.mockClear();
+    await expect(geminiProvider.generate({ systemInstruction: '', contents: [] })).rejects.toMatchObject({ statusCode: 429 });
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('reports configuration from GEMINI_API_KEY', () => {

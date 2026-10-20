@@ -18,6 +18,7 @@ class KnowledgeArticleRepository extends BaseRepository {
     const filter = { active: true, ...(category ? { category } : {}) };
     const articles = await this.findAll(filter, { sort: { updatedAt: -1 } });
     const terms = new Set(tokenize(query));
+    const plainQuery = tokenize(query).join(' ');
     if (!terms.size) return articles.slice(0, limit);
 
     return articles
@@ -25,7 +26,11 @@ class KnowledgeArticleRepository extends BaseRepository {
         const keywordTokens = tokenize(article.keywords.join(' '));
         const titleTokens = tokenize(article.title);
         const bodyTokens = tokenize(article.content);
-        let score = 0;
+        // Whole keyword phrases ("tra lai", "doi tra") outweigh single shared words ("tra").
+        let score = article.keywords
+          .map((keyword) => tokenize(keyword).join(' '))
+          .filter((phrase) => phrase.includes(' ') && ` ${plainQuery} `.includes(` ${phrase} `))
+          .length * 6;
         for (const term of terms) {
           if (keywordTokens.includes(term)) score += 3;
           if (titleTokens.includes(term)) score += 2;

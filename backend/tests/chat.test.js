@@ -136,6 +136,7 @@ describe('AI chatbot', () => {
     it('filters by brand alias', async () => {
       const response = await send({ message: 'Có iphone nào không', visitorId: VISITOR }).expect(201);
       expect(response.body.data.message.products.map((item) => item.id)).toEqual(['p-iphone']);
+      expect(response.body.data.message.content).toContain('còn hàng (5 máy)');
     });
 
     it('answers policy questions from the knowledge base', async () => {
@@ -145,6 +146,12 @@ describe('AI chatbot', () => {
     });
 
     it('routes return questions phrased casually to the return policy', async () => {
+      await KnowledgeArticle.create({
+        title: 'Mua trả góp',
+        category: 'installment',
+        keywords: ['trả góp', 'tra gop'],
+        content: 'Hỗ trợ trả góp 0% qua thẻ tín dụng.',
+      });
       await KnowledgeArticle.create({
         title: 'Chính sách đổi trả',
         category: 'return',

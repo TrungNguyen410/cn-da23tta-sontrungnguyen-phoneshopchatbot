@@ -380,7 +380,7 @@ class ChatService {
     }
     return done([
       'Mình gợi ý một số mẫu phù hợp:',
-      ...items.slice(0, 3).map((item) => `- **${item.name}**: ${formatVnd(item.price)} — ${[item.chip, item.ram && `RAM ${item.ram}`, item.storage, item.battery && `pin ${item.battery}`].filter(Boolean).join(', ')}${item.inStock ? '' : ' (tạm hết hàng)'}`),
+      ...items.slice(0, 3).map((item) => `- **${item.name}**: ${formatVnd(item.price)} — ${[item.chip, item.ram && `RAM ${item.ram}`, item.storage, item.battery && `pin ${item.battery}`].filter(Boolean).join(', ')}${item.inStock ? ` — còn hàng (${item.stock} máy)` : ' (tạm hết hàng)'}`),
       'Bạn muốn mình so sánh chi tiết hay tư vấn thêm theo nhu cầu (chơi game, chụp ảnh, pin trâu) không?',
     ].join('\n'), output.cards.slice(0, 3));
   }
@@ -438,6 +438,8 @@ class ChatService {
       sessionsToday,
       ...messages,
       aiEnabled: geminiProvider.isConfigured(),
+      aiModel: geminiProvider.status?.().model || '',
+      aiQuotaExhausted: geminiProvider.status?.().quotaExhausted || [],
       recentQuestions,
     };
   }
