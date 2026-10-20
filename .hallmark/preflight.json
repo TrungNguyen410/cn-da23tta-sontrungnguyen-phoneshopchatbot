@@ -1,0 +1,9 @@
+{
+  "scannedAt": "2026-07-16",
+  "framework": "React 19 with Vite",
+  "fontStack": "Inter, Segoe UI, Arial",
+  "palette": "legacy blue CSS variables in frontend/src/assets/styles/main.css",
+  "motion": "motion-cut: no Motion, GSAP, or animation library installed",
+  "spacing": "mixed CSS values with no named 4-point scale",
+  "redesign": "full visual overhaul preserving routes, API contracts, and functionality"
+}

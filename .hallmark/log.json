@@ -1,0 +1,18 @@
+[
+  {
+    "date": "2026-07-16",
+    "scope": "app",
+    "macrostructure": "Asymmetric Commerce / Guided Task Flow / Operations Workbench",
+    "theme": "Cobalt modern-minimal",
+    "enrichment": "catalog and banner imagery only",
+    "brief": "TechPhone Store full visual overhaul with routes and functionality preserved"
+  },
+  {
+    "date": "2026-07-28",
+    "scope": "app",
+    "macrostructure": "Asymmetric Commerce / Guided Task Flow / Operations Workbench",
+    "theme": "Cobalt modern-minimal",
+    "enrichment": "existing catalog imagery; no decorative AI imagery",
+    "brief": "Nine ecommerce workstreams: payments, guest checkout, shipping, verified reviews, comparison, personalization, wishlist sync, policy support, and SEO analytics"
+  }
+]

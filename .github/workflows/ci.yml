@@ -1,0 +1,89 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - main
+      - devnguyen
+      - devdhuy
+      - devthuy
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      JWT_ACCESS_SECRET: ci-access-secret
+      JWT_REFRESH_SECRET: ci-refresh-secret
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run API tests
+        run: npm run test:coverage
+
+  frontend:
+    name: Frontend quality
+    runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: https://api.techphone.example/api
+      VITE_USE_MOCK: "false"
+      VITE_SITE_URL: https://shop.techphone.example
+      VITE_DEPLOYMENT_TARGET: render
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint frontend
+        run: npm run lint
+
+      - name: Run frontend tests
+        run: npm run test:run
+
+      - name: Build frontend
+        run: npm run build
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    env:
+      JWT_ACCESS_SECRET: ci-docker-access-secret-at-least-32-characters
+      JWT_REFRESH_SECRET: ci-docker-refresh-secret-at-least-32-characters
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Build application images
+        run: docker compose build
