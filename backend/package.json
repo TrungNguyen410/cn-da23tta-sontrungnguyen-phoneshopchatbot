@@ -14,6 +14,7 @@
     "migrate:phone-auth": "node src/scripts/migratePhoneAuth.js",
     "migrate:soft-delete-indexes": "node src/scripts/migrateSoftDeleteIndexes.js",
     "eval:chatbot": "node scripts/evaluateChatbot.mjs",
+    "smoke": "node scripts/smokeTest.mjs",
     "test": "jest --runInBand",
     "test:coverage": "jest --coverage --runInBand"
   },

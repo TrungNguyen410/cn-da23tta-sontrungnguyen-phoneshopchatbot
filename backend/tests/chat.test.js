@@ -133,6 +133,14 @@ describe('AI chatbot', () => {
       expect(response.body.data.message.toolCalls.map((tool) => tool.name)).not.toContain('search_accessories');
     });
 
+    it('suggests the closest-priced phones when nothing fits the budget', async () => {
+      const response = await send({ message: 'Điện thoại dưới 5 triệu', visitorId: VISITOR }).expect(201);
+
+      expect(response.body.data.message.content).toContain('chưa có điện thoại dưới 5.000.000đ');
+      expect(response.body.data.message.products[0].id).toBe('p-redmi');
+      expect(response.body.data.message.products.map((item) => item.price)).toEqual([6990000, 9490000, 30990000]);
+    });
+
     it('filters by brand alias', async () => {
       const response = await send({ message: 'Có iphone nào không', visitorId: VISITOR }).expect(201);
       expect(response.body.data.message.products.map((item) => item.id)).toEqual(['p-iphone']);

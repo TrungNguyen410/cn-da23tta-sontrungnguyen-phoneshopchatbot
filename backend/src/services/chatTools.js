@@ -215,15 +215,27 @@ const handlers = {
       { ...base, ...keywordFilter(args.keyword, ['name', 'chip', 'description', 'camera', 'battery', 'ram', 'storage']) },
       { sort, limit: MAX_RESULTS },
     );
-    let relaxed = false;
+    let note = '';
+    let outOfBudget = false;
     if (!products.length && args.keyword) {
       products = await productRepository.findAll(base, { sort, limit: MAX_RESULTS });
-      relaxed = products.length > 0;
+      if (products.length) note = 'Không có máy khớp từ khóa, đây là các máy phù hợp tiêu chí giá/hãng.';
+    }
+    // Nothing in the budget: offer the closest-priced phones instead of an empty answer.
+    if (!products.length && (Number(args.maxPrice) > 0 || Number(args.minPrice) > 0)) {
+      const { price, ...withoutPrice } = base;
+      const closest = Number(args.maxPrice) > 0 ? { price: 1 } : { price: -1 };
+      products = await productRepository.findAll(withoutPrice, { sort: closest, limit: 3 });
+      if (products.length) {
+        outOfBudget = true;
+        note = 'Không có máy trong tầm giá khách yêu cầu. Đây là các máy có giá gần nhất — hãy nói rõ với khách là vượt ngân sách.';
+      }
     }
     const names = await brandNameMap();
     return {
       products: products.map((product) => productSummary(product, names)),
-      ...(relaxed ? { note: 'Không có máy khớp từ khóa, đây là các máy phù hợp tiêu chí giá/hãng.' } : {}),
+      ...(note ? { note } : {}),
+      ...(outOfBudget ? { outOfBudget } : {}),
       cards: products.map((product) => toProductCard(product)),
     };
   },

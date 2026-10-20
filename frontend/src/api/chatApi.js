@@ -11,7 +11,7 @@ export const DEFAULT_CHAT_CONFIG = {
   enabled: true,
   greeting: 'Xin chào! Mình là **trợ lý AI** của cửa hàng. Mình có thể:\n- Tư vấn chọn điện thoại theo ngân sách, nhu cầu\n- So sánh các mẫu máy\n- Tra cứu đơn hàng, khuyến mãi, chính sách\nBạn cần hỗ trợ gì ạ?',
   quickQuestions: [
-    'Tư vấn điện thoại dưới 10 triệu',
+    'Tư vấn điện thoại dưới 20 triệu',
     'So sánh iPhone 16 Pro Max và Galaxy S25 Ultra',
     'Chính sách bảo hành thế nào?',
     'Có mã giảm giá nào không?',
