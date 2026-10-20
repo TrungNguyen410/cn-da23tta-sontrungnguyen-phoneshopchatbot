@@ -3,6 +3,7 @@ import { FiActivity, FiClock, FiCpu, FiEye, FiMessageCircle, FiThumbsDown, FiThu
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { chatApi } from '../../api/chatApi';
+import ChatbotConfigCard from '../../components/admin/ChatbotConfigCard';
 import DataTable from '../../components/admin/DataTable';
 import StatCard from '../../components/admin/StatCard';
 import RichText from '../../components/chat/RichText';
@@ -96,6 +97,8 @@ export default function ChatbotManagement() {
         <StatCard label="Hài lòng" value={`${stats.liked} / ${stats.liked + stats.disliked}`} change={`${stats.disliked} đánh giá chưa tốt`} icon={stats.disliked > stats.liked ? FiThumbsDown : FiThumbsUp} color="green" />
         <StatCard label="Thời gian phản hồi" value={`${(stats.avgLatencyMs / 1000).toFixed(1)}s`} change="Trung bình mỗi câu trả lời" icon={FiClock} color="orange" />
       </section>
+
+      <ChatbotConfigCard />
 
       <section className="dashboard-bottom-grid">
         <div className="admin-card chatbot-tools">

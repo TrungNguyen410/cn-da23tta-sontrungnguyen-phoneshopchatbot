@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FiCpu, FiSend, FiShoppingCart, FiThumbsDown, FiThumbsUp, FiTrash2, FiX } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { chatApi } from '../../api/chatApi';
+import { chatApi, DEFAULT_CHAT_CONFIG } from '../../api/chatApi';
 import { useCart } from '../../hooks/useCart';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { storage } from '../../utils/storage';
@@ -13,19 +13,10 @@ export const CHAT_STORAGE_KEYS = {
   sessionId: 'chat_session_id',
 };
 
-export const QUICK_QUESTIONS = [
-  'Tư vấn điện thoại dưới 10 triệu',
-  'So sánh iPhone 16 Pro Max và Galaxy S25 Ultra',
-  'Chính sách bảo hành thế nào?',
-  'Có mã giảm giá nào không?',
-];
-
-const WELCOME = {
-  id: 'welcome',
-  role: 'assistant',
-  content: 'Xin chào! Mình là **trợ lý AI** của cửa hàng. Mình có thể:\n- Tư vấn chọn điện thoại theo ngân sách, nhu cầu\n- So sánh các mẫu máy\n- Tra cứu đơn hàng, khuyến mãi, chính sách\nBạn cần hỗ trợ gì ạ?',
-  products: [],
-};
+// The welcome bubble's text comes from the admin-configured greeting at render time.
+const WELCOME = { id: 'welcome', role: 'assistant', content: '', products: [] };
+const STREAMING_ID = 'streaming-reply';
+const NO_FALLBACK_STATUSES = [404, 422, 429, 503];
 
 const ensureVisitorId = () => {
   let visitorId = storage.get(CHAT_STORAGE_KEYS.visitorId);
@@ -68,6 +59,7 @@ export default function ChatWidget() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [sessionId, setSessionId] = useState(() => storage.get(CHAT_STORAGE_KEYS.sessionId));
+  const [config, setConfig] = useState(DEFAULT_CHAT_CONFIG);
   const historyRequestedRef = useRef(false);
   const visitorIdRef = useRef(null);
   const listRef = useRef(null);
@@ -86,6 +78,16 @@ export default function ChatWidget() {
     } catch {
       // Ignore unavailable storage.
     }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    chatApi.getConfig()
+      .then((next) => {
+        if (active && next) setConfig({ ...DEFAULT_CHAT_CONFIG, ...next });
+      })
+      .catch(() => {});
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -124,20 +126,44 @@ export default function ChatWidget() {
     setInput('');
     setMessages((current) => [...current, { id: `local-${Date.now()}`, role: 'user', content: message }]);
     setSending(true);
+    const payload = { message, sessionId, visitorId: visitorId() };
+    const updateStreaming = (update) => setMessages((current) => (
+      current.some((item) => item.id === STREAMING_ID)
+        ? current.map((item) => (item.id === STREAMING_ID ? update(item) : item))
+        : [...current, update({ id: STREAMING_ID, role: 'assistant', content: '', products: [] })]
+    ));
+    let streamedText = false;
     try {
-      const result = await chatApi.sendMessage({ message, sessionId, visitorId: visitorId() });
+      let result;
+      try {
+        result = await chatApi.streamMessage(payload, (event) => {
+          if (event.type === 'delta') {
+            streamedText = true;
+            updateStreaming((item) => ({ ...item, content: item.content + event.text }));
+          } else if (event.type === 'reset') {
+            updateStreaming((item) => ({ ...item, content: '' }));
+          }
+        });
+      } catch (streamError) {
+        const status = streamError.response?.status ?? streamError.status;
+        // Retry over the JSON endpoint (it refreshes expired tokens) when streaming failed before showing anything.
+        if (streamedText || NO_FALLBACK_STATUSES.includes(status)) throw streamError;
+        result = await chatApi.sendMessage(payload);
+      }
       if (result.sessionId !== sessionId) rememberSession(result.sessionId);
-      setMessages((current) => [...current, result.message]);
+      setMessages((current) => [...current.filter((item) => item.id !== STREAMING_ID), result.message]);
     } catch (error) {
       const status = error.response?.status ?? error.status;
       if (status === 404 && sessionId) rememberSession(null);
-      setMessages((current) => [...current, {
+      setMessages((current) => [...current.filter((item) => item.id !== STREAMING_ID), {
         id: `error-${Date.now()}`,
         role: 'assistant',
         error: true,
         content: status === 429
           ? 'Bạn gửi hơi nhanh, vui lòng chờ một chút rồi thử lại nhé.'
-          : 'Xin lỗi, trợ lý đang gặp sự cố. Bạn thử lại sau hoặc gọi hotline nhé.',
+          : status === 503
+            ? 'Chatbot đang tạm ngưng. Bạn vui lòng liên hệ hotline để được hỗ trợ nhé.'
+            : 'Xin lỗi, trợ lý đang gặp sự cố. Bạn thử lại sau hoặc gọi hotline nhé.',
       }]);
     } finally {
       setSending(false);
@@ -164,7 +190,10 @@ export default function ChatWidget() {
     setMessages([WELCOME]);
   };
 
-  const showQuickQuestions = messages.length === 1 && !sending;
+  const showQuickQuestions = messages.length === 1 && !sending && config.quickQuestions.length > 0;
+  const streaming = messages.some((message) => message.id === STREAMING_ID);
+
+  if (!config.enabled) return null;
 
   return (
     <div className={`chat-widget ${open ? 'is-open' : ''}`}>
@@ -184,7 +213,9 @@ export default function ChatWidget() {
             {messages.map((message) => (
               <div key={message.id} className={`chat-message ${message.role} ${message.error ? 'error' : ''}`}>
                 <div className="chat-bubble">
-                  {message.role === 'assistant' ? <RichText text={message.content} /> : message.content}
+                  {message.role === 'assistant'
+                    ? <RichText text={message.id === 'welcome' ? config.greeting : message.content} />
+                    : message.content}
                 </div>
                 {message.products?.length > 0 && (
                   <div className="chat-products">
@@ -193,7 +224,7 @@ export default function ChatWidget() {
                     ))}
                   </div>
                 )}
-                {message.role === 'assistant' && message.id !== 'welcome' && !message.error && (
+                {message.role === 'assistant' && !['welcome', STREAMING_ID].includes(message.id) && !message.error && (
                   <div className="chat-feedback">
                     <button type="button" aria-label="Câu trả lời hữu ích" aria-pressed={message.feedback === 'up'} onClick={() => rate(message, 'up')}><FiThumbsUp /></button>
                     <button type="button" aria-label="Câu trả lời chưa tốt" aria-pressed={message.feedback === 'down'} onClick={() => rate(message, 'down')}><FiThumbsDown /></button>
@@ -201,14 +232,14 @@ export default function ChatWidget() {
                 )}
               </div>
             ))}
-            {sending && (
+            {sending && !streaming && (
               <div className="chat-message assistant">
                 <div className="chat-bubble chat-typing" aria-label="Trợ lý đang trả lời"><span /><span /><span /></div>
               </div>
             )}
             {showQuickQuestions && (
               <div className="chat-quick">
-                {QUICK_QUESTIONS.map((question) => (
+                {config.quickQuestions.map((question) => (
                   <button type="button" key={question} onClick={() => send(question)}>{question}</button>
                 ))}
               </div>

@@ -1542,6 +1542,23 @@ h4,
   color: var(--color-ink-subtle);
 }
 
+.chatbot-config {
+  display: grid;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.chatbot-config-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.chatbot-config-actions small {
+  color: var(--color-ink-muted);
+}
+
 .chat-transcript {
   display: flex;
   flex-direction: column;

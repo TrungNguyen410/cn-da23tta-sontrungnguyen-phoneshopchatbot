@@ -89,6 +89,14 @@ npm install
 npm run dev                   # http://localhost:5173
 ```
 
+### Cách 3 – Chỉ chạy frontend bằng Docker (dữ liệu mock)
+
+```bash
+cd frontend
+docker build -t duanwebdidong-frontend .
+docker run -p 8080:80 duanwebdidong-frontend   # http://localhost:8080
+```
+
 ### Cấu hình Chatbot AI
 
 1. Tạo API key miễn phí tại <https://aistudio.google.com/apikey>.
