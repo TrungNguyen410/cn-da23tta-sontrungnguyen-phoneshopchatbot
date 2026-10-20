@@ -5,7 +5,7 @@ import axiosClient from './axiosClient';
 
 const MOCK_KNOWLEDGE_KEY = 'mock_knowledge';
 const MOCK_CONFIG_KEY = 'mock_chat_config';
-const STREAM_TIMEOUT_MS = 60000;
+const STREAM_TIMEOUT_MS = 120000;
 
 export const DEFAULT_CHAT_CONFIG = {
   enabled: true,
@@ -99,7 +99,7 @@ export const chatApi = {
   sendMessage: async ({ message, sessionId, visitorId }) => {
     if (!USE_MOCK) {
       // Gemini answers with tool calls can take longer than the default 10s client timeout.
-      return axiosClient.post('/chat/messages', { message, sessionId, visitorId }, { timeout: 45000 });
+      return axiosClient.post('/chat/messages', { message, sessionId, visitorId }, { timeout: 120000 });
     }
     const reply = await mockReply(message);
     return {

@@ -110,6 +110,16 @@ describe('AI chatbot', () => {
       expect(await ChatMessage.countDocuments({ sessionId })).toBe(2);
     });
 
+    it('answers greetings and capability questions without searching products', async () => {
+      for (const message of ['Xin chào, bạn giúp được gì?', 'Bạn là ai vậy']) {
+        const response = await send({ message, visitorId: VISITOR }).expect(201);
+        expect(response.body.data.message.content).toContain('trợ lý AI');
+        expect(response.body.data.message.toolCalls).toEqual([]);
+      }
+      const shopping = await send({ message: 'Chào shop, có iphone không', visitorId: VISITOR }).expect(201);
+      expect(shopping.body.data.message.toolCalls[0].name).toBe('search_products');
+    });
+
     it('filters by brand alias', async () => {
       const response = await send({ message: 'Có iphone nào không', visitorId: VISITOR }).expect(201);
       expect(response.body.data.message.products.map((item) => item.id)).toEqual(['p-iphone']);
@@ -121,6 +131,19 @@ describe('AI chatbot', () => {
       expect(response.body.data.message.toolCalls[0].name).toBe('search_store_policies');
     });
 
+    it('routes return questions phrased casually to the return policy', async () => {
+      await KnowledgeArticle.create({
+        title: 'Chính sách đổi trả',
+        category: 'return',
+        keywords: ['đổi trả', 'trả hàng', 'trả lại'],
+        content: 'Trong 7 ngày khách có thể trả máy còn nguyên hộp với phí 10%.',
+      });
+
+      const response = await send({ message: 'Mua về không ưng có trả lại được không?', visitorId: VISITOR }).expect(201);
+      expect(response.body.data.message.toolCalls[0].name).toBe('search_store_policies');
+      expect(response.body.data.message.content).toContain('7 ngày');
+    });
+
     it('lists active promotions', async () => {
       await Voucher.create({
         code: 'TECH10', type: 'percent', value: 10, minOrder: 5000000,
@@ -128,6 +151,30 @@ describe('AI chatbot', () => {
       });
       const response = await send({ message: 'Có mã giảm giá nào không', visitorId: VISITOR }).expect(201);
       expect(response.body.data.message.content).toContain('TECH10');
+    });
+
+    it('checks a specific voucher code against the order value', async () => {
+      await Voucher.create({
+        code: 'TECH10', type: 'percent', value: 10, minOrder: 5000000, maxDiscount: 1000000,
+        startDate: new Date(Date.now() - 86400000), endDate: new Date(Date.now() + 86400000 * 10),
+      });
+
+      const ok = await send({ message: 'Mã TECH10 dùng cho đơn 6 triệu được không?', visitorId: VISITOR }).expect(201);
+      expect(ok.body.data.message.toolCalls[0]).toMatchObject({ name: 'list_promotions', args: { code: 'TECH10', subtotal: 6000000 } });
+      expect(ok.body.data.message.content).toContain('dùng được');
+
+      const tooSmall = await send({ message: 'Mã TECH10 cho đơn 2 triệu được không', visitorId: VISITOR }).expect(201);
+      expect(tooSmall.body.data.message.content).toContain('chưa áp dụng được');
+    });
+
+    it('treats "sạc dự phòng" as a power bank, not a charger', async () => {
+      await Category.create({ _id: 'cat-powerbank', name: 'Pin dự phòng', slug: 'pin-du-phong' });
+      await Accessory.create({
+        _id: 'acc-powerbank', name: 'Baseus Power Bank 20000mAh', brandId: 'brand-apple', categoryId: 'cat-powerbank', price: 890000, stock: 5,
+      });
+
+      const response = await send({ message: 'Có sạc dự phòng không?', visitorId: VISITOR }).expect(201);
+      expect(response.body.data.message.products.map((item) => item.id)).toEqual(['acc-powerbank']);
     });
 
     it('finds accessories by Vietnamese category name', async () => {
@@ -204,6 +251,28 @@ describe('AI chatbot', () => {
       expect(toolTurn.parts[0].functionResponse.response.products[0].name).toBe('Galaxy A56');
       expect(secondCall.systemInstruction).toContain('Tuyệt đối không tự bịa giá');
       expect(secondCall.tools.map((tool) => tool.name)).toContain('lookup_order');
+    });
+
+    it('matches product names even when the model prepends the brand and echoes call ids', async () => {
+      geminiProvider.generate
+        .mockResolvedValueOnce({
+          content: {
+            role: 'model',
+            parts: [{
+              functionCall: { id: 'call_1', name: 'compare_products', args: { names: ['Apple iPhone 16 Pro Max', 'Samsung Galaxy S25 Ultra'] } },
+              thoughtSignature: 'sig',
+            }],
+          },
+        })
+        .mockResolvedValueOnce({ content: { role: 'model', parts: [{ text: 'So sánh xong.' }] } });
+
+      const response = await send({ message: 'So sánh 2 máy', visitorId: VISITOR }).expect(201);
+
+      expect(response.body.data.message.products.map((item) => item.id)).toEqual(['p-iphone', 'p-s25']);
+      const { contents } = geminiProvider.generate.mock.calls[1][0];
+      expect(contents.at(-2).parts[0].thoughtSignature).toBe('sig');
+      expect(contents.at(-1).parts[0].functionResponse).toMatchObject({ id: 'call_1', name: 'compare_products' });
+      expect(contents.at(-1).parts[0].functionResponse.response.missing).toEqual([]);
     });
 
     it('sends previous turns as conversation history', async () => {

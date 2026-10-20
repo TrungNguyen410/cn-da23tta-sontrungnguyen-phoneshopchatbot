@@ -167,9 +167,10 @@ const env = {
   },
   gemini: {
     apiKey: String(process.env.GEMINI_API_KEY || '').trim(),
-    model: String(process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim(),
-    maxOutputTokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 1024),
-    timeoutMs: Number(process.env.GEMINI_TIMEOUT_MS || 20000),
+    model: String(process.env.GEMINI_MODEL || 'gemini-3.5-flash').trim(),
+    fallbackModel: String(process.env.GEMINI_FALLBACK_MODEL ?? 'gemini-flash-latest').trim(),
+    maxOutputTokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 2048),
+    timeoutMs: Number(process.env.GEMINI_TIMEOUT_MS || 40000),
   },
   momo: {
     phone: process.env.MOMO_PHONE || '',

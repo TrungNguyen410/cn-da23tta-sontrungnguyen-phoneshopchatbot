@@ -75,6 +75,32 @@ describe('Gemini provider', () => {
     ]);
   });
 
+  it('retries overloaded models and then switches to the fallback model', async () => {
+    Object.assign(env.gemini, { apiKey: 'test-key', model: 'primary-model', fallbackModel: 'backup-model' });
+    const overloaded = { ok: false, status: 503, text: async () => 'high demand' };
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce(overloaded)
+      .mockResolvedValueOnce(overloaded)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ candidates: [{ content: { role: 'model', parts: [{ text: 'ok' }] } }] }),
+      });
+
+    const result = await geminiProvider.generate({ systemInstruction: '', contents: [] });
+
+    expect(global.fetch.mock.calls.map(([url]) => url.match(/models\/([^:]+)/)[1]))
+      .toEqual(['primary-model', 'primary-model', 'backup-model']);
+    expect(result.content.parts[0].text).toBe('ok');
+  });
+
+  it('does not retry client errors such as an invalid key', async () => {
+    Object.assign(env.gemini, { apiKey: 'test-key', model: 'primary-model', fallbackModel: 'backup-model' });
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 400, text: async () => 'API_KEY_INVALID' });
+
+    await expect(geminiProvider.generate({ systemInstruction: '', contents: [] })).rejects.toMatchObject({ statusCode: 502 });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('refuses to run without an API key', async () => {
     env.gemini.apiKey = '';
     await expect(geminiProvider.generate({ systemInstruction: '', contents: [] }))

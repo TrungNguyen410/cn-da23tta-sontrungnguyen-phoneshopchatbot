@@ -57,8 +57,10 @@ const STOPWORDS = new Set(tokenize(
   + 'duoi tren tam khoang tu den trieu tr gia re tot nhat hay va voi la thi nhe a o di de nhu cau dung ngan sach '
   + 'shop cua hang hien con khong ko gi sao the ra ve',
 ));
-const ACCESSORY_WORDS = ['op lung', 'sac', 'tai nghe', 'cap', 'cuong luc', 'du phong', 'phu kien', 'airpods', 'cu sac'];
-const POLICY_WORDS = ['bao hanh', 'doi tra', 'giao hang', 'ship', 'van chuyen', 'thanh toan', 'tra gop', 'dia chi', 'hotline', 'mo cua', 'chinh sach', 'hoan tien'];
+// Most specific phrases first so "sạc dự phòng" is not treated as a plain charger.
+const ACCESSORY_WORDS = ['du phong', 'op lung', 'tai nghe', 'cuong luc', 'cu sac', 'phu kien', 'airpods', 'sac', 'cap'];
+const VOUCHER_CODE_PATTERN = /\b([A-Z][A-Z0-9]{3,19})\b/g;
+const POLICY_WORDS = ['bao hanh', 'doi tra', 'tra lai', 'tra hang', 'doi may', 'khong ung', 'gio mo cua', 'giao hang', 'ship', 'van chuyen', 'thanh toan', 'tra gop', 'dia chi', 'hotline', 'mo cua', 'chinh sach', 'hoan tien'];
 const PROMO_WORDS = ['voucher', 'ma giam', 'khuyen mai', 'giam gia', 'uu dai', 'coupon'];
 const GREETING = /^(xin chao|chao|hello|hi|alo)\b/;
 
@@ -240,7 +242,11 @@ class ChatService {
           if (!products.some((item) => item.id === card.id)) products.push(card);
         }
         responses.push({
-          functionResponse: { name: functionCall.name, response: output.result },
+          functionResponse: {
+            ...(functionCall.id ? { id: functionCall.id } : {}),
+            name: functionCall.name,
+            response: output.result,
+          },
         });
       }
       contents.push({ role: 'user', parts: responses });
@@ -276,6 +282,22 @@ class ChatService {
       ].filter(Boolean).join('\n'));
     }
 
+    const voucherCode = [...text.matchAll(VOUCHER_CODE_PATTERN)]
+      .map((match) => match[1])
+      .find((code) => !ORDER_NUMBER_PATTERN.test(code) && !BRAND_ALIASES[code.toLowerCase()]);
+    if (voucherCode && (/\bma\b/.test(normalized) || PROMO_WORDS.some((word) => normalized.includes(word)))) {
+      const subtotal = parseBudget(normalized).maxPrice;
+      const { result } = await run('list_promotions', { code: voucherCode, ...(subtotal ? { subtotal } : {}) });
+      if (!result.valid) return done(`Mã **${voucherCode}** chưa áp dụng được: ${result.message}`);
+      const { voucher } = result;
+      const value = voucher.type === 'percent' ? `${voucher.value}%` : formatVnd(voucher.value);
+      return done([
+        `Mã **${voucher.code}** dùng được${subtotal ? ` cho đơn ${formatVnd(subtotal)}` : ''}:`,
+        `- Giảm ${voucher.type === 'shipping' ? 'phí giao hàng ' : ''}${value}${voucher.maxDiscount ? `, tối đa ${formatVnd(voucher.maxDiscount)}` : ''}`,
+        `- Đơn tối thiểu ${formatVnd(voucher.minOrder)}`,
+      ].join('\n'));
+    }
+
     if (PROMO_WORDS.some((word) => normalized.includes(word))) {
       const { result } = await run('list_promotions', {});
       if (!result.vouchers?.length) return done('Hiện cửa hàng chưa có mã giảm giá nào đang áp dụng.');
@@ -292,7 +314,12 @@ class ChatService {
       return done(`Mình chưa có thông tin này. Bạn vui lòng gọi hotline ${result.store?.hotline || 'của cửa hàng'} để được hỗ trợ nhé.`);
     }
 
-    if (GREETING.test(normalized) && normalized.split(/\s+/).length <= 4) {
+    const asksAboutBot = /giup (duoc )?gi|lam (duoc )?gi|ban la ai/.test(normalized);
+    const greetingOnly = GREETING.test(normalized)
+      && normalized.split(/\s+/).length <= 8
+      && !BUDGET_PATTERN.test(normalized)
+      && !Object.keys(BRAND_ALIASES).some((alias) => normalized.includes(alias));
+    if (greetingOnly || asksAboutBot) {
       return done('Xin chào! Mình là trợ lý AI của cửa hàng. Mình có thể tư vấn chọn điện thoại theo ngân sách, so sánh máy, tra cứu đơn hàng và giải đáp chính sách. Bạn cần gì ạ?');
     }
 

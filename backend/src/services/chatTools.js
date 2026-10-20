@@ -185,12 +185,19 @@ const priceFilter = ({ minPrice, maxPrice }) => {
   return Object.keys(range).length ? { price: range } : {};
 };
 
+// Matches every word of the requested name; if nothing matches, retries without
+// brand words the model often prepends ("Samsung Galaxy S25 Ultra" → "Galaxy S25 Ultra").
 const findProductsByName = async (name, limit = 1) => {
-  const exact = await productRepository.findAll(
-    { status: 'active', ...keywordFilter(name, ['name']) },
+  const search = (query) => productRepository.findAll(
+    { status: 'active', ...keywordFilter(query, ['name']) },
     { sort: { sold: -1 }, limit },
   );
-  return exact;
+  const exact = await search(name);
+  if (exact.length) return exact;
+
+  const brandWords = new Set((await brandRepository.findAll({})).map((brand) => plain(brand.name)));
+  const withoutBrand = String(name || '').split(/\s+/).filter((word) => !brandWords.has(plain(word))).join(' ');
+  return withoutBrand && withoutBrand !== String(name).trim() ? search(withoutBrand) : [];
 };
 
 const handlers = {
