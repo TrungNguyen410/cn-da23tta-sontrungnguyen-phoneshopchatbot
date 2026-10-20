@@ -13,6 +13,7 @@
     "migrate:taxonomy": "node src/scripts/migrateCatalogTaxonomy.js",
     "migrate:phone-auth": "node src/scripts/migratePhoneAuth.js",
     "migrate:soft-delete-indexes": "node src/scripts/migrateSoftDeleteIndexes.js",
+    "eval:chatbot": "node scripts/evaluateChatbot.mjs",
     "test": "jest --runInBand",
     "test:coverage": "jest --coverage --runInBand"
   },
