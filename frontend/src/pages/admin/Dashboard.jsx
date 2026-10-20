@@ -15,6 +15,7 @@ import { adminApi } from '../../api/adminApi';
 import DataTable from '../../components/admin/DataTable';
 import StatCard from '../../components/admin/StatCard';
 import Loading from '../../components/common/Loading';
+import { useAuth } from '../../hooks/useAuth';
 import { formatCurrency, formatDate } from '../../utils/formatCurrency';
 import { getOrderStatus } from '../../utils/orderStatus';
 
@@ -33,7 +34,15 @@ const readChartColors = () => {
   };
 };
 
+const greetingFor = (hour) => {
+  if (hour < 11) return 'Chào buổi sáng';
+  if (hour < 14) return 'Chào buổi trưa';
+  if (hour < 18) return 'Chào buổi chiều';
+  return 'Chào buổi tối';
+};
+
 export default function Dashboard() {
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   useEffect(() => { adminApi.getDashboard().then(setData); }, []);
   if (!data) return <Loading />;
@@ -67,7 +76,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className="dashboard-welcome"><div><span>Cập nhật hôm nay</span><h2>Chào buổi sáng, Admin</h2><p>Đây là tình hình hoạt động mới nhất của cửa hàng.</p></div><Link className="btn btn-primary" to="/admin/products">Quản lý sản phẩm</Link></div>
+      <div className="dashboard-welcome"><div><span>Cập nhật hôm nay</span><h2>{greetingFor(new Date().getHours())}, {user?.fullName || 'Admin'}</h2><p>Đây là tình hình hoạt động mới nhất của cửa hàng.</p></div><Link className="btn btn-primary" to="/admin/products">Quản lý sản phẩm</Link></div>
       <section className="stat-grid">
         <StatCard label="Tổng sản phẩm" value={data.stats.products} change="Đang được quản lý" icon={FiSmartphone} color="blue" />
         <StatCard label="Tổng đơn hàng" value={data.stats.orders} change="Đơn hàng trong hệ thống" icon={FiPackage} color="violet" />

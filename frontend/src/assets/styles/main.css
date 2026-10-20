@@ -2802,6 +2802,13 @@ p {
   margin-top: 18px;
 }
 
+/* The public lookup page pulls the form over its hero with a negative margin;
+   inside the account page it must sit below its heading instead. */
+.account-order-lookup .lookup-form {
+  max-width: none;
+  margin: 0;
+}
+
 .mock-accounts {
   display: flex;
   flex-direction: column;

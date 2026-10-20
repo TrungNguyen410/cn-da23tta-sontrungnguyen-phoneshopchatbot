@@ -1542,6 +1542,12 @@ h4,
   color: var(--color-ink-subtle);
 }
 
+.chatbot-config,
+.chatbot-tools,
+.chatbot-questions {
+  padding: var(--space-lg);
+}
+
 .chatbot-config {
   display: grid;
   gap: var(--space-sm);

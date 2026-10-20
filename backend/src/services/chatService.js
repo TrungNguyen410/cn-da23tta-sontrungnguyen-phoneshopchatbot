@@ -16,7 +16,7 @@ const PHONE_PATTERN = /(?:\+?84|0)\d{9}/;
 const DEFAULT_CONFIG = {
   greeting: 'Xin chào! Mình là **trợ lý AI** của cửa hàng. Mình có thể:\n- Tư vấn chọn điện thoại theo ngân sách, nhu cầu\n- So sánh các mẫu máy\n- Tra cứu đơn hàng, khuyến mãi, chính sách\nBạn cần hỗ trợ gì ạ?',
   quickQuestions: [
-    'Tư vấn điện thoại dưới 10 triệu',
+    'Tư vấn điện thoại dưới 20 triệu',
     'So sánh iPhone 16 Pro Max và Galaxy S25 Ultra',
     'Chính sách bảo hành thế nào?',
     'Có mã giảm giá nào không?',
@@ -33,7 +33,7 @@ const buildSystemInstruction = (store = {}, user = null) => [
   'Nguyên tắc bắt buộc:',
   '1. Luôn trả lời bằng tiếng Việt, thân thiện, ngắn gọn (tối đa khoảng 150 từ), dùng gạch đầu dòng khi liệt kê.',
   '2. Mọi thông tin về sản phẩm, giá, tồn kho, khuyến mãi, đơn hàng, chính sách PHẢI lấy từ công cụ (function). Tuyệt đối không tự bịa giá, cấu hình hay chính sách.',
-  '3. Khi tư vấn chọn máy: hỏi thêm ngân sách/nhu cầu nếu khách chưa nói; gợi ý 2-3 máy phù hợp nhất kèm lý do ngắn và giá.',
+  '3. Khi tư vấn chọn máy: hỏi thêm ngân sách/nhu cầu nếu khách chưa nói; gợi ý 2-3 máy phù hợp nhất kèm lý do ngắn và giá. Nếu công cụ báo outOfBudget thì nói rõ cửa hàng chưa có máy trong tầm giá đó và giới thiệu các máy giá gần nhất.',
   '4. Khi so sánh: nêu khác biệt chính (chip, RAM, camera, pin, giá) và kết luận nên chọn máy nào cho nhu cầu nào.',
   '5. Tra cứu đơn hàng cần mã đơn (bắt đầu bằng TP, ví dụ TP2610200001) và số điện thoại người nhận; nếu thiếu thì hỏi khách.',
   '6. Nếu công cụ không có dữ liệu, nói rõ là cửa hàng chưa có thông tin và mời khách gọi hotline.',
@@ -378,8 +378,11 @@ class ChatService {
     if (!items.length) {
       return done('Hiện mình chưa tìm thấy điện thoại phù hợp. Bạn cho mình biết thêm ngân sách (ví dụ "dưới 10 triệu") hoặc hãng bạn thích nhé.');
     }
+    const budgetText = budget.maxPrice ? `dưới ${formatVnd(budget.maxPrice)}` : `từ ${formatVnd(budget.minPrice)}`;
     return done([
-      'Mình gợi ý một số mẫu phù hợp:',
+      output.result.outOfBudget
+        ? `Hiện cửa hàng chưa có điện thoại ${budgetText}. Các mẫu có giá gần nhất:`
+        : 'Mình gợi ý một số mẫu phù hợp:',
       ...items.slice(0, 3).map((item) => `- **${item.name}**: ${formatVnd(item.price)} — ${[item.chip, item.ram && `RAM ${item.ram}`, item.storage, item.battery && `pin ${item.battery}`].filter(Boolean).join(', ')}${item.inStock ? ` — còn hàng (${item.stock} máy)` : ' (tạm hết hàng)'}`),
       'Bạn muốn mình so sánh chi tiết hay tư vấn thêm theo nhu cầu (chơi game, chụp ảnh, pin trâu) không?',
     ].join('\n'), output.cards.slice(0, 3));
