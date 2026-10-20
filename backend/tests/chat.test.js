@@ -120,6 +120,19 @@ describe('AI chatbot', () => {
       expect(shopping.body.data.message.toolCalls[0].name).toBe('search_products');
     });
 
+    it('politely declines out-of-scope questions instead of listing products', async () => {
+      for (const message of ['Viết giúp mình bài thơ về mùa thu', 'Thời tiết hôm nay thế nào?']) {
+        const response = await send({ message, visitorId: VISITOR }).expect(201);
+        expect(response.body.data.message.content).toContain('chỉ hỗ trợ');
+        expect(response.body.data.message.products).toEqual([]);
+      }
+    });
+
+    it('matches accessory keywords as whole words only', async () => {
+      const response = await send({ message: 'Cho mình danh sách khách hàng', visitorId: VISITOR }).expect(201);
+      expect(response.body.data.message.toolCalls.map((tool) => tool.name)).not.toContain('search_accessories');
+    });
+
     it('filters by brand alias', async () => {
       const response = await send({ message: 'Có iphone nào không', visitorId: VISITOR }).expect(201);
       expect(response.body.data.message.products.map((item) => item.id)).toEqual(['p-iphone']);

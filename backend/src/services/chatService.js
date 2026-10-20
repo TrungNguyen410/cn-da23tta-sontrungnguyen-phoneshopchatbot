@@ -60,6 +60,16 @@ const STOPWORDS = new Set(tokenize(
 // Most specific phrases first so "sạc dự phòng" is not treated as a plain charger.
 const ACCESSORY_WORDS = ['du phong', 'op lung', 'tai nghe', 'cuong luc', 'cu sac', 'phu kien', 'airpods', 'sac', 'cap'];
 const VOUCHER_CODE_PATTERN = /\b([A-Z][A-Z0-9]{3,19})\b/g;
+// Words that indicate a shopping question; without any of them the offline mode declines politely.
+const SHOPPING_WORDS = [
+  // Accent-stripped, so ambiguous words ("mua" = mua/mùa, "hang" = hàng/hãng/hằng) are avoided.
+  'dien thoai', 'dt', 'may', 'smartphone', 'muon mua', 'can mua', 'tu van', 'gia', 'camera', 'chup anh',
+  'pin', 'game', 'ram', 'chip', 'man hinh', '5g', 'flagship', 're', 'tot', 'san pham', 'con hang',
+  'goi y', 'nen chon',
+];
+
+// Whole-word match on normalized text, so "danh sach" does not match "sac" and "cap nhat" not "cap".
+const hasPhrase = (normalizedText, phrase) => new RegExp(`(^|[^a-z0-9])${phrase}($|[^a-z0-9])`).test(normalizedText);
 const POLICY_WORDS = ['bao hanh', 'doi tra', 'tra lai', 'tra hang', 'doi may', 'khong ung', 'gio mo cua', 'giao hang', 'ship', 'van chuyen', 'thanh toan', 'tra gop', 'dia chi', 'hotline', 'mo cua', 'chinh sach', 'hoan tien'];
 const PROMO_WORDS = ['voucher', 'ma giam', 'khuyen mai', 'giam gia', 'uu dai', 'coupon'];
 const GREETING = /^(xin chao|chao|hello|hi|alo)\b/;
@@ -285,7 +295,7 @@ class ChatService {
     const voucherCode = [...text.matchAll(VOUCHER_CODE_PATTERN)]
       .map((match) => match[1])
       .find((code) => !ORDER_NUMBER_PATTERN.test(code) && !BRAND_ALIASES[code.toLowerCase()]);
-    if (voucherCode && (/\bma\b/.test(normalized) || PROMO_WORDS.some((word) => normalized.includes(word)))) {
+    if (voucherCode && (/\bma\b/.test(normalized) || PROMO_WORDS.some((word) => hasPhrase(normalized, word)))) {
       const subtotal = parseBudget(normalized).maxPrice;
       const { result } = await run('list_promotions', { code: voucherCode, ...(subtotal ? { subtotal } : {}) });
       if (!result.valid) return done(`Mã **${voucherCode}** chưa áp dụng được: ${result.message}`);
@@ -298,7 +308,7 @@ class ChatService {
       ].join('\n'));
     }
 
-    if (PROMO_WORDS.some((word) => normalized.includes(word))) {
+    if (PROMO_WORDS.some((word) => hasPhrase(normalized, word))) {
       const { result } = await run('list_promotions', {});
       if (!result.vouchers?.length) return done('Hiện cửa hàng chưa có mã giảm giá nào đang áp dụng.');
       return done(['Các mã giảm giá đang áp dụng:', ...result.vouchers.map((voucher) => {
@@ -307,7 +317,7 @@ class ChatService {
       })].join('\n'));
     }
 
-    if (POLICY_WORDS.some((word) => normalized.includes(word))) {
+    if (POLICY_WORDS.some((word) => hasPhrase(normalized, word))) {
       const { result } = await run('search_store_policies', { query: text });
       const [article] = result.articles || [];
       if (article) return done(`**${article.title}**\n${article.content}`);
@@ -339,15 +349,24 @@ class ChatService {
     }
 
     const brand = Object.entries(BRAND_ALIASES).find(([alias]) => normalized.includes(alias))?.[1];
-    if (ACCESSORY_WORDS.some((word) => normalized.includes(word))) {
+    if (ACCESSORY_WORDS.some((word) => hasPhrase(normalized, word))) {
       const output = await run('search_accessories', {
-        keyword: ACCESSORY_WORDS.find((word) => normalized.includes(word)),
+        keyword: ACCESSORY_WORDS.find((word) => hasPhrase(normalized, word)),
         ...parseBudget(normalized),
       });
       const items = output.result.accessories || [];
       if (items.length) {
         return done(['Một số phụ kiện phù hợp:', ...items.map((item) => `- **${item.name}**: ${formatVnd(item.price)}${item.inStock ? '' : ' (tạm hết hàng)'}`)].join('\n'), output.cards);
       }
+    }
+
+    const budget = parseBudget(normalized);
+    const looksLikeShopping = brand
+      || budget.minPrice || budget.maxPrice
+      || SHOPPING_WORDS.some((word) => hasPhrase(normalized, word))
+      || /\d/.test(extractKeyword(normalized));
+    if (!looksLikeShopping) {
+      return done('Xin lỗi, mình chỉ hỗ trợ các câu hỏi về mua sắm tại cửa hàng: tư vấn chọn điện thoại, phụ kiện, so sánh máy, đơn hàng, khuyến mãi và chính sách. Bạn cần mình tư vấn gì không ạ?');
     }
 
     const output = await run('search_products', {
