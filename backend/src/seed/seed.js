@@ -4,7 +4,10 @@ const Accessory = require('../models/Accessory');
 const Banner = require('../models/Banner');
 const Brand = require('../models/Brand');
 const Category = require('../models/Category');
+const ChatMessage = require('../models/ChatMessage');
+const ChatSession = require('../models/ChatSession');
 const Contact = require('../models/Contact');
+const KnowledgeArticle = require('../models/KnowledgeArticle');
 const Order = require('../models/Order');
 const OrderCounter = require('../models/OrderCounter');
 const OrderItem = require('../models/OrderItem');
@@ -108,7 +111,10 @@ const run = async () => {
     Banner.deleteMany({}),
     Brand.deleteMany({}),
     Category.deleteMany({}),
+    ChatMessage.deleteMany({}),
+    ChatSession.deleteMany({}),
     Contact.deleteMany({}),
+    KnowledgeArticle.deleteMany({}),
     Order.deleteMany({}),
     OrderCounter.deleteMany({}),
     OrderItem.deleteMany({}),
@@ -450,6 +456,58 @@ const run = async () => {
     { _id: 'setting-4', key: 'address', value: '123 Nguyen Hue, District 1, Ho Chi Minh City', group: 'general', label: 'Store address' },
     { _id: 'setting-5', key: 'freeShippingThreshold', value: 10000000, group: 'checkout', label: 'Free shipping threshold' },
     { _id: 'setting-6', key: 'maintenanceMode', value: false, group: 'system', label: 'Maintenance mode' },
+  ]);
+
+  await KnowledgeArticle.insertMany([
+    {
+      _id: 'kb-warranty',
+      title: 'Chính sách bảo hành',
+      category: 'warranty',
+      keywords: ['bảo hành', 'bao hanh', 'lỗi', 'hỏng', 'sửa chữa', 'warranty'],
+      content: 'Điện thoại chính hãng được bảo hành 12 tháng tại trung tâm bảo hành hãng, phụ kiện bảo hành 6-12 tháng. '
+        + 'Trong 30 ngày đầu, máy lỗi phần cứng do nhà sản xuất được đổi máy mới cùng model. '
+        + 'Không bảo hành khi máy rơi vỡ, vào nước, can thiệp phần mềm trái phép. Mang máy và hóa đơn (hoặc mã đơn) đến cửa hàng để được hỗ trợ.',
+    },
+    {
+      _id: 'kb-return',
+      title: 'Chính sách đổi trả',
+      category: 'return',
+      keywords: ['đổi trả', 'doi tra', 'hoàn tiền', 'hoan tien', 'trả hàng', 'đổi máy'],
+      content: 'Đổi mới trong 30 ngày nếu lỗi do nhà sản xuất. Trong 7 ngày, khách có thể trả máy còn nguyên hộp, đủ phụ kiện '
+        + 'với phí 10% giá trị hóa đơn. Tiền hoàn qua tài khoản ngân hàng trong 3-5 ngày làm việc.',
+    },
+    {
+      _id: 'kb-shipping',
+      title: 'Giao hàng và phí vận chuyển',
+      category: 'shipping',
+      keywords: ['giao hàng', 'giao hang', 'ship', 'vận chuyển', 'van chuyen', 'phí ship', 'bao lâu'],
+      content: 'Miễn phí giao hàng cho đơn từ 10.000.000đ. TP. Hồ Chí Minh: 20.000đ, nhận trong 1 ngày. '
+        + 'Hà Nội, Đà Nẵng: 30.000đ, 2 ngày. Tỉnh thành khác: 40.000đ, 3-4 ngày. Khách được kiểm tra hàng trước khi nhận.',
+    },
+    {
+      _id: 'kb-payment',
+      title: 'Phương thức thanh toán',
+      category: 'payment',
+      keywords: ['thanh toán', 'thanh toan', 'chuyển khoản', 'chuyen khoan', 'cod', 'vnpay', 'momo', 'qr'],
+      content: 'Hỗ trợ thanh toán khi nhận hàng (COD), chuyển khoản ngân hàng qua mã VietQR (hệ thống tự động xác nhận khi nhận được tiền, '
+        + 'ghi đúng nội dung là mã đơn hàng), ví MoMo và thẻ/QR qua cổng VNPay.',
+    },
+    {
+      _id: 'kb-installment',
+      title: 'Mua trả góp',
+      category: 'installment',
+      keywords: ['trả góp', 'tra gop', 'góp', '0%', 'lãi suất'],
+      content: 'Hỗ trợ trả góp 0% qua thẻ tín dụng của các ngân hàng liên kết cho đơn từ 3.000.000đ, kỳ hạn 6-12 tháng. '
+        + 'Trả góp qua công ty tài chính cần CCCD, duyệt hồ sơ khoảng 15 phút tại cửa hàng.',
+    },
+    {
+      _id: 'kb-store',
+      title: 'Thông tin cửa hàng',
+      category: 'store',
+      keywords: ['địa chỉ', 'dia chi', 'hotline', 'giờ mở cửa', 'mo cua', 'liên hệ', 'cửa hàng'],
+      content: 'Cửa hàng mở cửa 8:00-21:30 tất cả các ngày trong tuần. Hotline 1900 6868, email support@techphone.vn, '
+        + 'địa chỉ 123 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh.',
+    },
   ]);
 
   console.log('TechPhone seed data inserted successfully.');

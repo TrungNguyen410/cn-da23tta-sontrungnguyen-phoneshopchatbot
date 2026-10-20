@@ -1,6 +1,8 @@
 const express = require('express');
 const { query } = require('express-validator');
 const adminController = require('../controllers/adminController');
+const chatController = require('../controllers/chatController');
+const chatValidators = require('../validators/chatValidators');
 const createCrudController = require('../controllers/crudController');
 const orderController = require('../controllers/orderController');
 const paymentController = require('../controllers/paymentController');
@@ -91,6 +93,15 @@ router.get('/banners', bannerController.list);
 router.post('/banners', bannerValidators.create, validate, bannerController.create);
 router.put('/banners/:id', idParam, bannerValidators.update, validate, bannerController.update);
 router.delete('/banners/:id', idParam, validate, bannerController.remove);
+
+router.get('/chat/stats', chatController.statsAdmin);
+router.get('/chat/sessions', chatValidators.adminList, validate, chatController.listSessionsAdmin);
+router.get('/chat/sessions/:id', idParam, validate, chatController.getSessionAdmin);
+
+router.get('/knowledge', chatController.listKnowledge);
+router.post('/knowledge', chatValidators.createKnowledge, validate, chatController.createKnowledge);
+router.put('/knowledge/:id', idParam, chatValidators.updateKnowledge, validate, chatController.updateKnowledge);
+router.delete('/knowledge/:id', idParam, validate, chatController.removeKnowledge);
 
 router.get('/settings', settingController.list);
 router.post('/settings', settingValidators.create, validate, settingController.create);

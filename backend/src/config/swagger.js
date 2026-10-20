@@ -361,6 +361,50 @@ const swaggerDocument = {
     '/seo/sitemap.xml': {
       get: { tags: ['SEO'], summary: 'Generate a sitemap for active product detail routes' },
     },
+    '/chat/messages': {
+      post: {
+        tags: ['Chatbot'],
+        summary: 'Send a message to the AI sales assistant (Gemini function calling, offline fallback)',
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['message'],
+                properties: {
+                  message: { type: 'string', maxLength: 1000 },
+                  sessionId: { type: 'string' },
+                  visitorId: { type: 'string', description: 'Required for guests' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/chat/sessions/{id}': {
+      get: { tags: ['Chatbot'], summary: 'Get a chat session and its messages (owner or matching visitorId)' },
+    },
+    '/chat/messages/{id}/feedback': {
+      post: { tags: ['Chatbot'], summary: 'Rate an assistant reply (up/down)' },
+    },
+    '/admin/chat/stats': {
+      get: { tags: ['Chatbot'], security: [{ bearerAuth: [] }], summary: 'Chatbot usage statistics' },
+    },
+    '/admin/chat/sessions': {
+      get: { tags: ['Chatbot'], security: [{ bearerAuth: [] }], summary: 'List chat sessions' },
+    },
+    '/admin/chat/sessions/{id}': {
+      get: { tags: ['Chatbot'], security: [{ bearerAuth: [] }], summary: 'Get a chat session transcript' },
+    },
+    '/admin/knowledge': {
+      get: { tags: ['Chatbot'], security: [{ bearerAuth: [] }], summary: 'List chatbot knowledge articles' },
+      post: { tags: ['Chatbot'], security: [{ bearerAuth: [] }], summary: 'Create a knowledge article' },
+    },
+    '/admin/knowledge/{id}': {
+      put: { tags: ['Chatbot'], security: [{ bearerAuth: [] }], summary: 'Update a knowledge article' },
+      delete: { tags: ['Chatbot'], security: [{ bearerAuth: [] }], summary: 'Delete a knowledge article' },
+    },
     '/uploads/products': { post: { tags: ['Uploads'], security: [{ bearerAuth: [] }], summary: 'Upload product image' } },
     '/uploads/banners': { post: { tags: ['Uploads'], security: [{ bearerAuth: [] }], summary: 'Upload banner image' } },
     '/uploads/avatar': { post: { tags: ['Uploads'], security: [{ bearerAuth: [] }], summary: 'Upload user avatar' } },

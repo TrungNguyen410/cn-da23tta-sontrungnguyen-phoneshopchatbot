@@ -14,6 +14,7 @@ const uploadRoutes = require('./uploadRoutes');
 const adminRoutes = require('./adminRoutes');
 const paymentRoutes = require('./paymentRoutes');
 const seoRoutes = require('./seoRoutes');
+const chatRoutes = require('./chatRoutes');
 
 const router = express.Router();
 
@@ -32,5 +33,6 @@ router.use('/uploads', uploadRoutes);
 router.use('/admin', adminRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/seo', seoRoutes);
+router.use('/chat', chatRoutes);
 
 module.exports = router;
