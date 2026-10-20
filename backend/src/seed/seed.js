@@ -472,7 +472,7 @@ const run = async () => {
       _id: 'kb-return',
       title: 'Chính sách đổi trả',
       category: 'return',
-      keywords: ['đổi trả', 'doi tra', 'hoàn tiền', 'hoan tien', 'trả hàng', 'đổi máy'],
+      keywords: ['đổi trả', 'doi tra', 'trả lại', 'tra lai', 'không ưng', 'hoàn tiền', 'hoan tien', 'trả hàng', 'đổi máy'],
       content: 'Đổi mới trong 30 ngày nếu lỗi do nhà sản xuất. Trong 7 ngày, khách có thể trả máy còn nguyên hộp, đủ phụ kiện '
         + 'với phí 10% giá trị hóa đơn. Tiền hoàn qua tài khoản ngân hàng trong 3-5 ngày làm việc.',
     },

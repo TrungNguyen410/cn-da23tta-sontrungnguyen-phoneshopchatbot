@@ -2,11 +2,26 @@ const env = require('../../config/env');
 const AppError = require('../../utils/AppError');
 
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-// Overload / rate-limit statuses are retried (once on the primary model, then on the fallback model).
-const RETRYABLE_STATUSES = new Set([429, 500, 503]);
+// Overloaded models (500/503) are retried once, then the fallback model is tried.
+const OVERLOADED_STATUSES = new Set([500, 503]);
 const RETRY_DELAY_MS = 1200;
+// A 429 means the quota (free tier: requests per day per model) is used up, so retrying is
+// pointless: the model is skipped for a while and the chatbot answers offline immediately.
+const QUOTA_COOLDOWN_MS = 10 * 60 * 1000;
+const cooldownUntil = new Map();
 
 const isConfigured = () => Boolean(env.gemini.apiKey);
+
+const isCoolingDown = (model) => (cooldownUntil.get(model) || 0) > Date.now();
+
+const status = () => ({
+  configured: isConfigured(),
+  model: env.gemini.model,
+  fallbackModel: env.gemini.fallbackModel,
+  quotaExhausted: [env.gemini.model, env.gemini.fallbackModel].filter((model) => model && isCoolingDown(model)),
+});
+
+const resetCooldowns = () => cooldownUntil.clear();
 
 const buildBody = ({ systemInstruction, contents, tools = [] }) => ({
   systemInstruction: { parts: [{ text: systemInstruction }] },
@@ -31,12 +46,14 @@ const post = async (method, payload) => {
   if (!isConfigured()) throw new AppError('Chatbot AI chưa được cấu hình GEMINI_API_KEY', 503);
 
   const attempts = modelAttempts();
-  let lastError;
+  let lastError = new AppError('Gemini API đã hết hạn mức, tạm dùng chế độ offline', 429);
   for (let index = 0; index < attempts.length; index += 1) {
+    const model = attempts[index];
+    if (isCoolingDown(model)) continue;
     if (index > 0) await wait(env.nodeEnv === 'test' ? 0 : RETRY_DELAY_MS);
     let response;
     try {
-      response = await fetch(`${API_BASE}/models/${encodeURIComponent(attempts[index])}:${method}`, {
+      response = await fetch(`${API_BASE}/models/${encodeURIComponent(model)}:${method}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -52,7 +69,11 @@ const post = async (method, payload) => {
 
     const detail = await response.text().catch(() => '');
     lastError = new AppError(`Gemini API trả lỗi ${response.status}: ${detail.slice(0, 300)}`, 502);
-    if (!RETRYABLE_STATUSES.has(response.status)) throw lastError;
+    if (response.status === 429) {
+      cooldownUntil.set(model, Date.now() + QUOTA_COOLDOWN_MS);
+    } else if (!OVERLOADED_STATUSES.has(response.status)) {
+      throw lastError;
+    }
   }
   throw lastError;
 };
@@ -118,4 +139,10 @@ const stream = async (payload, onText = () => {}) => {
   };
 };
 
-module.exports = { generate, isConfigured, stream };
+module.exports = {
+  generate,
+  isConfigured,
+  resetCooldowns,
+  status,
+  stream,
+};

@@ -76,16 +76,26 @@ export default function ChatbotManagement() {
     },
   ];
 
+  const quotaExhausted = stats.aiEnabled && stats.aiQuotaExhausted?.length > 0;
+
   return (
     <>
-      <div className={`chatbot-status ${stats.aiEnabled ? 'is-on' : 'is-off'}`}>
+      <div className={`chatbot-status ${stats.aiEnabled && !quotaExhausted ? 'is-on' : 'is-off'}`}>
         <FiCpu />
         <div>
-          <strong>{stats.aiEnabled ? 'Gemini API đang hoạt động' : 'Chatbot đang chạy chế độ offline'}</strong>
+          <strong>
+            {!stats.aiEnabled
+              ? 'Chatbot đang chạy chế độ offline'
+              : quotaExhausted
+                ? 'Gemini API tạm hết hạn mức'
+                : `Gemini API đang hoạt động${stats.aiModel ? ` (${stats.aiModel})` : ''}`}
+          </strong>
           <span>
-            {stats.aiEnabled
-              ? 'Câu trả lời được sinh bởi Gemini, dữ liệu lấy trực tiếp từ cửa hàng qua function calling.'
-              : 'Chưa cấu hình GEMINI_API_KEY trên backend. Chatbot trả lời theo luật dựa trên dữ liệu cửa hàng.'}
+            {!stats.aiEnabled
+              ? 'Chưa cấu hình GEMINI_API_KEY trên backend. Chatbot trả lời theo luật dựa trên dữ liệu cửa hàng.'
+              : quotaExhausted
+                ? `Model ${stats.aiQuotaExhausted.join(', ')} đã hết lượt gọi (gói miễn phí giới hạn theo ngày). Chatbot tạm trả lời ở chế độ offline và sẽ tự dùng lại Gemini khi có hạn mức.`
+                : 'Câu trả lời được sinh bởi Gemini, dữ liệu lấy trực tiếp từ cửa hàng qua function calling.'}
           </span>
         </div>
         <Link className="btn btn-light" to="/admin/knowledge">Kho kiến thức</Link>
