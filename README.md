@@ -1,201 +1,136 @@
-# TechPhone Frontend
+# Xây dựng hệ thống bán điện thoại và chatbot AI hỗ trợ tư vấn khách hàng
 
-Frontend React cho website bán điện thoại và phụ kiện TechPhone. Dự án chạy độc lập bằng mock data, đồng thời đã sẵn sàng kết nối backend Node.js/Express qua REST API.
+Đồ án chuyên ngành – Khoa Công nghệ Thông tin, Trường Kỹ thuật và Công nghệ (2026).
+
+| | |
+|---|---|
+| **Sinh viên** | Sơn Trung Nguyên – MSSV 110123031 – Lớp DA23TTA |
+| **Email / Điện thoại** | trungnguyen550811@gmail.com / 0918550811 |
+| **Giảng viên hướng dẫn** | ThS. Phạm Minh Đương |
+| **Thời gian thực hiện** | 19/10/2026 – 31/12/2026 |
+
+## Giới thiệu
+
+Website bán điện thoại và phụ kiện, tích hợp **Chatbot AI** (Google Gemini) tư vấn khách hàng bằng ngôn ngữ tự nhiên: gợi ý máy theo ngân sách và nhu cầu, so sánh sản phẩm, tra cứu đơn hàng, giải đáp khuyến mãi và chính sách cửa hàng. Chatbot luôn lấy dữ liệu thật từ cơ sở dữ liệu qua cơ chế **function calling**, không tự bịa giá hay tồn kho.
+
+> **Nguồn gốc mã nguồn:** phần hệ thống bán hàng (sản phẩm, giỏ hàng, đặt hàng, voucher, đánh giá, quản trị, thống kê) được **kế thừa từ dự án cá nhân [TechPhone-Store](https://github.com/TrungNguyen410/TechPhone-Store)** của sinh viên và được hoàn thiện trong đồ án này. Phần đóng góp mới của đề tài là **Chatbot AI** và **thanh toán chuyển khoản tự động**.
+
+## Chức năng
+
+### Kế thừa & hoàn thiện (hệ thống bán hàng)
+- Khách hàng: trang chủ, tìm kiếm/lọc/sắp xếp sản phẩm, chi tiết, so sánh, giỏ hàng, voucher, đặt hàng, tra cứu đơn, đánh giá, tài khoản (đăng ký/đăng nhập JWT, OTP).
+- Thanh toán: COD, chuyển khoản VietQR, MoMo, VNPay (sandbox).
+- Quản trị: dashboard doanh thu, sản phẩm, phụ kiện, đơn hàng, khách hàng, đánh giá, banner, voucher, danh mục, thương hiệu, cài đặt.
+
+### Mới trong đồ án
+- **Chatbot AI tư vấn** (khung chat nổi trên mọi trang):
+  - Gemini API + function calling với 7 công cụ: tìm điện thoại, chi tiết sản phẩm, so sánh máy, tìm phụ kiện, tra cứu đơn hàng, khuyến mãi, chính sách cửa hàng.
+  - Thẻ sản phẩm trong khung chat, thêm vào giỏ ngay; lưu lịch sử hội thoại; đánh giá 👍/👎 từng câu trả lời.
+  - **Kho kiến thức** (bảo hành, đổi trả, giao hàng, trả góp…) do admin tự cập nhật – cách “dạy” chatbot mà không cần huấn luyện lại mô hình.
+  - Chế độ **offline** (trả lời theo luật trên dữ liệu thật) khi chưa có API key hoặc Gemini lỗi.
+  - Bảo vệ: giới hạn 20 tin/phút/IP, tối đa 1000 ký tự, system prompt chống prompt injection, chỉ tra đơn khi khớp mã đơn + số điện thoại.
+  - Trang quản trị: thống kê (số phiên, tỉ lệ hài lòng, thời gian phản hồi, công cụ hay dùng), xem lại hội thoại.
+- **Thanh toán chuyển khoản tự động** qua webhook **SePay**: đơn hiển thị mã VietQR theo mã đơn; khi tiền về, hệ thống tự đối chiếu mã đơn + số tiền và chuyển đơn sang “Đã thanh toán” (chống xử lý trùng, phát hiện chuyển thiếu, đơn đã hủy → cần hoàn tiền).
 
 ## Công nghệ
 
-- React 19 + Vite 8
-- React Router DOM
-- Axios và JWT interceptor
-- Bootstrap 5 + CSS custom responsive
-- React Icons
-- Chart.js + React Chart.js 2
-- React Toastify
-- Context API cho xác thực và giỏ hàng
-- Nginx + Docker multi-stage
+| Thành phần | Công nghệ |
+|---|---|
+| Frontend | React 19, Vite 8, React Router, Bootstrap 5, Axios, Chart.js |
+| Backend | Node.js 22, Express 5, Mongoose 9 (Clean Architecture: routes → controllers → services → repositories → models) |
+| Cơ sở dữ liệu | MongoDB 7 (replica set) / MongoDB Atlas |
+| AI | Google Gemini API (`gemini-2.5-flash`, function calling) |
+| Thanh toán | VietQR, SePay webhook, VNPay sandbox |
+| Kiểm thử | Jest + Supertest + mongodb-memory-server (backend), Vitest + Testing Library (frontend) |
+| Triển khai | Docker Compose, Nginx |
+
+## Cấu trúc thư mục
+
+```text
+├── backend/            # REST API (Express + MongoDB)
+│   └── src/services/   # chatService.js, chatTools.js, aiProviders/geminiProvider.js, paymentService.js ...
+├── frontend/           # Giao diện React (components/chat/ChatWidget.jsx, pages/admin/ChatbotManagement.jsx ...)
+├── docs/               # Tài liệu phân tích thiết kế kế thừa từ TechPhone-Store
+├── progress-report/    # Báo cáo tiến độ hằng tuần
+├── thesis/             # Tài liệu đồ án: doc/, pdf/, html/, abs/ (slide, video), refs/
+├── setup/              # Hướng dẫn cài đặt, dữ liệu thử
+├── docker/             # Tệp triển khai Docker bổ sung
+└── docker-compose.yml
+```
 
 ## Cài đặt và chạy
 
-Yêu cầu Node.js 22 (`>=22 <23`).
+Yêu cầu: **Node.js 22**, **Docker** (hoặc MongoDB replica set / MongoDB Atlas).
+
+### Cách 1 – Docker Compose (nhanh nhất)
 
 ```bash
-cd frontend
+cp .env.example .env          # điền JWT secret, SEED_DEMO_PASSWORD, (tuỳ chọn) GEMINI_API_KEY
+docker compose up -d --build
+docker compose exec backend npm run seed
+```
+
+Truy cập: website <http://localhost:3000> · API <http://localhost:5000/api> · Swagger <http://localhost:5000/api/docs>
+
+### Cách 2 – Chạy từng phần khi phát triển
+
+```bash
+# Backend
+cd backend
+cp .env.example .env          # MONGO_URI phải trỏ tới MongoDB replica set
 npm install
-npm run dev
+npm run seed
+npm run dev                   # http://localhost:5000
+
+# Frontend (cửa sổ khác)
+cd frontend
+cp .env.example .env          # VITE_USE_MOCK=false để dùng backend thật
+npm install
+npm run dev                   # http://localhost:5173
 ```
 
-Ứng dụng mặc định chạy tại `http://localhost:5173`.
+### Cấu hình Chatbot AI
 
-## Local preview build
+1. Tạo API key miễn phí tại <https://aistudio.google.com/apikey>.
+2. Thêm vào `backend/.env` (hoặc `.env` gốc khi dùng Docker): `GEMINI_API_KEY=...` (tuỳ chọn `GEMINI_MODEL`).
+3. Khởi động lại backend. Trang **Admin → Chatbot AI** sẽ hiện “Gemini API đang hoạt động”.
+
+Không có key, chatbot vẫn chạy ở chế độ offline.
+
+### Cấu hình thanh toán chuyển khoản tự động (SePay)
+
+1. Điền thông tin tài khoản nhận tiền: `BANK_NAME`, `BANK_BIN`, `BANK_ACCOUNT_NUMBER`, `BANK_ACCOUNT_NAME`.
+2. Trên SePay, tạo webhook trỏ tới `<API_PUBLIC_URL>/api/payments/sepay/webhook`, kiểu xác thực **API Key**, rồi đặt cùng giá trị vào `SEPAY_WEBHOOK_API_KEY`.
+3. Khách chọn “Chuyển khoản ngân hàng” → đặt hàng → quét VietQR với nội dung là mã đơn → trang đơn hàng tự cập nhật “Đã nhận thanh toán”.
+
+Theo phạm vi đề cương, có thể demo bằng webhook giả lập:
 
 ```bash
-npm run build
-npm run preview
+curl -X POST http://localhost:5000/api/payments/sepay/webhook \
+  -H "Authorization: Apikey <SEPAY_WEBHOOK_API_KEY>" -H "Content-Type: application/json" \
+  -d '{"id":1001,"gateway":"Vietcombank","content":"<MA_DON> thanh toan","transferType":"in","transferAmount":<TONG_TIEN>}'
 ```
 
-Copy `.env.example` to `.env` before this local preview workflow. It uses the
-explicit `local-preview` target so localhost URLs are intentional. A Render
-production build must instead use the non-loopback variables documented below.
-
-The local preview is available at `http://localhost:5173`.
-
-Thư mục build được tạo tại `dist/`.
-
-## Chạy bằng Docker
-
-```bash
-docker build -t duanwebdidong-frontend .
-docker run -p 8080:80 duanwebdidong-frontend
-```
-
-Mở `http://localhost:8080`.
-
-Để build và kết nối backend thật:
-
-```bash
-docker build \
-  --build-arg VITE_USE_MOCK=false \
-  --build-arg VITE_API_URL=http://localhost:5000/api \
-  --build-arg VITE_SITE_URL=http://localhost:8080 \
-  --build-arg VITE_DEPLOYMENT_TARGET=docker \
-  -t duanwebdidong-frontend .
-```
-
-## Biến môi trường
-
-Tạo file `.env` từ `.env.example`:
-
-```env
-VITE_API_URL=http://localhost:5000/api
-VITE_USE_MOCK=true
-VITE_SITE_URL=http://localhost:5173
-VITE_DEPLOYMENT_TARGET=local-preview
-```
-
-- `VITE_USE_MOCK=true`: dùng dữ liệu mock và lưu tạm thay đổi trong localStorage.
-- `VITE_USE_MOCK=false`: gọi backend REST API qua Axios.
-- JWT tự động được gắn vào header `Authorization: Bearer <token>`.
-- Phản hồi `401` sẽ xóa phiên đăng nhập và chuyển về `/login`.
-
-## Tài khoản mock
+## Tài khoản demo (sau khi seed)
 
 | Vai trò | Số điện thoại | Mật khẩu |
-| --- | --- | --- |
-| Admin | `0900000000` | `123456` |
-| Khách hàng | `0911111111` | `123456` |
+|---|---|---|
+| Admin | 0900000000 | giá trị `SEED_DEMO_PASSWORD` |
+| Khách hàng | 0911111111 | giá trị `SEED_DEMO_PASSWORD` |
 
-Đơn hàng mẫu để tra cứu: `TP260601` và số điện thoại `0911111111`.
+Đơn mẫu để tra cứu: `TP260601` – số điện thoại `0911111111`. Voucher: `TECH10`, `GIAM200K`, `FREESHIP`.
 
-Voucher dùng thử:
+## Kiểm thử
 
-- `TECH10`: giảm 10%, tối đa 1.000.000đ, đơn từ 5.000.000đ.
-- `GIAM200K`: giảm 200.000đ, đơn từ 3.000.000đ.
-- `FREESHIP`: giảm phí giao hàng, đơn từ 500.000đ.
-
-## Các trang
-
-### Khách hàng
-
-- `/`: trang chủ, banner, danh mục, sản phẩm và phụ kiện nổi bật.
-- `/products`: tìm kiếm, lọc, sắp xếp, phân trang.
-- `/products/:id`: chi tiết điện thoại, giỏ hàng, mua ngay, đánh giá.
-- `/accessories/:id`: chi tiết phụ kiện.
-- `/cart`: quản lý giỏ hàng và voucher.
-- `/checkout`: thanh toán, yêu cầu đăng nhập.
-- `/order-success/:orderId`: xác nhận đặt hàng.
-- `/login`, `/register`: xác thực mock hoặc REST API.
-- `/account`: hồ sơ, đơn hàng, hủy/đặt lại đơn, đổi mật khẩu.
-- `/reviews`: danh sách và gửi đánh giá.
-- `/contact`: thông tin cửa hàng, biểu mẫu, bản đồ, FAQ.
-- `/order-lookup`: tra cứu trạng thái và timeline đơn hàng.
-
-### Quản trị
-
-- `/admin/dashboard`: chỉ số, biểu đồ doanh thu, trạng thái đơn, top sản phẩm.
-- `/admin/products`: CRUD sản phẩm và tồn kho.
-- `/admin/accessories`: CRUD phụ kiện.
-- `/admin/orders`: tìm kiếm, lọc, xem chi tiết và cập nhật trạng thái.
-- `/admin/customers`: thống kê mua hàng, khóa/mở tài khoản.
-- `/admin/reviews`: duyệt, từ chối, xóa đánh giá.
-- `/admin/banners`: CRUD banner.
-- `/admin/vouchers`: CRUD voucher.
-- `/admin/categories`: CRUD danh mục.
-- `/admin/brands`: CRUD thương hiệu.
-- `/admin/settings`: thông tin cửa hàng và mạng xã hội.
-
-## Cấu trúc chính
-
-```text
-src/
-├── api/          # Axios client và API theo domain
-├── assets/       # CSS và tài nguyên tĩnh
-├── components/   # Common, product, cart, auth, admin
-├── context/      # AuthContext, CartContext
-├── hooks/        # Hooks dùng chung
-├── mock/         # Mock data và mock repository
-├── pages/        # Trang khách hàng và quản trị
-├── routes/       # Khai báo route và route guard
-└── utils/        # Format, validate, storage, constants
+```bash
+cd backend && npm test        # 251 test, gồm chat.test.js, sepay-webhook.test.js, gemini-provider.test.js
+cd frontend && npm run test:run && npm run lint
 ```
 
-## Kết nối backend
+## Tiến độ
 
-Các module trong `src/api` đã ánh xạ endpoint dự kiến cho:
+Báo cáo tiến độ hằng tuần nằm trong thư mục [`progress-report/`](progress-report/). Công việc được quản lý theo sprint tuần trên Jira.
 
-- Auth: đăng ký, đăng nhập, hồ sơ, đổi mật khẩu.
-- Products và Accessories: danh sách, chi tiết, CRUD.
-- Orders: tạo đơn, đơn của tôi, hủy đơn, quản trị trạng thái.
-- Reviews: danh sách, gửi, duyệt, từ chối, xóa.
-- Vouchers và Banners: kiểm tra và CRUD.
-- Admin Dashboard, Customers, Categories, Brands.
+## Liên hệ
 
-Khi backend hoàn thành, đặt `VITE_USE_MOCK=false`. Component và Context không cần thay đổi vì mock repository và REST API trả về cùng cấu trúc dữ liệu.
-
-## Ghi chú dữ liệu tạm
-
-Mock mode dùng localStorage để mô phỏng thay đổi trong phiên phát triển, không được xem là database production. Các key chính:
-
-- `token`, `currentUser`
-- `cart_items`, `cart_voucher`
-- `mock_products`, `mock_orders`, `mock_reviews` và các collection quản trị khác
-
-Xóa các key `mock_*` trong DevTools để khôi phục dữ liệu mẫu ban đầu.
-
-## Canonical production deployment
-
-Render is the repository's single canonical production target: use a Render
-Static Site for the frontend, a Render Web Service for the backend, and MongoDB
-Atlas. The backend requires a Render persistent disk mounted at `/app/uploads`
-with `UPLOAD_DIR=/app/uploads`; do not deploy the current local-upload routes to
-a serverless filesystem.
-
-Replace these documented domain placeholders with the actual Render domains:
-
-```env
-VITE_SITE_URL=https://shop.techphone.example
-VITE_API_URL=https://api.techphone.example/api
-VITE_DEPLOYMENT_TARGET=render
-FRONTEND_URL=https://shop.techphone.example
-PUBLIC_SITE_URL=https://shop.techphone.example
-API_PUBLIC_URL=https://api.techphone.example
-DEPLOYMENT_TARGET=render
-UPLOAD_DIR=/app/uploads
-```
-
-Production public URLs must be absolute HTTP(S) URLs. Render builds reject
-loopback URLs and do not fall back to localhost; only the explicit `docker` and
-`local-preview` targets permit localhost in a production-mode frontend build. If VNPay is enabled, also set
-`VNPAY_RETURN_URL=https://api.techphone.example/api/payments/vnpay/return`.
-See [deployment.md](deployment.md) for the complete Render checklist.
-
-## Security exception: React Router RSC advisory
-
-- Advisory: [GHSA-qwww-vcr4-c8h2](https://github.com/advisories/GHSA-qwww-vcr4-c8h2)
-- Package: `react-router@7.18.2`, installed through `react-router-dom@7.18.2`.
-- Reason: this is a Vite browser SPA using stable `react-router-dom` routing APIs;
-  it does not import or enable the unstable RSC APIs affected by the advisory.
-- Owner: TechPhone maintainers.
-- Review date: 2026-09-05.
-- Compatibility plan: upgrade `react-router-dom` and `react-router` to 8.3.0 or
-  newer in a separate change, then run the route and full frontend test suites.
-  Do not use `npm audit fix --force` or downgrade the packages.
+Sơn Trung Nguyên – trungnguyen550811@gmail.com – 0918550811
