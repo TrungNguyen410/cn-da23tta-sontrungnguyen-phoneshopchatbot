@@ -162,6 +162,9 @@ const env = {
     accountNumber: process.env.BANK_ACCOUNT_NUMBER || '',
     accountName: process.env.BANK_ACCOUNT_NAME || '',
   },
+  sepay: {
+    webhookApiKey: String(process.env.SEPAY_WEBHOOK_API_KEY || '').trim(),
+  },
   momo: {
     phone: process.env.MOMO_PHONE || '',
     accountName: process.env.MOMO_ACCOUNT_NAME || '',

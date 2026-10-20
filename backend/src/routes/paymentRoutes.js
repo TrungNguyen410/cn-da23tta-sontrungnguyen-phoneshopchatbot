@@ -17,5 +17,6 @@ router.post(
 router.get('/vnpay/ipn', paymentController.vnpayIpn);
 router.get('/vnpay/return', paymentController.vnpayReturn);
 router.post('/vnpay/result', paymentController.verifyVnpayResult);
+router.post('/sepay/webhook', paymentController.sepayWebhook);
 
 module.exports = router;

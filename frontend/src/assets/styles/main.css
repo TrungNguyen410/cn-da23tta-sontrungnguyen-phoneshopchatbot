@@ -2359,6 +2359,32 @@ p {
   line-height: 1.6;
 }
 
+.success-card .bank-transfer-section {
+  margin-top: 18px;
+  text-align: left;
+}
+
+.bank-transfer-paid {
+  border-color: var(--color-success-rule);
+}
+
+.bank-transfer-paid h2 {
+  color: var(--success);
+}
+
+.spin {
+  animation: spin 1.2s linear infinite;
+  vertical-align: -2px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+}
+
 .bank-edit-button {
   width: 100%;
   margin-top: 10px;

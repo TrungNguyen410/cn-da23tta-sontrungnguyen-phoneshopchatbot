@@ -9,6 +9,14 @@ const vnpayProvider = require('./paymentProviders/vnpayProvider');
 const withTransaction = require('../utils/withTransaction');
 
 const PAYMENT_URL_TTL_MS = 15 * 60 * 1000;
+const ORDER_NUMBER_PATTERN = /TP\d{10}/i;
+const SETTLED_PAYMENT_STATUSES = ['paid', 'refund_required', 'refunded'];
+
+const safeEqual = (left, right) => {
+  const a = Buffer.from(String(left));
+  const b = Buffer.from(String(right));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+};
 
 class PaymentService {
   getVnpayConfig() {
@@ -41,6 +49,7 @@ class PaymentService {
           enabled: bankEnabled,
           ...(bankEnabled
             ? {
+                autoConfirm: Boolean(env.sepay?.webhookApiKey),
                 display: {
                   bankName: bank.name,
                   bankBin: bank.bin,
@@ -333,6 +342,98 @@ class PaymentService {
       throw new AppError('Trạng thái thanh toán vừa thay đổi. Vui lòng thử lại.', 409);
     }
     return updatedOrder;
+  }
+
+  assertSepayAuthorized(authorization) {
+    const apiKey = String(env.sepay?.webhookApiKey || '').trim();
+    if (!apiKey) throw new AppError('SePay chưa được cấu hình', 503);
+    const match = /^Apikey\s+(.+)$/i.exec(String(authorization || '').trim());
+    if (!match || !safeEqual(match[1].trim(), apiKey)) {
+      throw new AppError('Webhook SePay không hợp lệ', 401);
+    }
+  }
+
+  extractOrderNumber(...texts) {
+    const match = ORDER_NUMBER_PATTERN.exec(texts.filter(Boolean).join(' '));
+    return match ? match[0].toUpperCase() : '';
+  }
+
+  async processSepayWebhook(payload = {}, authorization = '') {
+    this.assertSepayAuthorized(authorization);
+
+    const providerTransactionId = String(payload.id ?? '').trim();
+    const amount = Number(payload.transferAmount);
+    if (!providerTransactionId || !Number.isFinite(amount) || amount <= 0) {
+      throw new AppError('Dữ liệu webhook SePay không hợp lệ', 400);
+    }
+    if (String(payload.transferType || '').toLowerCase() !== 'in') {
+      return { matched: false, reason: 'not_incoming' };
+    }
+
+    const orderNumber = this.extractOrderNumber(payload.code, payload.content, payload.description);
+    if (!orderNumber) return { matched: false, reason: 'order_number_missing' };
+
+    const reference = `SEPAY-${providerTransactionId}`;
+    await paymentTransactionRepository.ensureIndexes();
+    try {
+      return await withTransaction(async (session) => {
+        if (await paymentTransactionRepository.findByReference(reference, session)) {
+          return { matched: true, duplicate: true, orderNumber };
+        }
+
+        const order = await orderRepository.findByOrderNumber(orderNumber, session);
+        if (!order || order.paymentMethod !== 'bank') {
+          return { matched: false, reason: 'order_not_found', orderNumber };
+        }
+
+        const fullyPaid = amount >= order.total;
+        const alreadySettled = SETTLED_PAYMENT_STATUSES.includes(order.paymentStatus);
+        await paymentTransactionRepository.create({
+          orderId: order.id,
+          provider: 'sepay',
+          method: 'bank',
+          amount,
+          reference,
+          status: fullyPaid && !alreadySettled ? 'paid' : 'failed',
+          providerTransactionId,
+          bankCode: String(payload.gateway || ''),
+          responseCode: fullyPaid ? 'MATCHED' : 'UNDERPAID',
+          rawResponse: payload,
+          paidAt: fullyPaid && !alreadySettled ? new Date() : null,
+        }, session);
+
+        if (alreadySettled) {
+          return { matched: true, orderNumber, paymentStatus: order.paymentStatus, duplicate: true };
+        }
+        if (!fullyPaid) {
+          return { matched: true, orderNumber, paymentStatus: order.paymentStatus, underpaid: true };
+        }
+
+        const cancelled = order.status === 'cancelled';
+        const updatedOrder = await orderRepository.updateState(
+          order.id,
+          { paymentStatus: { $nin: SETTLED_PAYMENT_STATUSES } },
+          {
+            paymentStatus: cancelled ? 'refund_required' : 'paid',
+            paymentReference: reference,
+            paymentAudit: {
+              confirmedBy: null,
+              confirmedAt: new Date(),
+              note: `Tự động xác nhận qua SePay (${payload.gateway || 'ngân hàng'})`,
+            },
+            ...(!cancelled && order.status === 'pending' ? { status: 'confirmed' } : {}),
+          },
+          session,
+        );
+        if (!updatedOrder) {
+          throw new AppError('Trạng thái thanh toán của đơn hàng vừa thay đổi. Vui lòng thử lại.', 409);
+        }
+        return { matched: true, orderNumber, paymentStatus: updatedOrder.paymentStatus };
+      });
+    } catch (error) {
+      if (error?.code === 11000) return { matched: true, duplicate: true, orderNumber };
+      throw error;
+    }
   }
 
   verifyResultProof(proof) {

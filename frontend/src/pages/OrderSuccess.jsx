@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FiCheck, FiHome, FiPackage } from 'react-icons/fi';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { orderApi } from '../api/orderApi';
+import BankTransferPanel from '../components/common/BankTransferPanel';
 import EmptyState from '../components/common/EmptyState';
 import Loading from '../components/common/Loading';
 import { formatCurrency, formatDate } from '../utils/formatCurrency';
@@ -79,6 +80,7 @@ export default function OrderSuccess() {
           </div>
           {order.trackingNumber && <div className="order-shipping-note"><strong>{order.shippingProvider || 'Đơn vị giao hàng'}</strong><span>Mã vận đơn: <b>{order.trackingNumber}</b></span>{order.estimatedDelivery && <span>Dự kiến giao: {formatDate(order.estimatedDelivery, true)}</span>}</div>}
           <div className="success-total"><span>Tổng thanh toán</span><strong>{formatCurrency(order.total)}</strong></div>
+          {order.paymentMethod === 'bank' && <BankTransferPanel order={order} onPaid={setOrder} />}
           <div className="success-actions">
             <Link className="btn btn-light" to="/"><FiHome /> Về trang chủ</Link>
             <Link className="btn btn-primary" to="/order-lookup"><FiPackage /> Tra cứu đơn</Link>

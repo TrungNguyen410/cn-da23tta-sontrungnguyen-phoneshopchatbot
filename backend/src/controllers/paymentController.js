@@ -42,6 +42,11 @@ const verifyVnpayResult = asyncHandler(async (req, res) => {
   successResponse(res, result, 'Payment result verified');
 });
 
+const sepayWebhook = asyncHandler(async (req, res) => {
+  const result = await paymentService.processSepayWebhook(req.body, req.get('Authorization'));
+  res.status(200).json({ success: true, ...result });
+});
+
 const reconcileManualPayment = asyncHandler(async (req, res) => {
   const order = await paymentService.reconcileManualPayment(req.params.id, req.body, req.user);
   successResponse(res, order, 'Manual payment reconciled');
@@ -51,6 +56,7 @@ module.exports = {
   createVnpayCheckout,
   getConfig,
   reconcileManualPayment,
+  sepayWebhook,
   verifyVnpayResult,
   vnpayIpn,
   vnpayReturn,

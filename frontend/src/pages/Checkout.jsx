@@ -16,11 +16,11 @@ import { trackEvent } from '../utils/analytics';
 
 const paymentHint = (method) => {
   if (method === 'cod') return 'Thanh toán trực tiếp cho nhân viên giao hàng';
-  if (method === 'bank') return 'Quét mã QR và xác nhận đã chuyển khoản trước khi đặt hàng';
+  if (method === 'bank') return 'Đặt hàng rồi quét mã VietQR theo mã đơn; thanh toán được xác nhận tự động';
   if (method === 'momo') return 'Quét mã MoMo và xác nhận thanh toán trước khi đặt hàng';
   return 'Thanh toán an toàn trên cổng VNPay; TechPhone không thu thập thông tin thẻ';
 };
-const PAYMENT_CONFIRM_METHODS = ['bank', 'momo'];
+const PAYMENT_CONFIRM_METHODS = ['momo'];
 const providerNameFor = (method) => (method === 'card' ? 'vnpay' : method);
 const createCheckoutKey = () =>
   `checkout-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
@@ -92,7 +92,6 @@ export default function Checkout() {
     [cart.subtotal, cart.voucher, shipping.fee],
   );
   const orderTotal = Math.max(0, cart.subtotal + shipping.fee - checkoutDiscount);
-  const bankDisplay = paymentConfig.providers?.bank?.display || {};
   const momoDisplay = paymentConfig.providers?.momo?.display || {};
 
   useEffect(() => {
@@ -105,14 +104,6 @@ export default function Checkout() {
     });
   }, [cart.cartCount, cart.cartItems.length, orderTotal]);
 
-  const bankQrUrl = useMemo(() => {
-    const params = new URLSearchParams({
-      amount: String(orderTotal),
-      addInfo: transferContent,
-      accountName: bankDisplay.accountName || '',
-    });
-    return `https://img.vietqr.io/image/${bankDisplay.bankBin}-${bankDisplay.accountNumber}-compact2.png?${params.toString()}`;
-  }, [bankDisplay.accountName, bankDisplay.accountNumber, bankDisplay.bankBin, orderTotal, transferContent]);
   const momoQrUrl = useMemo(
     () => `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`MOMO|${momoDisplay.phone || ''}|${orderTotal}|${transferContent}`)}`,
     [momoDisplay.phone, orderTotal, transferContent],
@@ -183,7 +174,6 @@ export default function Checkout() {
     },
     note: [
       form.note.trim(),
-      form.paymentMethod === 'bank' ? `Ma chuyen khoan: ${transferContent}` : '',
       form.paymentMethod === 'momo' ? `Ma giao dich MoMo: ${transferContent}` : '',
     ]
       .filter(Boolean)
@@ -341,28 +331,6 @@ export default function Checkout() {
               </div>
             </section>
 
-            {paymentConfirmStep && form.paymentMethod === 'bank' && (
-              <section className="panel checkout-section bank-transfer-section" ref={paymentConfirmRef}>
-                <h2><FiCreditCard /> Thanh toán chuyển khoản</h2>
-                <div className="bank-transfer-grid">
-                  <div className="bank-qr-card">
-                    <img src={bankQrUrl} alt="Mã QR chuyển khoản TechPhone" />
-                  </div>
-                  <div className="bank-transfer-info">
-                    <span>Quét QR hoặc chuyển khoản thủ công</span>
-                    <h3>{bankDisplay.bankName}</h3>
-                    <div><small>Số tài khoản</small><strong>{bankDisplay.accountNumber}</strong></div>
-                    <div><small>Chủ tài khoản</small><strong>{bankDisplay.accountName}</strong></div>
-                    <div><small>Số tiền</small><strong>{formatCurrency(orderTotal)}</strong></div>
-                    <div><small>Nội dung chuyển khoản</small><strong>{transferContent}</strong></div>
-                  </div>
-                </div>
-                <p className="bank-transfer-note">
-                  Sau khi chuyển khoản, bấm <strong>Tôi đã chuyển khoản</strong> để hoàn tất đơn hàng.
-                  Nhân viên TechPhone sẽ đối soát và xác nhận thanh toán.
-                </p>
-              </section>
-            )}
             {paymentConfirmStep && form.paymentMethod === 'momo' && <section className="panel checkout-section bank-transfer-section" ref={paymentConfirmRef}><h2><FiCreditCard /> Thanh toán qua MoMo</h2><div className="bank-transfer-grid"><div className="bank-qr-card"><img src={momoQrUrl} alt="Mã QR thanh toán MoMo" /></div><div className="bank-transfer-info"><span>Quét mã trong ứng dụng MoMo</span><div><small>Số điện thoại nhận</small><strong>{momoDisplay.phone}</strong></div><div><small>Chủ tài khoản</small><strong>{momoDisplay.accountName}</strong></div><div><small>Số tiền</small><strong>{formatCurrency(orderTotal)}</strong></div><div><small>Nội dung</small><strong>{transferContent}</strong></div></div></div><p className="bank-transfer-note">Sau khi thanh toán qua MoMo, bấm <strong>Tôi đã thanh toán</strong> để hoàn tất đơn hàng.</p></section>}
           </div>
 

@@ -217,15 +217,15 @@ describe('Checkout payment confirmations', () => {
     expect(screen.getByRole('radio', { name: /COD/i })).toBeInTheDocument();
   });
 
-  it('renders configured public bank display data', async () => {
+  it('creates bank-transfer orders immediately so the QR can use the order number', async () => {
     render(<MemoryRouter><Checkout /></MemoryRouter>);
     completeCurrentAddress();
     fireEvent.click(await screen.findByRole('radio', { name: /Chuyển khoản ngân hàng/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Tiếp tục thanh toán' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Xác nhận đặt hàng' }));
 
-    expect(await screen.findByText('Test Bank')).toBeInTheDocument();
-    expect(screen.getByText('123456789')).toBeInTheDocument();
-    expect(screen.getByText('TECHPHONE TEST')).toBeInTheDocument();
+    await waitFor(() => expect(orderApi.create).toHaveBeenCalledTimes(1));
+    expect(orderApi.create.mock.calls[0][0].paymentMethod).toBe('bank');
+    expect(orderApi.create.mock.calls[0][0].note).not.toMatch(/Ma chuyen khoan/);
   });
 
   it('connects inline validation errors to invalid fields', async () => {

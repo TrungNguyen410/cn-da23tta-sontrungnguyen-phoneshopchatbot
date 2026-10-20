@@ -6,8 +6,8 @@ const paymentTransactionSchema = new mongoose.Schema(
   {
     _id: stringId,
     orderId: { type: String, ref: 'Order', required: true, index: true },
-    provider: { type: String, enum: ['vnpay'], required: true, index: true },
-    method: { type: String, enum: ['card'], required: true },
+    provider: { type: String, enum: ['vnpay', 'sepay'], required: true, index: true },
+    method: { type: String, enum: ['card', 'bank'], required: true },
     status: {
       type: String,
       enum: ['pending', 'paid', 'failed', 'expired', 'refunded'],

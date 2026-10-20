@@ -31,6 +31,14 @@ class OrderRepository extends BaseRepository {
     return order?.toJSON() || null;
   }
 
+  async findByOrderNumber(orderNumber, session) {
+    const order = await Order.findOne({
+      isDeleted: false,
+      orderNumber: String(orderNumber).toUpperCase(),
+    }).session(session || null);
+    return order?.toJSON() || null;
+  }
+
   async findByIdempotencyKey(idempotencyKey, session) {
     if (!idempotencyKey) return null;
     await this.ensureIndexes();

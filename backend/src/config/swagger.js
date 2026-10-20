@@ -352,6 +352,12 @@ const swaggerDocument = {
     '/payments/vnpay/return': {
       get: { tags: ['Payments'], summary: 'Verify the browser return and redirect to the storefront' },
     },
+    '/payments/sepay/webhook': {
+      post: {
+        tags: ['Payments'],
+        summary: 'Receive a SePay bank-transfer webhook (Authorization: Apikey <key>) and auto-confirm the matching bank order',
+      },
+    },
     '/seo/sitemap.xml': {
       get: { tags: ['SEO'], summary: 'Generate a sitemap for active product detail routes' },
     },

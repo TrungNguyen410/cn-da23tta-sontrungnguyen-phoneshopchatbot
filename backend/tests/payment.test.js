@@ -67,6 +67,7 @@ describe('VNPay checkout and IPN', () => {
 
     expect(response.body.data.providers.bank).toEqual({
       enabled: true,
+      autoConfirm: false,
       display: {
         bankName: 'Test Bank',
         bankBin: '970436',
