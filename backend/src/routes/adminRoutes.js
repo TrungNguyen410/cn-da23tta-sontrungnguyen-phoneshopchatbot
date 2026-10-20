@@ -95,6 +95,8 @@ router.put('/banners/:id', idParam, bannerValidators.update, validate, bannerCon
 router.delete('/banners/:id', idParam, validate, bannerController.remove);
 
 router.get('/chat/stats', chatController.statsAdmin);
+router.get('/chat/config', chatController.getConfig);
+router.put('/chat/config', chatValidators.updateConfig, validate, chatController.updateConfig);
 router.get('/chat/sessions', chatValidators.adminList, validate, chatController.listSessionsAdmin);
 router.get('/chat/sessions/:id', idParam, validate, chatController.getSessionAdmin);
 

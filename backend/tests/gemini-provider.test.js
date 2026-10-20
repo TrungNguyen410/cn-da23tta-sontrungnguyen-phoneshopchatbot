@@ -52,6 +52,29 @@ describe('Gemini provider', () => {
       .rejects.toMatchObject({ statusCode: 502, message: expect.not.stringContaining('secret-key') });
   });
 
+  it('parses streamed SSE chunks, forwarding text and keeping function calls', async () => {
+    Object.assign(env.gemini, { apiKey: 'test-key', model: 'gemini-test' });
+    const encoder = new TextEncoder();
+    const event = (parts) => `data: ${JSON.stringify({ candidates: [{ content: { role: 'model', parts } }] })}\r\n\r\n`;
+    const raw = event([{ text: 'Xin ' }]) + event([{ text: 'chào' }]) + event([{ functionCall: { name: 'search_products', args: {} } }]);
+    // Split mid-event to make sure the parser buffers partial chunks.
+    const body = [encoder.encode(raw.slice(0, 25)), encoder.encode(raw.slice(25))];
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, body });
+    const deltas = [];
+
+    const result = await geminiProvider.stream(
+      { systemInstruction: 'x', contents: [] },
+      (text) => deltas.push(text),
+    );
+
+    expect(global.fetch.mock.calls[0][0]).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-test:streamGenerateContent?alt=sse');
+    expect(deltas).toEqual(['Xin ', 'chào']);
+    expect(result.content.parts).toEqual([
+      { text: 'Xin chào' },
+      { functionCall: { name: 'search_products', args: {} } },
+    ]);
+  });
+
   it('refuses to run without an API key', async () => {
     env.gemini.apiKey = '';
     await expect(geminiProvider.generate({ systemInstruction: '', contents: [] }))

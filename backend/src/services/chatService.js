@@ -13,6 +13,16 @@ const MAX_CARDS = 6;
 const ORDER_NUMBER_PATTERN = /\bTP\d{6,12}\b/i;
 const PHONE_PATTERN = /(?:\+?84|0)\d{9}/;
 
+const DEFAULT_CONFIG = {
+  greeting: 'Xin chào! Mình là **trợ lý AI** của cửa hàng. Mình có thể:\n- Tư vấn chọn điện thoại theo ngân sách, nhu cầu\n- So sánh các mẫu máy\n- Tra cứu đơn hàng, khuyến mãi, chính sách\nBạn cần hỗ trợ gì ạ?',
+  quickQuestions: [
+    'Tư vấn điện thoại dưới 10 triệu',
+    'So sánh iPhone 16 Pro Max và Galaxy S25 Ultra',
+    'Chính sách bảo hành thế nào?',
+    'Có mã giảm giá nào không?',
+  ],
+};
+
 const formatVnd = (value) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 
 const buildSystemInstruction = (store = {}, user = null) => [
@@ -98,12 +108,52 @@ class ChatService {
     return { session, isNew: true };
   }
 
-  async sendMessage({ message, sessionId, visitorId, user }) {
+  async getConfig() {
+    const settings = await settingRepository.findAll({ group: 'chatbot' });
+    const values = Object.fromEntries(settings.map((setting) => [setting.key, setting.value]));
+    return {
+      enabled: values.chatbotEnabled !== false,
+      greeting: typeof values.chatbotGreeting === 'string' && values.chatbotGreeting.trim()
+        ? values.chatbotGreeting
+        : DEFAULT_CONFIG.greeting,
+      quickQuestions: Array.isArray(values.chatbotQuickQuestions)
+        ? values.chatbotQuickQuestions
+        : DEFAULT_CONFIG.quickQuestions,
+    };
+  }
+
+  async updateConfig(payload = {}) {
+    const updates = [];
+    if ('enabled' in payload) {
+      updates.push(['chatbotEnabled', Boolean(payload.enabled), 'Bật chatbot AI']);
+    }
+    if ('greeting' in payload) {
+      updates.push(['chatbotGreeting', String(payload.greeting || '').trim().slice(0, 500), 'Lời chào chatbot']);
+    }
+    if ('quickQuestions' in payload) {
+      const questions = (Array.isArray(payload.quickQuestions) ? payload.quickQuestions : [])
+        .map((question) => String(question).trim().slice(0, 120))
+        .filter(Boolean)
+        .slice(0, 6);
+      updates.push(['chatbotQuickQuestions', questions, 'Câu hỏi gợi ý chatbot']);
+    }
+    for (const [key, value, label] of updates) {
+      await settingRepository.upsertByKey(key, { value, group: 'chatbot', label });
+    }
+    return this.getConfig();
+  }
+
+  // hooks: onSession(sessionId), onDelta(text), onReset() — used by the streaming endpoint.
+  async sendMessage({ message, sessionId, visitorId, user }, hooks = {}) {
     const text = String(message || '').trim();
     if (!text) throw new AppError('Vui lòng nhập nội dung tin nhắn', 422);
     if (!user && !visitorId) throw new AppError('Thiếu mã khách truy cập', 422);
+    if (!(await this.getConfig()).enabled) {
+      throw new AppError('Chatbot đang tạm ngưng. Vui lòng liên hệ hotline để được hỗ trợ.', 503);
+    }
 
     const { session, isNew } = await this.resolveSession({ sessionId, visitorId, user });
+    hooks.onSession?.(session.id);
     const history = isNew ? [] : await chatMessageRepository.findRecentBySession(session.id, HISTORY_LIMIT);
     await chatMessageRepository.create({ sessionId: session.id, role: 'user', content: text, source: 'user' });
 
@@ -111,13 +161,16 @@ class ChatService {
     let result;
     if (geminiProvider.isConfigured()) {
       try {
-        result = await this.answerWithGemini({ history, text, user });
+        result = await this.answerWithGemini({ history, text, user, onDelta: hooks.onDelta });
       } catch (error) {
         if (process.env.NODE_ENV !== 'test') console.error('[chatbot] Gemini error:', error.message);
+        hooks.onReset?.();
         result = { ...(await this.answerOffline(text)), source: 'fallback' };
+        this.emitWords(result.reply, hooks.onDelta);
       }
     } else {
       result = await this.answerOffline(text);
+      this.emitWords(result.reply, hooks.onDelta);
     }
 
     const reply = await chatMessageRepository.create({
@@ -136,7 +189,12 @@ class ChatService {
     return { sessionId: session.id, message: reply };
   }
 
-  async answerWithGemini({ history, text, user }) {
+  emitWords(reply, onDelta) {
+    if (!onDelta) return;
+    for (const piece of String(reply).match(/\S+\s*|\s+/g) || []) onDelta(piece);
+  }
+
+  async answerWithGemini({ history, text, user, onDelta }) {
     const store = await this.getStoreInfo();
     const systemInstruction = buildSystemInstruction(store, user);
     const contents = history.map((item) => ({
@@ -147,19 +205,24 @@ class ChatService {
 
     const toolCalls = [];
     const products = [];
+    let streamedText = '';
     for (let step = 0; step < MAX_TOOL_STEPS; step += 1) {
-      const { content } = await geminiProvider.generate({
-        systemInstruction,
-        contents,
-        tools: chatTools.declarations,
-      });
+      const request = { systemInstruction, contents, tools: chatTools.declarations };
+      const { content } = onDelta
+        ? await geminiProvider.stream(request, (delta) => {
+          streamedText += delta;
+          onDelta(delta);
+        })
+        : await geminiProvider.generate(request);
       const calls = content.parts.filter((part) => part.functionCall);
       if (!calls.length) {
-        const reply = content.parts
-          .filter((part) => typeof part.text === 'string' && !part.thought)
-          .map((part) => part.text)
-          .join('')
-          .trim();
+        const reply = onDelta
+          ? streamedText.trim()
+          : content.parts
+            .filter((part) => typeof part.text === 'string' && !part.thought)
+            .map((part) => part.text)
+            .join('')
+            .trim();
         return {
           reply: reply || 'Xin lỗi, mình chưa có câu trả lời phù hợp. Bạn có thể hỏi lại chi tiết hơn không?',
           products,
