@@ -68,7 +68,7 @@ router.get(
   [
     ...adminPagination,
     ...adminSearch,
-    query('status').optional().isIn(['pending', 'confirmed', 'shipping', 'delivered', 'completed', 'cancelled']),
+    query('status').optional({ values: 'falsy' }).isIn(['pending', 'confirmed', 'shipping', 'delivered', 'completed', 'cancelled']),
   ],
   validate,
   orderController.list,

@@ -40,7 +40,7 @@ services:
       SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
-      GEMINI_FALLBACK_MODEL: ${GEMINI_FALLBACK_MODEL:-gemini-flash-latest}
+      GEMINI_FALLBACK_MODEL: ${GEMINI_FALLBACK_MODEL:-gemini-3.5-flash-lite,gemini-flash-lite-latest}
       SEPAY_WEBHOOK_API_KEY: ${SEPAY_WEBHOOK_API_KEY:-}
       BANK_NAME: ${BANK_NAME:-}
       BANK_BIN: ${BANK_BIN:-}

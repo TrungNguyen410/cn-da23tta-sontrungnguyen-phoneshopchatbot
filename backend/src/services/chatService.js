@@ -55,8 +55,13 @@ const BRAND_ALIASES = {
 const STOPWORDS = new Set(tokenize(
   'toi minh em anh chi ban can muon tim mua tu van giup cho xem co nao may dien thoai dt smartphone loai cai chiec '
   + 'duoi tren tam khoang tu den trieu tr gia re tot nhat hay va voi la thi nhe a o di de nhu cau dung ngan sach '
-  + 'shop cua hang hien con khong ko gi sao the ra ve',
+  + 'shop cua hang hien con khong ko gi sao the ra ve mac cao cap nhat tiet kiem binh dan sinh vien hoc',
 ));
+// Price direction for short questions: "rẻ" lists the cheapest phones, "mắc"/"cao cấp" the most expensive.
+const CHEAP_WORDS = ['re', 'gia re', 'tiet kiem', 'binh dan', 'sinh vien', 'hoc sinh'];
+const PREMIUM_WORDS = ['mac', 'cao', 'cao cap', 'dat nhat'];
+const RUDE_WORDS = ['ngu', 'dot', 'vo dung', 'ngao'];
+const EXAMPLE_QUESTIONS = '"điện thoại dưới 10 triệu", "máy chơi game tầm 15 triệu", "so sánh iPhone 16 và Galaxy S25", "chính sách bảo hành"';
 // Most specific phrases first so "sạc dự phòng" is not treated as a plain charger.
 const ACCESSORY_WORDS = ['du phong', 'op lung', 'tai nghe', 'cuong luc', 'cu sac', 'phu kien', 'airpods', 'sac', 'cap'];
 const VOUCHER_CODE_PATTERN = /\b([A-Z][A-Z0-9]{3,19})\b/g;
@@ -219,7 +224,9 @@ class ChatService {
     const products = [];
     let streamedText = '';
     for (let step = 0; step < MAX_TOOL_STEPS; step += 1) {
-      const request = { systemInstruction, contents, tools: chatTools.declarations };
+      // On the last step the model must answer with what it already found instead of searching again.
+      const isLastStep = step === MAX_TOOL_STEPS - 1;
+      const request = { systemInstruction, contents, tools: chatTools.declarations, ...(isLastStep ? { toolMode: 'NONE' } : {}) };
       const { content } = onDelta
         ? await geminiProvider.stream(request, (delta) => {
           streamedText += delta;
@@ -349,9 +356,11 @@ class ChatService {
     }
 
     const brand = Object.entries(BRAND_ALIASES).find(([alias]) => normalized.includes(alias))?.[1];
-    if (ACCESSORY_WORDS.some((word) => hasPhrase(normalized, word))) {
+    // "cao cấp" (premium) must not be read as "cáp" (cable).
+    const accessoryText = normalized.replace(/cao cap/g, ' ');
+    if (ACCESSORY_WORDS.some((word) => hasPhrase(accessoryText, word))) {
       const output = await run('search_accessories', {
-        keyword: ACCESSORY_WORDS.find((word) => hasPhrase(normalized, word)),
+        keyword: ACCESSORY_WORDS.find((word) => hasPhrase(accessoryText, word)),
         ...parseBudget(normalized),
       });
       const items = output.result.accessories || [];
@@ -361,28 +370,36 @@ class ChatService {
     }
 
     const budget = parseBudget(normalized);
-    const looksLikeShopping = brand
+    const sortBy = (CHEAP_WORDS.some((word) => hasPhrase(normalized, word)) && 'price_asc')
+      || (PREMIUM_WORDS.some((word) => hasPhrase(normalized, word)) && 'price_desc')
+      || undefined;
+    const keyword = extractKeyword(normalized);
+    const looksLikeShopping = brand || sortBy
       || budget.minPrice || budget.maxPrice
       || SHOPPING_WORDS.some((word) => hasPhrase(normalized, word))
-      || /\d/.test(extractKeyword(normalized));
+      || /\d/.test(keyword);
     if (!looksLikeShopping) {
-      return done('Xin lỗi, mình chỉ hỗ trợ các câu hỏi về mua sắm tại cửa hàng: tư vấn chọn điện thoại, phụ kiện, so sánh máy, đơn hàng, khuyến mãi và chính sách. Bạn cần mình tư vấn gì không ạ?');
+      if (RUDE_WORDS.some((word) => hasPhrase(normalized, word))) {
+        return done(`Xin lỗi nếu câu trả lời trước chưa đúng ý bạn. Bạn hỏi cụ thể hơn giúp mình nhé, ví dụ: ${EXAMPLE_QUESTIONS}.`);
+      }
+      return done(`Xin lỗi, mình chỉ hỗ trợ các câu hỏi về mua sắm tại cửa hàng: tư vấn chọn điện thoại, phụ kiện, so sánh máy, đơn hàng, khuyến mãi và chính sách. Bạn có thể hỏi như: ${EXAMPLE_QUESTIONS}.`);
     }
 
-    const output = await run('search_products', {
-      keyword: extractKeyword(normalized),
-      brand,
-      ...parseBudget(normalized),
-    });
+    const output = await run('search_products', { keyword, brand, sortBy, ...budget });
     const items = output.result.products || [];
     if (!items.length) {
       return done('Hiện mình chưa tìm thấy điện thoại phù hợp. Bạn cho mình biết thêm ngân sách (ví dụ "dưới 10 triệu") hoặc hãng bạn thích nhé.');
     }
+    // Nothing concrete to search on ("tư vấn"): show best sellers but ask for budget and needs.
+    const isVague = !keyword && !brand && !sortBy && !budget.minPrice && !budget.maxPrice;
     const budgetText = budget.maxPrice ? `dưới ${formatVnd(budget.maxPrice)}` : `từ ${formatVnd(budget.minPrice)}`;
+    let heading = 'Mình gợi ý một số mẫu phù hợp:';
+    if (output.result.outOfBudget) heading = `Hiện cửa hàng chưa có điện thoại ${budgetText}. Các mẫu có giá gần nhất:`;
+    else if (isVague) heading = 'Để tư vấn sát hơn, bạn cho mình biết **ngân sách** (ví dụ dưới 10 triệu, 15–20 triệu) và **nhu cầu chính** (chơi game, chụp ảnh, pin trâu, nhỏ gọn) nhé. Trong lúc đó, đây là các mẫu bán chạy nhất:';
+    else if (sortBy === 'price_asc') heading = 'Các mẫu có giá dễ chịu nhất hiện có:';
+    else if (sortBy === 'price_desc') heading = 'Các mẫu cao cấp nhất hiện có:';
     return done([
-      output.result.outOfBudget
-        ? `Hiện cửa hàng chưa có điện thoại ${budgetText}. Các mẫu có giá gần nhất:`
-        : 'Mình gợi ý một số mẫu phù hợp:',
+      heading,
       ...items.slice(0, 3).map((item) => `- **${item.name}**: ${formatVnd(item.price)} — ${[item.chip, item.ram && `RAM ${item.ram}`, item.storage, item.battery && `pin ${item.battery}`].filter(Boolean).join(', ')}${item.inStock ? ` — còn hàng (${item.stock} máy)` : ' (tạm hết hàng)'}`),
       'Bạn muốn mình so sánh chi tiết hay tư vấn thêm theo nhu cầu (chơi game, chụp ảnh, pin trâu) không?',
     ].join('\n'), output.cards.slice(0, 3));

@@ -1526,6 +1526,13 @@ describe('Orders and dashboard APIs', () => {
     expect(response.body.data.items.map((order) => order.orderNumber)).toEqual(['TP.LITERAL1']);
     expect(response.body.data.pagination).toEqual({ page: 1, limit: 20, total: 1, totalPages: 1 });
 
+    // The admin page sends status= when no filter is selected.
+    const unfiltered = await request(app)
+      .get('/api/admin/orders?page=1&limit=20&search=&status=')
+      .set('Authorization', `Bearer ${token}`);
+    expect(unfiltered.status).toBe(200);
+    expect(unfiltered.body.data.pagination.total).toBe(3);
+
     await request(app)
       .get('/api/admin/orders?status=not-a-status')
       .set('Authorization', `Bearer ${token}`)
