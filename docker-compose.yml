@@ -75,6 +75,22 @@ services:
       backend:
         condition: service_healthy
 
+  # Optional public tunnel with a fixed ngrok domain so the SePay webhook URL never changes.
+  # Enable with COMPOSE_PROFILES=tunnel (or --profile tunnel) plus NGROK_AUTHTOKEN and NGROK_DOMAIN in root .env.
+  tunnel:
+    image: ngrok/ngrok:3
+    container_name: phoneshopai-tunnel
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: ["http", "--url=${NGROK_DOMAIN:-}", "backend:5000"]
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    ports:
+      - "4040:4040"
+    depends_on:
+      backend:
+        condition: service_healthy
+
 volumes:
   mongodb_data:
   backend_uploads:
