@@ -9,8 +9,8 @@ const list = [
   query('search').optional().trim(),
   query('category').optional().trim(),
   query('brand').optional().trim(),
-  query('status').optional().isIn(['active', 'inactive']).withMessage('Trạng thái không hợp lệ'),
-  query('sort').optional().isIn(['newest', 'price-asc', 'price-desc', 'best-selling', 'rating']).withMessage('Kiểu sắp xếp không hợp lệ'),
+  query('status').optional({ values: 'falsy' }).isIn(['active', 'inactive']).withMessage('Trạng thái không hợp lệ'),
+  query('sort').optional({ values: 'falsy' }).isIn(['newest', 'price-asc', 'price-desc', 'best-selling', 'rating']).withMessage('Kiểu sắp xếp không hợp lệ'),
 ];
 const activeExists = (repository, label) => async (value) => {
   const item = await repository.findById(value);

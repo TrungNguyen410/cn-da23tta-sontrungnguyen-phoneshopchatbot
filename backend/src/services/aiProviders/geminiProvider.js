@@ -2,7 +2,7 @@ const env = require('../../config/env');
 const AppError = require('../../utils/AppError');
 
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-// Overloaded models (500/503) are retried once, then the fallback model is tried.
+// Overloaded models (500/503) are retried once, then the fallback models are tried in order.
 const OVERLOADED_STATUSES = new Set([500, 503]);
 const RETRY_DELAY_MS = 1200;
 // A 429 means the quota (free tier: requests per day per model) is used up, so retrying is
@@ -14,16 +14,24 @@ const isConfigured = () => Boolean(env.gemini.apiKey);
 
 const isCoolingDown = (model) => (cooldownUntil.get(model) || 0) > Date.now();
 
+// GEMINI_FALLBACK_MODEL may list several models separated by commas; each one has its own
+// free-tier quota, so the chatbot keeps answering with AI after the primary model runs out.
+const fallbackModels = () => String(env.gemini.fallbackModel || '')
+  .split(',')
+  .map((model) => model.trim())
+  .filter((model) => model && model !== env.gemini.model);
+
 const status = () => ({
   configured: isConfigured(),
   model: env.gemini.model,
-  fallbackModel: env.gemini.fallbackModel,
-  quotaExhausted: [env.gemini.model, env.gemini.fallbackModel].filter((model) => model && isCoolingDown(model)),
+  fallbackModel: fallbackModels().join(', '),
+  quotaExhausted: [env.gemini.model, ...fallbackModels()].filter((model) => model && isCoolingDown(model)),
 });
 
 const resetCooldowns = () => cooldownUntil.clear();
 
-const buildBody = ({ systemInstruction, contents, tools = [] }) => ({
+// toolMode 'NONE' keeps the tool declarations (the history has function calls) but forces a text answer.
+const buildBody = ({ systemInstruction, contents, tools = [], toolMode }) => ({
   systemInstruction: { parts: [{ text: systemInstruction }] },
   contents,
   generationConfig: {
@@ -31,13 +39,10 @@ const buildBody = ({ systemInstruction, contents, tools = [] }) => ({
     maxOutputTokens: env.gemini.maxOutputTokens,
   },
   ...(tools.length ? { tools: [{ functionDeclarations: tools }] } : {}),
+  ...(tools.length && toolMode ? { toolConfig: { functionCallingConfig: { mode: toolMode } } } : {}),
 });
 
-const modelAttempts = () => {
-  const primary = env.gemini.model;
-  const fallback = env.gemini.fallbackModel;
-  return [primary, primary, ...(fallback && fallback !== primary ? [fallback] : [])];
-};
+const modelAttempts = () => [env.gemini.model, env.gemini.model, ...fallbackModels()];
 
 const wait = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 

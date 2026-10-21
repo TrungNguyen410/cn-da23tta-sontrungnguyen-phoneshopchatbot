@@ -147,6 +147,30 @@ describe('AI chatbot', () => {
       expect(response.body.data.message.content).toContain('còn hàng (5 máy)');
     });
 
+    it('understands short price-direction and vague questions', async () => {
+      const prices = async (message) => {
+        const response = await send({ message, visitorId: VISITOR }).expect(201);
+        return { content: response.body.data.message.content, prices: response.body.data.message.products.map((item) => item.price) };
+      };
+
+      const cheap = await prices('rẻ');
+      expect(cheap.content).toContain('giá dễ chịu nhất');
+      expect(cheap.prices).toEqual([6990000, 9490000, 30990000]);
+
+      const premium = await prices('máy cao cấp');
+      expect(premium.content).toContain('cao cấp nhất');
+      expect(premium.prices).toEqual([33990000, 30990000, 9490000]);
+      expect((await prices('mắc')).prices[0]).toBe(33990000);
+
+      const vague = await prices('tư vấn');
+      expect(vague.content).toContain('**ngân sách**');
+      expect(vague.prices).toHaveLength(3);
+
+      const rude = await prices('ngu');
+      expect(rude.content).toContain('hỏi cụ thể hơn');
+      expect(rude.prices).toEqual([]);
+    });
+
     it('answers policy questions from the knowledge base', async () => {
       const response = await send({ message: 'Chính sách bảo hành thế nào?', visitorId: VISITOR }).expect(201);
       expect(response.body.data.message.content).toContain('12 tháng');
@@ -312,6 +336,20 @@ describe('AI chatbot', () => {
       const { contents } = geminiProvider.generate.mock.calls[1][0];
       expect(contents.map((item) => item.role)).toEqual(['user', 'model', 'user']);
       expect(contents[0].parts[0].text).toBe('Xin chào');
+    });
+
+    it('forces a text answer on the last step when the model keeps calling tools', async () => {
+      const search = { content: { role: 'model', parts: [{ functionCall: { name: 'search_products', args: { maxPrice: 20000000 } } }] } };
+      geminiProvider.generate
+        .mockResolvedValueOnce(search)
+        .mockResolvedValueOnce(search)
+        .mockResolvedValueOnce(search)
+        .mockResolvedValueOnce({ content: { role: 'model', parts: [{ text: 'Bạn tham khảo Galaxy A56 nhé.' }] } });
+
+      const response = await send({ message: 'máy pin trâu dưới 20 triệu', visitorId: VISITOR }).expect(201);
+
+      expect(response.body.data.message).toMatchObject({ source: 'gemini', content: 'Bạn tham khảo Galaxy A56 nhé.' });
+      expect(geminiProvider.generate.mock.calls.map(([request]) => request.toolMode)).toEqual([undefined, undefined, undefined, 'NONE']);
     });
 
     it('falls back to offline answers when Gemini fails', async () => {

@@ -108,6 +108,42 @@ describe('Gemini provider', () => {
     expect(result.content.parts[0].text).toBe('ok');
   });
 
+  it('sends toolConfig NONE when a text answer is forced', async () => {
+    Object.assign(env.gemini, { apiKey: 'test-key', model: 'primary-model', fallbackModel: '' });
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { role: 'model', parts: [{ text: 'ok' }] } }] }),
+    });
+
+    await geminiProvider.generate({ systemInstruction: '', contents: [], tools: [{ name: 'search_products' }], toolMode: 'NONE' });
+
+    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+    expect(body.toolConfig).toEqual({ functionCallingConfig: { mode: 'NONE' } });
+    expect(body.tools[0].functionDeclarations[0].name).toBe('search_products');
+  });
+
+  it('walks a comma-separated fallback list when quotas run out', async () => {
+    Object.assign(env.gemini, { apiKey: 'test-key', model: 'primary-model', fallbackModel: 'lite-a, lite-b' });
+    const quota = { ok: false, status: 429, text: async () => 'RESOURCE_EXHAUSTED' };
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce(quota)
+      .mockResolvedValueOnce(quota)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ candidates: [{ content: { role: 'model', parts: [{ text: 'ok' }] } }] }),
+      });
+
+    const result = await geminiProvider.generate({ systemInstruction: '', contents: [] });
+
+    expect(global.fetch.mock.calls.map(([url]) => url.match(/models\/([^:]+)/)[1]))
+      .toEqual(['primary-model', 'lite-a', 'lite-b']);
+    expect(result.content.parts[0].text).toBe('ok');
+    expect(geminiProvider.status()).toMatchObject({
+      fallbackModel: 'lite-a, lite-b',
+      quotaExhausted: ['primary-model', 'lite-a'],
+    });
+  });
+
   it('does not retry client errors such as an invalid key', async () => {
     Object.assign(env.gemini, { apiKey: 'test-key', model: 'primary-model', fallbackModel: 'backup-model' });
     global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 400, text: async () => 'API_KEY_INVALID' });
