@@ -111,6 +111,12 @@ Không có key, chatbot vẫn chạy ở chế độ offline.
 2. Trên SePay, tạo webhook trỏ tới `<API_PUBLIC_URL>/api/payments/sepay/webhook`, kiểu xác thực **API Key**, rồi đặt cùng giá trị vào `SEPAY_WEBHOOK_API_KEY`.
 3. Khách chọn “Chuyển khoản ngân hàng” → đặt hàng → quét VietQR với nội dung là mã đơn → trang đơn hàng tự cập nhật “Đã nhận thanh toán”.
 
+Chạy trên máy cá nhân (SePay không gọi được `localhost`): dùng tên miền cố định miễn phí của ngrok để URL webhook không đổi.
+
+1. Đăng ký tại dashboard.ngrok.com, lấy **Authtoken** và tên miền tại mục **Domains** (dạng `xxx.ngrok-free.app`).
+2. Trong `.env` gốc: `COMPOSE_PROFILES=tunnel`, `NGROK_AUTHTOKEN=...`, `NGROK_DOMAIN=xxx.ngrok-free.app`.
+3. `docker compose up -d` sẽ chạy thêm container `phoneshopai-tunnel`; URL webhook cố định là `https://xxx.ngrok-free.app/api/payments/sepay/webhook`.
+
 Theo phạm vi đề cương, có thể demo bằng webhook giả lập:
 
 ```bash
