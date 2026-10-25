@@ -17,6 +17,20 @@ Mỗi câu có tiêu chí đạt/không đạt (ví dụ: gợi ý đúng tầm 
 | 2 | Dự phòng – key hết hạn mức ngày (429) | 24/26 (92%) | [`result-2026-10-20-fallback-quota.json`](result-2026-10-20-fallback-quota.json). Sau lần 1 đã sửa: sạc dự phòng, mã giảm giá cụ thể, “trả lại”, câu ngoài phạm vi, so khớp nguyên từ. |
 | 3 | Offline (không dùng Gemini) | **26/26 (100%)** | [`result-2026-10-20-offline.json`](result-2026-10-20-offline.json). Sửa thêm: hiển thị “còn hàng”, ưu tiên cụm từ khoá trong kho kiến thức. Trung bình 52 ms/câu. |
 
+## Kết quả ngày 25/10/2026 (sau khi sửa lỗi từ code review)
+
+Chạy trên cơ sở dữ liệu tạm (MongoDB in-memory, dữ liệu seed chuẩn), khoá Gemini miễn phí, chuỗi model `gemini-3.5-flash` → `gemini-3.5-flash-lite` → `gemini-flash-lite-latest`.
+
+| Chỉ số | Kết quả |
+|---|---|
+| Đạt | **26/26 (100%)** – [`result-2026-10-25-gemini.json`](result-2026-10-25-gemini.json) |
+| Do Gemini trả lời | 11/26 – toàn bộ nhóm Tư vấn (6), So sánh (2), Chi tiết (1), Phụ kiện (2); **11/11 đạt**, mỗi câu gọi đúng công cụ |
+| Do chế độ dự phòng trả lời | 15/26 – từ câu 12, cả 3 model trả **429 hết hạn mức ngày**; 15/15 đạt |
+| Thời gian Gemini | 2,1–20,3 giây, trung bình 5,3 giây (lần 20/10: 4,5–19,4 giây) |
+| Thời gian dự phòng | trung bình 0,16 giây |
+
+So với lần 20/10, Gemini không còn lỗi 503 hay quá 40 giây; giới hạn duy nhất là hạn mức miễn phí (khoảng 20 lượt/ngày/model). Các nhóm Tra đơn, Khuyến mãi, Chính sách, Ngoài phạm vi, Bảo mật cần chạy lại bằng Gemini vào ngày khác hoặc khi bật thanh toán cho API key.
+
 ### Theo nhóm (lần 3 – offline)
 
 | Nhóm | Đạt |
