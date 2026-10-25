@@ -71,7 +71,7 @@ export default function Reviews() {
     <main className="page-shell reviews-page">
       <div className="container">
         <div className="page-hero">
-          <div><span>Khách hàng nói gì</span><h1>Trải nghiệm thật, chia sẻ thật</h1><p>Những phản hồi giúp TechPhone phục vụ bạn tốt hơn mỗi ngày.</p></div>
+          <div><span>Khách hàng nói gì</span><h1>Trải nghiệm thật, chia sẻ thật</h1><p>Những phản hồi giúp PhoneShopAI phục vụ bạn tốt hơn mỗi ngày.</p></div>
           <FiMessageSquare />
         </div>
         <section className="review-summary panel">
@@ -93,7 +93,7 @@ export default function Reviews() {
             ))}
           </section>
           <form className="panel global-review-form" onSubmit={submit}>
-            <h2>Gửi đánh giá</h2><p>Chia sẻ cảm nhận về dịch vụ TechPhone.</p>
+            <h2>Gửi đánh giá</h2><p>Chia sẻ cảm nhận về dịch vụ PhoneShopAI.</p>
             <label>Mức độ hài lòng</label>
             <div className="star-picker">{[1, 2, 3, 4, 5].map((star) => <button type="button" key={star} className={star <= form.rating ? 'active' : ''} onClick={() => setForm({ ...form, rating: star })}><FiStar /></button>)}</div>
             <textarea rows="6" value={form.comment} onChange={(event) => setForm({ ...form, comment: event.target.value })} placeholder="Hãy kể cho chúng tôi về trải nghiệm của bạn..." />

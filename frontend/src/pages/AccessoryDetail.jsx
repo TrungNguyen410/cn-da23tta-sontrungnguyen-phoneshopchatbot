@@ -25,7 +25,7 @@ export default function AccessoryDetail() {
 
   usePageMeta({
     title: accessory?.name || 'Chi tiết phụ kiện',
-    description: accessory?.description || 'Phụ kiện chính hãng tại TechPhone.',
+    description: accessory?.description || 'Phụ kiện chính hãng tại PhoneShopAI.',
     image: accessory?.image,
     canonicalPath: accessory ? `/accessories/${accessory.id}` : window.location.pathname,
     type: 'product',
@@ -103,7 +103,7 @@ export default function AccessoryDetail() {
               <h3>Quyền lợi mua hàng</h3>
               <p><FiCheck /> Sản phẩm chính hãng, đầy đủ phụ kiện</p>
               <p><FiCheck /> Đổi mới trong 30 ngày nếu lỗi kỹ thuật</p>
-              <p><FiCheck /> Bảo hành 12 tháng tại TechPhone</p>
+              <p><FiCheck /> Bảo hành 12 tháng tại PhoneShopAI</p>
             </div>
             <div className="purchase-row">
               <div className="quantity-control large">

@@ -116,7 +116,7 @@ export default function OrderManagement() {
     setSelectedOrder(order);
     setPaymentForm({ reference: order.paymentReference || '', note: '' });
     setTrackingForm({
-      shippingProvider: order.shippingProvider || 'TechPhone Express',
+      shippingProvider: order.shippingProvider || 'PhoneShopAI Express',
       trackingNumber: order.trackingNumber || '',
       estimatedDelivery: order.estimatedDelivery?.slice(0, 10) || '',
     });

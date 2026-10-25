@@ -119,7 +119,7 @@ describe('Account profile', () => {
       orderNumber: 'TPTRACKING',
       createdAt: '2026-07-29T08:00:00.000Z',
       estimatedDelivery: '2026-08-01T08:00:00.000Z',
-      shippingProvider: 'TechPhone Express',
+      shippingProvider: 'PhoneShopAI Express',
       trackingNumber: 'TPX123456',
       status: 'shipping',
       total: 12000000,
@@ -136,7 +136,7 @@ describe('Account profile', () => {
     render(<MemoryRouter initialEntries={['/account?tab=orders']}><Account /></MemoryRouter>);
 
     expect(await screen.findByText('TPX123456')).toBeInTheDocument();
-    expect(screen.getByText('TechPhone Express')).toBeInTheDocument();
+    expect(screen.getByText('PhoneShopAI Express')).toBeInTheDocument();
     expect(screen.getByText(/Dự kiến giao:/)).toBeInTheDocument();
   });
   it('does not offer self-cancel for a paid confirmed order', async () => {

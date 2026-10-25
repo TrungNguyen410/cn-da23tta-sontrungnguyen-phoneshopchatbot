@@ -39,7 +39,7 @@ export default function AdminSidebar({ open, onClose }) {
     <aside className={`admin-sidebar ${open ? 'open' : ''}`}>
       <div className="admin-brand">
         <span className="brand-mark">T</span>
-        <span>TechPhone<small>ADMIN CENTER</small></span>
+        <span>PhoneShopAI<small>ADMIN CENTER</small></span>
         <button onClick={onClose}><FiX /></button>
       </div>
       <nav>

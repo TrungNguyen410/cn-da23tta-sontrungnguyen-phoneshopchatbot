@@ -68,7 +68,7 @@ export default function SettingManagement() {
         </div>
       </section>
       <section className="admin-card settings-card">
-        <div className="settings-heading"><FiGlobe /><div><h2>Mạng xã hội</h2><p>Các kênh chính thức của TechPhone.</p></div></div>
+        <div className="settings-heading"><FiGlobe /><div><h2>Mạng xã hội</h2><p>Các kênh chính thức của PhoneShopAI.</p></div></div>
         <div className="form-grid">
           <label className="form-field full"><span>Facebook</span><input value={form.facebook} onChange={(event) => update('facebook', event.target.value)} /></label>
           <label className="form-field full"><span>Instagram</span><input value={form.instagram} onChange={(event) => update('instagram', event.target.value)} /></label>

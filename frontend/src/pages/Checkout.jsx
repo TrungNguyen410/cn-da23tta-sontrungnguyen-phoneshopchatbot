@@ -18,7 +18,7 @@ const paymentHint = (method) => {
   if (method === 'cod') return 'Thanh toán trực tiếp cho nhân viên giao hàng';
   if (method === 'bank') return 'Đặt hàng rồi quét mã VietQR theo mã đơn; thanh toán được xác nhận tự động';
   if (method === 'momo') return 'Quét mã MoMo và xác nhận thanh toán trước khi đặt hàng';
-  return 'Thanh toán an toàn trên cổng VNPay; TechPhone không thu thập thông tin thẻ';
+  return 'Thanh toán an toàn trên cổng VNPay; PhoneShopAI không thu thập thông tin thẻ';
 };
 const PAYMENT_CONFIRM_METHODS = ['momo'];
 const providerNameFor = (method) => (method === 'card' ? 'vnpay' : method);
@@ -80,7 +80,7 @@ export default function Checkout() {
   }, []);
 
   const transferContent = useMemo(
-    () => `${paymentReference} ${form.phone || 'TECHPHONE'}`.trim().toUpperCase(),
+    () => `${paymentReference} ${form.phone || 'PHONESHOPAI'}`.trim().toUpperCase(),
     [form.phone, paymentReference],
   );
   const shipping = useMemo(

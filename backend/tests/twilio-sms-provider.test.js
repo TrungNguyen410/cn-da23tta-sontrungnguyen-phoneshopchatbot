@@ -14,7 +14,7 @@ describe('TwilioProvider', () => {
       fetchImpl,
     });
 
-    await expect(provider.send({ to: '0912345678', body: 'Ma xac minh TechPhone: 123456' }))
+    await expect(provider.send({ to: '0912345678', body: 'Ma xac minh PhoneShopAI: 123456' }))
       .resolves.toEqual({ trackingId: 'SM123' });
 
     const [url, request] = fetchImpl.mock.calls[0];

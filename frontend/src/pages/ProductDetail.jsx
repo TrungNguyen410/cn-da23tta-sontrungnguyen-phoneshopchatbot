@@ -80,7 +80,7 @@ export default function ProductDetail() {
 
   usePageMeta({
     title: product?.name || 'Chi tiết điện thoại',
-    description: product?.description || 'Thông tin, giá bán và ưu đãi điện thoại chính hãng tại TechPhone.',
+    description: product?.description || 'Thông tin, giá bán và ưu đãi điện thoại chính hãng tại PhoneShopAI.',
     image: product?.image,
     canonicalPath: product ? `/products/${product.id}` : window.location.pathname,
     type: 'product',

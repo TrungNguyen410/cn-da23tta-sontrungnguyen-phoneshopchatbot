@@ -278,7 +278,7 @@ class OrderService {
           paymentMethod,
           paymentStatus: 'pending',
           paymentReference: payload.paymentReference || '',
-          shippingProvider: 'TechPhone Express',
+          shippingProvider: 'PhoneShopAI Express',
           trackingNumber: `TPX${Date.now().toString().slice(-10)}`,
           estimatedDelivery: new Date(Date.now() + shipping.days * 24 * 60 * 60 * 1000),
           note: payload.note || '',

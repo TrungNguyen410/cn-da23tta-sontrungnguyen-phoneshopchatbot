@@ -6,10 +6,10 @@ import { useStoreSettings } from '../hooks/useStoreSettings';
 import { isValidEmail, isValidVietnamesePhone, validateRequired } from '../utils/validators';
 
 const faqs = [
-  ['TechPhone có giao hàng toàn quốc không?', 'Có. Chúng tôi giao hàng toàn quốc, miễn phí với đơn hàng từ 10 triệu đồng.'],
+  ['PhoneShopAI có giao hàng toàn quốc không?', 'Có. Chúng tôi giao hàng toàn quốc, miễn phí với đơn hàng từ 10 triệu đồng.'],
   ['Sản phẩm được bảo hành bao lâu?', 'Điện thoại và phụ kiện được bảo hành từ 6 đến 24 tháng tùy sản phẩm.'],
   ['Tôi có thể đổi trả sản phẩm không?', 'Bạn có thể đổi trả trong 30 ngày nếu sản phẩm đáp ứng điều kiện chính sách.'],
-  ['TechPhone có hỗ trợ thu cũ đổi mới?', 'Có. Vui lòng mang thiết bị đến cửa hàng để được kiểm tra và định giá trực tiếp.'],
+  ['PhoneShopAI có hỗ trợ thu cũ đổi mới?', 'Có. Vui lòng mang thiết bị đến cửa hàng để được kiểm tra và định giá trực tiếp.'],
 ];
 
 export default function Contact() {

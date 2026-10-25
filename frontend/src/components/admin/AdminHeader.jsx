@@ -77,7 +77,7 @@ export default function AdminHeader({ onMenu }) {
     <header className="admin-header">
       <div>
         <button className="admin-menu-button" onClick={onMenu}><FiMenu /></button>
-        <div><small>TechPhone Admin</small><h1>{titles[page] || 'Quản trị'}</h1></div>
+        <div><small>PhoneShopAI Admin</small><h1>{titles[page] || 'Quản trị'}</h1></div>
       </div>
       <div className="admin-header-actions">
         <button className="admin-search-button" onClick={toggleSearch} aria-label="Tìm trang quản trị" aria-expanded={searchOpen}><FiSearch /></button>

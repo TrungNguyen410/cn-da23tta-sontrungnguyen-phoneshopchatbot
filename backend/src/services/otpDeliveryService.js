@@ -21,7 +21,7 @@ class OtpDeliveryService {
     if (this.smsProvider) {
       const { trackingId } = await this.smsProvider.send({
         to: target,
-        body: `Mã xác minh TechPhone: ${code}`,
+        body: `Mã xác minh PhoneShopAI: ${code}`,
       });
       return { deliveryTarget: maskPhone(target), trackingId };
     }

@@ -55,7 +55,7 @@ export default function BankTransferPanel({ order, onPaid }) {
       <section className="panel checkout-section bank-transfer-section bank-transfer-paid" role="status">
         <h2><FiCheckCircle /> Đã nhận thanh toán</h2>
         <p className="bank-transfer-note">
-          TechPhone đã nhận {formatCurrency(order.total)} cho đơn <strong>{order.orderNumber}</strong>.
+          PhoneShopAI đã nhận {formatCurrency(order.total)} cho đơn <strong>{order.orderNumber}</strong>.
           Đơn hàng đã được xác nhận tự động.
         </p>
       </section>
@@ -68,7 +68,7 @@ export default function BankTransferPanel({ order, onPaid }) {
       <h2><FiCreditCard /> Thanh toán chuyển khoản</h2>
       <div className="bank-transfer-grid">
         <div className="bank-qr-card">
-          <img src={buildVietQrUrl(display, order.total, order.orderNumber)} alt="Mã QR chuyển khoản TechPhone" />
+          <img src={buildVietQrUrl(display, order.total, order.orderNumber)} alt="Mã QR chuyển khoản PhoneShopAI" />
         </div>
         <div className="bank-transfer-info">
           <span>Quét QR hoặc chuyển khoản thủ công</span>
@@ -83,7 +83,7 @@ export default function BankTransferPanel({ order, onPaid }) {
         {bank.autoConfirm ? (
           <><FiLoader className="spin" /> Đang chờ thanh toán. Hệ thống sẽ <strong>tự động xác nhận</strong> trong vài giây sau khi nhận được tiền — vui lòng giữ đúng nội dung chuyển khoản.</>
         ) : (
-          <>Vui lòng ghi đúng nội dung chuyển khoản. Nhân viên TechPhone sẽ đối soát và xác nhận thanh toán.</>
+          <>Vui lòng ghi đúng nội dung chuyển khoản. Nhân viên PhoneShopAI sẽ đối soát và xác nhận thanh toán.</>
         )}
       </p>
     </section>

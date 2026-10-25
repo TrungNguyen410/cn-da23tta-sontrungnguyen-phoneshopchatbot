@@ -12,7 +12,7 @@ vi.mock('../../hooks/useAuth', () => ({
 }));
 vi.mock('../../hooks/useCart', () => ({ useCart: () => ({ cartCount: 0 }) }));
 vi.mock('../../hooks/useStoreSettings', () => ({
-  useStoreSettings: () => ({ hotline: '0900000000', storeName: 'TechPhone' }),
+  useStoreSettings: () => ({ hotline: '0900000000', storeName: 'PhoneShopAI' }),
 }));
 
 describe('Header search suggestions', () => {

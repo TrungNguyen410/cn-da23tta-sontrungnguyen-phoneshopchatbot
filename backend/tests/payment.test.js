@@ -60,7 +60,7 @@ describe('VNPay checkout and IPN', () => {
       name: 'Test Bank',
       bin: '970436',
       accountNumber: '123456789',
-      accountName: 'TECHPHONE TEST',
+      accountName: 'PHONESHOPAI TEST',
     });
 
     const response = await request(app).get('/api/payments/config').expect(200);
@@ -72,7 +72,7 @@ describe('VNPay checkout and IPN', () => {
         bankName: 'Test Bank',
         bankBin: '970436',
         accountNumber: '123456789',
-        accountName: 'TECHPHONE TEST',
+        accountName: 'PHONESHOPAI TEST',
       },
     });
     expect(response.body.data.providers.momo.enabled).toBe(false);
@@ -86,9 +86,9 @@ describe('VNPay checkout and IPN', () => {
       name: '  Test Bank  ',
       bin: ' 970436 ',
       accountNumber: ' 123456789 ',
-      accountName: ' TECHPHONE TEST ',
+      accountName: ' PHONESHOPAI TEST ',
     });
-    Object.assign(env.momo, { phone: '   ', accountName: ' TECHPHONE MOMO ' });
+    Object.assign(env.momo, { phone: '   ', accountName: ' PHONESHOPAI MOMO ' });
 
     const response = await request(app).get('/api/payments/config').expect(200);
 
@@ -96,7 +96,7 @@ describe('VNPay checkout and IPN', () => {
       bankName: 'Test Bank',
       bankBin: '970436',
       accountNumber: '123456789',
-      accountName: 'TECHPHONE TEST',
+      accountName: 'PHONESHOPAI TEST',
     });
     expect(response.body.data.providers.momo).toEqual({ enabled: false });
   });

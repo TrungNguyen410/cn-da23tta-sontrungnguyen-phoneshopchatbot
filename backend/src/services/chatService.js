@@ -26,7 +26,7 @@ const DEFAULT_CONFIG = {
 const formatVnd = (value) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 
 const buildSystemInstruction = (store = {}, user = null) => [
-  `Bạn là trợ lý tư vấn bán hàng AI của cửa hàng điện thoại ${store.storeName || 'TechPhone'}.`,
+  `Bạn là trợ lý tư vấn bán hàng AI của cửa hàng điện thoại ${store.storeName || 'PhoneShopAI'}.`,
   `Hotline: ${store.hotline || 'đang cập nhật'}. Địa chỉ: ${store.address || 'đang cập nhật'}. Hôm nay là ${new Date().toLocaleDateString('vi-VN')}.`,
   user ? `Khách đang đăng nhập với tên ${user.fullName}.` : 'Khách chưa đăng nhập.',
   '',

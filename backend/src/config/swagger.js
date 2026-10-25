@@ -3,9 +3,9 @@ const env = require('./env');
 const swaggerDocument = {
   openapi: '3.0.3',
   info: {
-    title: 'TechPhone Store REST API',
+    title: 'PhoneShopAI REST API',
     version: '1.0.0',
-    description: 'Production-ready REST API for the TechPhone Store Software Engineering course project.',
+    description: 'REST API for PhoneShopAI: phone store with an AI shopping assistant chatbot.',
   },
   servers: [
     {

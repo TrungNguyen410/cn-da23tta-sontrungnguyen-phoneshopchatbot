@@ -23,7 +23,7 @@ const { resolveSeedPassword } = require('../utils/seedCredentials');
 const imageFor = (label, color = '2563eb') =>
   `https://placehold.co/800x800/${color}/ffffff?text=${encodeURIComponent(label)}`;
 
-const brandNames = ['Apple', 'Samsung', 'Xiaomi', 'OPPO', 'Vivo', 'Honor', 'Realme', 'Google', 'Anker', 'Baseus', 'TechPhone'];
+const brandNames = ['Apple', 'Samsung', 'Xiaomi', 'OPPO', 'Vivo', 'Honor', 'Realme', 'Google', 'Anker', 'Baseus', 'PhoneShopAI'];
 const brandIdByName = Object.fromEntries(brandNames.map((name, index) => [name, `brand-${index + 1}`]));
 const categoryIdByName = {
   'Dien thoai': 'category-1',
@@ -61,7 +61,7 @@ const products = [
     battery: `${4500 + index * 120} mAh`,
     camera: `${48 + index * 4}MP camera system`,
     chip: 'Flagship 8-core chipset',
-    description: `${name} is a premium smartphone with strong performance, bright display, and official TechPhone warranty.`,
+    description: `${name} is a premium smartphone with strong performance, bright display, and official PhoneShopAI warranty.`,
     specifications: {
       Display: `${(6.3 + index * 0.1).toFixed(1)} inch OLED`,
       RAM: ram,
@@ -93,7 +93,7 @@ const accessories = [
     discountPercent: Math.round(((oldPrice - price) / oldPrice) * 100),
     image,
     images: [image],
-    description: `${name} is an official accessory with TechPhone warranty.`,
+    description: `${name} is an official accessory with PhoneShopAI warranty.`,
     specifications: { Brand: brand, Type: category, Warranty: '12 months' },
     stock: 20 + index * 8,
     sold: 50 + index * 20,
@@ -130,7 +130,7 @@ const run = async () => {
   await User.insertMany([
     {
       _id: 'user-admin',
-      fullName: 'Quan tri TechPhone',
+      fullName: 'Quan tri PhoneShopAI',
       email: 'admin@gmail.com',
       phone: '0900000000',
       password,
@@ -208,8 +208,8 @@ const run = async () => {
     name,
     slug: name.toLowerCase(),
     logo: imageFor(name, index % 2 ? '2563eb' : '0f766e'),
-    description: `${name} products available at TechPhone.`,
-    active: name !== 'TechPhone',
+    description: `${name} products available at PhoneShopAI.`,
+    active: name !== 'PhoneShopAI',
   })));
 
   await Product.insertMany([
@@ -240,7 +240,7 @@ const run = async () => {
     {
       _id: 'phone-inactive',
       name: 'Demo Hidden Phone',
-      brandId: brandIdByName.TechPhone,
+      brandId: brandIdByName.PhoneShopAI,
       categoryId: categoryIdByName['Dien thoai'],
       price: 9990000,
       oldPrice: 0,
@@ -278,7 +278,7 @@ const run = async () => {
     {
       _id: 'accessory-inactive',
       name: 'Demo Hidden Accessory',
-      brandId: brandIdByName.TechPhone,
+      brandId: brandIdByName.PhoneShopAI,
       categoryId: categoryIdByName['Phu kien'],
       price: 199000,
       oldPrice: 0,
@@ -450,9 +450,9 @@ const run = async () => {
     { _id: 'contact-3', fullName: 'Le Thu Trang', email: 'trang@example.com', phone: '0933333333', subject: 'Tu van phu kien', message: 'Can tu van sac nhanh phu hop.', status: 'resolved', adminNote: 'Suggested Anker 65W charger.' },
   ]);
   await Setting.insertMany([
-    { _id: 'setting-1', key: 'storeName', value: 'TechPhone', group: 'general', label: 'Store name' },
+    { _id: 'setting-1', key: 'storeName', value: 'PhoneShopAI', group: 'general', label: 'Store name' },
     { _id: 'setting-2', key: 'hotline', value: '1900 6868', group: 'general', label: 'Hotline' },
-    { _id: 'setting-3', key: 'email', value: 'support@techphone.vn', group: 'general', label: 'Support email' },
+    { _id: 'setting-3', key: 'email', value: 'support@phoneshopai.vn', group: 'general', label: 'Support email' },
     { _id: 'setting-4', key: 'address', value: '123 Nguyen Hue, District 1, Ho Chi Minh City', group: 'general', label: 'Store address' },
     { _id: 'setting-5', key: 'freeShippingThreshold', value: 10000000, group: 'checkout', label: 'Free shipping threshold' },
     { _id: 'setting-6', key: 'maintenanceMode', value: false, group: 'system', label: 'Maintenance mode' },
@@ -505,12 +505,12 @@ const run = async () => {
       title: 'Thông tin cửa hàng',
       category: 'store',
       keywords: ['địa chỉ', 'dia chi', 'hotline', 'giờ mở cửa', 'mo cua', 'liên hệ', 'cửa hàng'],
-      content: 'Cửa hàng mở cửa 8:00-21:30 tất cả các ngày trong tuần. Hotline 1900 6868, email support@techphone.vn, '
+      content: 'Cửa hàng mở cửa 8:00-21:30 tất cả các ngày trong tuần. Hotline 1900 6868, email support@phoneshopai.vn, '
         + 'địa chỉ 123 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh.',
     },
   ]);
 
-  console.log('TechPhone seed data inserted successfully.');
+  console.log('PhoneShopAI seed data inserted successfully.');
   await disconnectDB();
 };
 

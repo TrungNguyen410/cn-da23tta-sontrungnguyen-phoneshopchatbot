@@ -11,7 +11,7 @@ const display = {
   bankName: 'Test Bank',
   bankBin: '970436',
   accountNumber: '123456789',
-  accountName: 'TECHPHONE TEST',
+  accountName: 'PHONESHOPAI TEST',
 };
 const order = {
   id: 'order-1',
@@ -44,7 +44,7 @@ describe('BankTransferPanel', () => {
 
     expect(await screen.findByText('Test Bank')).toBeInTheDocument();
     expect(screen.getByText('TP2610200001')).toBeInTheDocument();
-    expect(screen.getByText(/Nhân viên TechPhone sẽ đối soát/)).toBeInTheDocument();
+    expect(screen.getByText(/Nhân viên PhoneShopAI sẽ đối soát/)).toBeInTheDocument();
   });
 
   it('polls the order and switches to paid when SePay confirms it', async () => {

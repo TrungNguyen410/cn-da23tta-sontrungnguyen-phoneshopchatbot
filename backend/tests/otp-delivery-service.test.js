@@ -34,7 +34,7 @@ describe('OtpDeliveryService', () => {
     });
     expect(smsProvider.send).toHaveBeenCalledWith({
       to: '0912345678',
-      body: 'Mã xác minh TechPhone: 654321',
+      body: 'Mã xác minh PhoneShopAI: 654321',
     });
   });
 

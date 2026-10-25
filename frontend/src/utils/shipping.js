@@ -36,8 +36,8 @@ export const SHIPPING_PROVINCES = [
 ];
 
 export function getShippingQuote({ province = '', subtotal = 0 } = {}) {
-  if (Number(subtotal) >= 10000000) return { fee: 0, eta: '1 ngày', provider: 'TechPhone Express' };
-  if (province === 'TP. Hồ Chí Minh') return { fee: 20000, eta: '1 ngày', provider: 'TechPhone Express' };
-  if (province === 'Hà Nội' || province === 'Đà Nẵng') return { fee: 30000, eta: '2 ngày', provider: 'TechPhone Express' };
-  return { fee: 40000, eta: '4 ngày', provider: 'TechPhone Express' };
+  if (Number(subtotal) >= 10000000) return { fee: 0, eta: '1 ngày', provider: 'PhoneShopAI Express' };
+  if (province === 'TP. Hồ Chí Minh') return { fee: 20000, eta: '1 ngày', provider: 'PhoneShopAI Express' };
+  if (province === 'Hà Nội' || province === 'Đà Nẵng') return { fee: 30000, eta: '2 ngày', provider: 'PhoneShopAI Express' };
+  return { fee: 40000, eta: '4 ngày', provider: 'PhoneShopAI Express' };
 }

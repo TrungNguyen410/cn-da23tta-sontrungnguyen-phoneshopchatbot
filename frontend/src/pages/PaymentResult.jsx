@@ -83,7 +83,7 @@ export default function PaymentResult() {
   const description = completedCheckout
     ? mock
       ? 'Chế độ dữ liệu mẫu đã hoàn tất luồng thanh toán.'
-      : 'TechPhone đang chờ VNPay gửi xác nhận máy chủ. Trạng thái đơn sẽ tự cập nhật sau khi đối soát.'
+      : 'PhoneShopAI đang chờ VNPay gửi xác nhận máy chủ. Trạng thái đơn sẽ tự cập nhật sau khi đối soát.'
     : verifiedResult?.valid
       ? 'VNPay không ghi nhận thanh toán thành công. Bạn có thể quay lại thanh toán với cùng đơn hàng.'
       : 'Kết quả thanh toán chưa được máy chủ xác minh. Giỏ hàng của bạn vẫn được giữ nguyên.';
@@ -109,7 +109,7 @@ export default function PaymentResult() {
             </Link>
           </div>
           <p className="payment-result-help">
-            Nếu tài khoản đã bị trừ tiền nhưng đơn chưa cập nhật, hãy giữ lại mã giao dịch và liên hệ TechPhone.
+            Nếu tài khoản đã bị trừ tiền nhưng đơn chưa cập nhật, hãy giữ lại mã giao dịch và liên hệ PhoneShopAI.
           </p>
         </section>
       </div>

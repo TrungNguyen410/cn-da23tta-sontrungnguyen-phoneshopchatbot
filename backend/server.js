@@ -5,11 +5,11 @@ const env = require('./src/config/env');
 const startServer = async () => {
   await connectDB();
   app.listen(env.port, () => {
-    console.log(`TechPhone API running on port ${env.port}`);
+    console.log(`PhoneShopAI API running on port ${env.port}`);
   });
 };
 
 startServer().catch((error) => {
-  console.error('Failed to start TechPhone API:', error);
+  console.error('Failed to start PhoneShopAI API:', error);
   process.exit(1);
 });

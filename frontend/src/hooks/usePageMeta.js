@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
-const DEFAULT_TITLE = 'TechPhone | Điện thoại & Phụ kiện';
-const DEFAULT_DESCRIPTION = 'TechPhone - Điện thoại và phụ kiện chính hãng, giá tốt, giao nhanh.';
+const DEFAULT_TITLE = 'PhoneShopAI | Điện thoại & Phụ kiện';
+const DEFAULT_DESCRIPTION = 'PhoneShopAI - Điện thoại và phụ kiện chính hãng, giá tốt, giao nhanh.';
 
 const upsertMeta = (selector, attribute, key, value) => {
   let node = document.head.querySelector(selector);
@@ -38,7 +38,7 @@ const resetPageMeta = () => {
 
 export function usePageMeta({ title, description, image, canonicalPath, type = 'website', structuredData }) {
   useEffect(() => {
-    const fullTitle = title ? `${title} | TechPhone` : DEFAULT_TITLE;
+    const fullTitle = title ? `${title} | PhoneShopAI` : DEFAULT_TITLE;
     const metaDescription = description || DEFAULT_DESCRIPTION;
     const canonicalUrl = new URL(canonicalPath || window.location.pathname, window.location.origin).href;
     document.title = fullTitle;

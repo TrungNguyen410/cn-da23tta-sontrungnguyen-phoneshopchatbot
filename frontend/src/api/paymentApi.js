@@ -11,15 +11,15 @@ export const paymentApi = {
             bank: {
               enabled: true,
               display: {
-                bankName: 'TechPhone Demo Bank',
+                bankName: 'PhoneShopAI Demo Bank',
                 bankBin: '970436',
                 accountNumber: '0000000000',
-                accountName: 'TECHPHONE STORE DEMO',
+                accountName: 'PHONESHOPAI DEMO',
               },
             },
             momo: {
               enabled: true,
-              display: { phone: '0900000000', accountName: 'TECHPHONE STORE DEMO' },
+              display: { phone: '0900000000', accountName: 'PHONESHOPAI DEMO' },
             },
             vnpay: { enabled: true, mode: 'sandbox' },
           },

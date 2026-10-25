@@ -38,7 +38,7 @@ describe('usePageMeta', () => {
 
     view.rerender(<MetaHarness product={false} />);
 
-    expect(document.title).toBe('Liên hệ | TechPhone');
+    expect(document.title).toBe('Liên hệ | PhoneShopAI');
     expect(document.head.querySelector('meta[property="og:image"]')).not.toBeInTheDocument();
     expect(document.getElementById('page-structured-data')).not.toBeInTheDocument();
     expect(document.head.querySelector('meta[property="og:type"]')).toHaveAttribute('content', 'website');

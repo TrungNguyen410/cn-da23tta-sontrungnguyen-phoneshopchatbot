@@ -21,7 +21,7 @@ export default function SupportLauncher() {
     <div className={`support-launcher ${open ? 'is-open' : ''}`}>
       {open && (
         <div className="support-panel panel" ref={panelRef} aria-label="Kênh hỗ trợ">
-          <div><strong>Liên hệ TechPhone</strong><button type="button" aria-label="Đóng hỗ trợ" onClick={() => setOpen(false)}><FiX /></button></div>
+          <div><strong>Liên hệ PhoneShopAI</strong><button type="button" aria-label="Đóng hỗ trợ" onClick={() => setOpen(false)}><FiX /></button></div>
           <a href={`tel:${settings.hotline.replace(/\s/g, '')}`}><FiPhone /><span><strong>Gọi hotline</strong><small>{settings.hotline}</small></span></a>
           <a href={`mailto:${settings.email}`}><FiMail /><span><strong>Gửi email</strong><small>{settings.email}</small></span></a>
           {settings.zaloUrl && <a href={settings.zaloUrl} target="_blank" rel="noreferrer"><FiMessageCircle /><span><strong>Mở Zalo</strong><small>Kênh do cửa hàng cấu hình</small></span></a>}

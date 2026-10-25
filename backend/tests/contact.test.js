@@ -125,17 +125,17 @@ describe('Contact support workflow', () => {
   });
 
   test('allows only supported setting update fields', async () => {
-    const setting = await Setting.create({ key: 'store_name', value: 'TechPhone', group: 'general', label: 'Store name' });
+    const setting = await Setting.create({ key: 'store_name', value: 'PhoneShopAI', group: 'general', label: 'Store name' });
     await createUser({ email: 'setting-admin@test.com', phone: '0900000003', role: 'admin' });
     const token = await login('setting-admin@test.com');
 
     const response = await request(app)
       .put(`/api/admin/settings/${setting.id}`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ value: 'TechPhone Plus', key: 'forged_key', isDeleted: true });
+      .send({ value: 'PhoneShopAI Plus', key: 'forged_key', isDeleted: true });
 
     expect(response.status).toBe(200);
     const persisted = (await Setting.findById(setting.id)).toJSON();
-    expect(persisted).toMatchObject({ key: 'store_name', value: 'TechPhone Plus', isDeleted: false });
+    expect(persisted).toMatchObject({ key: 'store_name', value: 'PhoneShopAI Plus', isDeleted: false });
   });
 });

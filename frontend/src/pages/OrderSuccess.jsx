@@ -68,7 +68,7 @@ export default function OrderSuccess() {
           <div className="success-icon"><FiCheck /></div>
           <span className="eyebrow">Đặt hàng thành công</span>
           <h1>Cảm ơn bạn đã mua sắm!</h1>
-          <p>Đơn hàng đã được tiếp nhận. TechPhone sẽ liên hệ xác nhận trong thời gian sớm nhất.</p>
+          <p>Đơn hàng đã được tiếp nhận. PhoneShopAI sẽ liên hệ xác nhận trong thời gian sớm nhất.</p>
           <div className="order-highlight">
             <div><small>Mã đơn hàng</small><strong>{order.orderNumber}</strong></div>
             <div><small>Ngày đặt</small><strong>{formatDate(order.createdAt, true)}</strong></div>

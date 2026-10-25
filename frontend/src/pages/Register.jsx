@@ -62,7 +62,7 @@ export default function Register() {
 
   return (
     <main className="auth-page register-page">
-      <div className="auth-visual"><div><FiUserPlus /><h1>Gia nhập cộng đồng<br />TechPhone</h1><p>Theo dõi đơn hàng, nhận ưu đãi và chăm sóc cá nhân hóa.</p></div></div>
+      <div className="auth-visual"><div><FiUserPlus /><h1>Gia nhập cộng đồng<br />PhoneShopAI</h1><p>Theo dõi đơn hàng, nhận ưu đãi và chăm sóc cá nhân hóa.</p></div></div>
       <div className="auth-panel">
         <Link className="brand" to="/"><span className="brand-mark">T</span><span>Tech<span>Phone</span></span></Link>
         <form className="auth-form" onSubmit={step === 'details' ? submitDetails : submitOtp}>

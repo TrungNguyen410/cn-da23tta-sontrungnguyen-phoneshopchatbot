@@ -8,11 +8,11 @@ const accessoryCatalog = [
   ['Pin dự phòng 20.000mAh', 'Baseus', 'Pin dự phòng', 890000, 1190000, '#f97316'],
   ['Apple Watch Series 10', 'Apple', 'Đồng hồ', 9990000, 11990000, '#0ea5e9'],
   ['Galaxy Watch7', 'Samsung', 'Đồng hồ', 5990000, 6990000, '#1d4ed8'],
-  ['Ốp lưng MagSafe trong suốt', 'TechPhone', 'Ốp lưng', 390000, 590000, '#14b8a6'],
+  ['Ốp lưng MagSafe trong suốt', 'PhoneShopAI', 'Ốp lưng', 390000, 590000, '#14b8a6'],
   ['Cáp USB-C bện 100W', 'Anker', 'Cáp sạc', 350000, 490000, '#ef4444'],
   ['Tai nghe Sony WH-1000XM5', 'Sony', 'Tai nghe', 7490000, 8990000, '#111827'],
   ['Loa JBL Flip 6', 'JBL', 'Loa', 2590000, 3290000, '#06b6d4'],
-  ['Kính cường lực Privacy', 'TechPhone', 'Bảo vệ màn hình', 250000, 350000, '#64748b'],
+  ['Kính cường lực Privacy', 'PhoneShopAI', 'Bảo vệ màn hình', 250000, 350000, '#64748b'],
   ['Giá đỡ điện thoại ô tô', 'Baseus', 'Giá đỡ', 450000, 650000, '#f59e0b'],
 ];
 
@@ -31,7 +31,7 @@ export const mockAccessories = accessoryCatalog.map(
       discountPercent: Math.round(((oldPrice - price) / oldPrice) * 100),
       image,
       images: [image],
-      description: `${name} chính hãng, tương thích tốt, thiết kế bền đẹp và được bảo hành tại TechPhone.`,
+      description: `${name} chính hãng, tương thích tốt, thiết kế bền đẹp và được bảo hành tại PhoneShopAI.`,
       specifications: {
         'Thương hiệu': brand,
         'Loại phụ kiện': category,

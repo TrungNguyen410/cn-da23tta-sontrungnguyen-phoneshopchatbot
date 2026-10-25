@@ -191,7 +191,7 @@ export default function Home() {
       <section className="store-story">
         <div className="container store-story-grid">
           <div>
-            <span className="eyebrow">An tâm chọn TechPhone</span>
+            <span className="eyebrow">An tâm chọn PhoneShopAI</span>
             <h2>Công nghệ tốt hơn, trải nghiệm gần gũi hơn</h2>
             <p>
               Mỗi thiết bị đều được kiểm định kỹ, công khai tình trạng và đi kèm chính sách bảo hành

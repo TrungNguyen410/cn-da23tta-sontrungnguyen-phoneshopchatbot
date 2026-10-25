@@ -57,7 +57,7 @@ export const mockProducts = catalog.map(([name, brand, price, oldPrice, ram, sto
     battery: `${4400 + (index % 8) * 150} mAh`,
     camera: `${48 + (index % 4) * 16}MP, chống rung quang học`,
     chip: index % 3 === 0 ? 'Chip flagship thế hệ mới' : 'Chip 8 nhân hiệu năng cao',
-    description: `${name} mang đến trải nghiệm cao cấp với hiệu năng mạnh mẽ, camera sắc nét và thời lượng pin bền bỉ. Sản phẩm được kiểm định kỹ lưỡng, bảo hành rõ ràng tại TechPhone.`,
+    description: `${name} mang đến trải nghiệm cao cấp với hiệu năng mạnh mẽ, camera sắc nét và thời lượng pin bền bỉ. Sản phẩm được kiểm định kỹ lưỡng, bảo hành rõ ràng tại PhoneShopAI.`,
     specifications: {
       'Màn hình': `${(6.1 + (index % 7) * 0.1).toFixed(1)} inch OLED, 120Hz`,
       'Hệ điều hành': brand === 'Apple' ? 'iOS' : 'Android',

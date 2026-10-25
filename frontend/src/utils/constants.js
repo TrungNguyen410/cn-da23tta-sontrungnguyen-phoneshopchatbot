@@ -1,6 +1,6 @@
 import { runtimeConfig } from './runtimeConfig';
 
-export const APP_NAME = 'TechPhone';
+export const APP_NAME = 'PhoneShopAI';
 export const API_URL = runtimeConfig.apiUrl;
 export const USE_MOCK = runtimeConfig.useMock;
 

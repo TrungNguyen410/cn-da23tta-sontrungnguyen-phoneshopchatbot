@@ -59,7 +59,7 @@ const orderSchema = new mongoose.Schema(
       confirmedAt: { type: Date, default: null },
       note: { type: String, default: '' },
     },
-    shippingProvider: { type: String, default: 'TechPhone Express' },
+    shippingProvider: { type: String, default: 'PhoneShopAI Express' },
     trackingNumber: { type: String, default: '' },
     estimatedDelivery: { type: Date, default: null },
     customer: { type: customerSchema, required: true },

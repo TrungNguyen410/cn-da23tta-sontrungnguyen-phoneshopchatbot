@@ -2,14 +2,14 @@ import { STORAGE_KEYS } from './constants';
 import { storage } from './storage';
 
 export const DEFAULT_STORE_SETTINGS = {
-  storeName: 'TechPhone',
+  storeName: 'PhoneShopAI',
   hotline: '1900 6868',
-  email: 'support@techphone.vn',
+  email: 'support@phoneshopai.vn',
   address: '123 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh',
   logo: '',
-  facebook: 'https://facebook.com/techphone',
-  instagram: 'https://instagram.com/techphone',
-  youtube: 'https://youtube.com/@techphone',
+  facebook: 'https://facebook.com/phoneshopai',
+  instagram: 'https://instagram.com/phoneshopai',
+  youtube: 'https://youtube.com/@phoneshopai',
   zaloUrl: '',
 };
 
