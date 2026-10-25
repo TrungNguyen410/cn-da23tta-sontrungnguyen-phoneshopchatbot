@@ -8,6 +8,7 @@ const voucherRepository = require('../repositories/voucherRepository');
 const orderService = require('./orderService');
 const voucherService = require('./voucherService');
 const { buildRegex } = require('../utils/query');
+const { normalizeVi } = require('../utils/vietnamese');
 
 const MAX_RESULTS = 5;
 const ORDER_STATUS_LABELS = {
@@ -159,12 +160,7 @@ const keywordFilter = (keyword, fields) => {
   };
 };
 
-const plain = (value) => String(value || '')
-  .toLowerCase()
-  .normalize('NFD')
-  .replace(/[̀-ͯ]/g, '')
-  .replace(/đ/g, 'd')
-  .trim();
+const plain = (value) => normalizeVi(value).trim();
 
 const matchingCategoryIds = async (keyword) => {
   const target = plain(keyword);

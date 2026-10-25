@@ -1,13 +1,7 @@
 const BaseRepository = require('./baseRepository');
 const KnowledgeArticle = require('../models/KnowledgeArticle');
 
-const tokenize = (value) => String(value || '')
-  .toLowerCase()
-  .normalize('NFD')
-  .replace(/[̀-ͯ]/g, '')
-  .replace(/đ/g, 'd')
-  .split(/[^a-z0-9]+/)
-  .filter((token) => token.length > 1);
+const { tokenizeVi: tokenize } = require('../utils/vietnamese');
 
 class KnowledgeArticleRepository extends BaseRepository {
   constructor() {

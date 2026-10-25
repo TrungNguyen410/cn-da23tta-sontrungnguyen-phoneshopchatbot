@@ -5,13 +5,13 @@ const settingRepository = require('../repositories/settingRepository');
 const userRepository = require('../repositories/userRepository');
 const geminiProvider = require('./aiProviders/geminiProvider');
 const chatTools = require('./chatTools');
-const { tokenize } = require('../repositories/knowledgeArticleRepository');
+const { ORDER_NUMBER_PATTERN } = require('../utils/orderNumber');
+const { normalizeVi, tokenizeVi: tokenize } = require('../utils/vietnamese');
 
 const HISTORY_LIMIT = 12;
 const MAX_TOOL_STEPS = 4;
 const MAX_CARDS = 6;
-const ORDER_NUMBER_PATTERN = /\bTP\d{6,12}\b/i;
-const PHONE_PATTERN = /(?:\+?84|0)\d{9}/;
+const PHONE_PATTERN = /(?<!\d)(?:\+?84|0)\d{9}(?!\d)/;
 
 const DEFAULT_CONFIG = {
   greeting: 'Xin chào! Mình là **trợ lý AI** của cửa hàng. Mình có thể:\n- Tư vấn chọn điện thoại theo ngân sách, nhu cầu\n- So sánh các mẫu máy\n- Tra cứu đơn hàng, khuyến mãi, chính sách\nBạn cần hỗ trợ gì ạ?',
@@ -42,11 +42,7 @@ const buildSystemInstruction = (store = {}, user = null) => [
   '9. Không yêu cầu hay lưu mật khẩu, số thẻ, mã OTP của khách.',
 ].join('\n');
 
-const normalize = (value) => String(value || '')
-  .toLowerCase()
-  .normalize('NFD')
-  .replace(/[̀-ͯ]/g, '')
-  .replace(/đ/g, 'd');
+const normalize = normalizeVi;
 
 const BRAND_ALIASES = {
   apple: 'Apple', iphone: 'Apple', samsung: 'Samsung', galaxy: 'Samsung', xiaomi: 'Xiaomi',
@@ -64,7 +60,10 @@ const RUDE_WORDS = ['ngu', 'dot', 'vo dung', 'ngao'];
 const EXAMPLE_QUESTIONS = '"điện thoại dưới 10 triệu", "máy chơi game tầm 15 triệu", "so sánh iPhone 16 và Galaxy S25", "chính sách bảo hành"';
 // Most specific phrases first so "sạc dự phòng" is not treated as a plain charger.
 const ACCESSORY_WORDS = ['du phong', 'op lung', 'tai nghe', 'cuong luc', 'cu sac', 'phu kien', 'airpods', 'sac', 'cap'];
-const VOUCHER_CODE_PATTERN = /\b([A-Z][A-Z0-9]{3,19})\b/g;
+// Unicode-aware boundaries, so the ASCII start of an uppercase Vietnamese word ("KHUYẾN") is not a code.
+const VOUCHER_CODE_PATTERN = /(?<![\p{L}\d])([A-Z][A-Z0-9]{3,19})(?![\p{L}\d])/gu;
+// Uppercase words customers type that are never voucher codes.
+const NOT_VOUCHER_WORDS = new Set(['VOUCHER', 'COUPON', 'CODE', 'SALE', 'VNPAY', 'MOMO', 'SEPAY', 'BANK', 'SHOP', 'SHIP', 'FREE', 'HELLO']);
 // Words that indicate a shopping question; without any of them the offline mode declines politely.
 const SHOPPING_WORDS = [
   // Accent-stripped, so ambiguous words ("mua" = mua/mùa, "hang" = hàng/hãng/hằng) are avoided.
@@ -222,26 +221,36 @@ class ChatService {
 
     const toolCalls = [];
     const products = [];
-    let streamedText = '';
+    // Text from every step is kept, in both streaming and JSON mode, so the two endpoints store the
+    // same answer; text written before a tool call ("Để mình tìm giúp bạn.") gets a blank line after it.
+    let replyText = '';
+    let needsBreak = false;
+    const addText = (piece) => {
+      if (!piece) return '';
+      const output = needsBreak ? `\n\n${piece}` : piece;
+      needsBreak = false;
+      replyText += output;
+      return output;
+    };
     for (let step = 0; step < MAX_TOOL_STEPS; step += 1) {
       // On the last step the model must answer with what it already found instead of searching again.
       const isLastStep = step === MAX_TOOL_STEPS - 1;
       const request = { systemInstruction, contents, tools: chatTools.declarations, ...(isLastStep ? { toolMode: 'NONE' } : {}) };
       const { content } = onDelta
         ? await geminiProvider.stream(request, (delta) => {
-          streamedText += delta;
-          onDelta(delta);
+          const output = addText(delta);
+          if (output) onDelta(output);
         })
         : await geminiProvider.generate(request);
+      if (!onDelta) {
+        addText(content.parts
+          .filter((part) => typeof part.text === 'string' && !part.thought)
+          .map((part) => part.text)
+          .join(''));
+      }
       const calls = content.parts.filter((part) => part.functionCall);
       if (!calls.length) {
-        const reply = onDelta
-          ? streamedText.trim()
-          : content.parts
-            .filter((part) => typeof part.text === 'string' && !part.thought)
-            .map((part) => part.text)
-            .join('')
-            .trim();
+        const reply = replyText.trim();
         return {
           reply: reply || 'Xin lỗi, mình chưa có câu trả lời phù hợp. Bạn có thể hỏi lại chi tiết hơn không?',
           products,
@@ -250,6 +259,7 @@ class ChatService {
         };
       }
 
+      if (replyText.trim()) needsBreak = true;
       contents.push(content);
       const responses = [];
       for (const { functionCall } of calls) {
@@ -284,7 +294,10 @@ class ChatService {
 
     const orderNumber = ORDER_NUMBER_PATTERN.exec(text)?.[0];
     if (orderNumber || /don hang|tra cuu|kiem tra don|ma don/.test(normalized)) {
-      const phone = PHONE_PATTERN.exec(text.replace(/[\s.]/g, ''))?.[0];
+      // Drop the order number first so its digits cannot be read as part of the phone,
+      // then rejoin phones written in groups ("0912 345 678", "0912.345.678").
+      const phoneText = text.replace(ORDER_NUMBER_PATTERN, ' ').replace(/(\d)[\s.](?=\d)/g, '$1');
+      const phone = PHONE_PATTERN.exec(phoneText)?.[0];
       if (!orderNumber || !phone) {
         return done('Để tra cứu đơn hàng, bạn vui lòng gửi **mã đơn** (bắt đầu bằng TP) và **số điện thoại người nhận** nhé.');
       }
@@ -299,13 +312,26 @@ class ChatService {
       ].filter(Boolean).join('\n'));
     }
 
+    const listPromotions = async (prefix = '') => {
+      const { result } = await run('list_promotions', {});
+      const lines = result.vouchers?.length
+        ? ['Các mã giảm giá đang áp dụng:', ...result.vouchers.map((voucher) => {
+          const value = voucher.type === 'percent' ? `${voucher.value}%` : formatVnd(voucher.value);
+          return `- **${voucher.code}**: giảm ${voucher.type === 'shipping' ? 'phí giao hàng ' : ''}${value}, đơn từ ${formatVnd(voucher.minOrder)}`;
+        })]
+        : ['Hiện cửa hàng chưa có mã giảm giá nào đang áp dụng.'];
+      return done([prefix, ...lines].filter(Boolean).join('\n'));
+    };
+
     const voucherCode = [...text.matchAll(VOUCHER_CODE_PATTERN)]
       .map((match) => match[1])
-      .find((code) => !ORDER_NUMBER_PATTERN.test(code) && !BRAND_ALIASES[code.toLowerCase()]);
+      .find((code) => !ORDER_NUMBER_PATTERN.test(code)
+        && !BRAND_ALIASES[code.toLowerCase()]
+        && !NOT_VOUCHER_WORDS.has(code));
     if (voucherCode && (/\bma\b/.test(normalized) || PROMO_WORDS.some((word) => hasPhrase(normalized, word)))) {
       const subtotal = parseBudget(normalized).maxPrice;
       const { result } = await run('list_promotions', { code: voucherCode, ...(subtotal ? { subtotal } : {}) });
-      if (!result.valid) return done(`Mã **${voucherCode}** chưa áp dụng được: ${result.message}`);
+      if (!result.valid) return listPromotions(`Mã **${voucherCode}** chưa áp dụng được: ${result.message}.`);
       const { voucher } = result;
       const value = voucher.type === 'percent' ? `${voucher.value}%` : formatVnd(voucher.value);
       return done([
@@ -315,14 +341,7 @@ class ChatService {
       ].join('\n'));
     }
 
-    if (PROMO_WORDS.some((word) => hasPhrase(normalized, word))) {
-      const { result } = await run('list_promotions', {});
-      if (!result.vouchers?.length) return done('Hiện cửa hàng chưa có mã giảm giá nào đang áp dụng.');
-      return done(['Các mã giảm giá đang áp dụng:', ...result.vouchers.map((voucher) => {
-        const value = voucher.type === 'percent' ? `${voucher.value}%` : formatVnd(voucher.value);
-        return `- **${voucher.code}**: giảm ${voucher.type === 'shipping' ? 'phí giao hàng ' : ''}${value}, đơn từ ${formatVnd(voucher.minOrder)}`;
-      })].join('\n'));
-    }
+    if (PROMO_WORDS.some((word) => hasPhrase(normalized, word))) return listPromotions();
 
     if (POLICY_WORDS.some((word) => hasPhrase(normalized, word))) {
       const { result } = await run('search_store_policies', { query: text });

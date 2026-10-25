@@ -144,6 +144,54 @@ describe('Gemini provider', () => {
     });
   });
 
+  it('waits between real requests only, not for models skipped while cooling down', async () => {
+    Object.assign(env.gemini, { apiKey: 'test-key', model: 'primary-model', fallbackModel: 'lite-a' });
+    const ok = { ok: true, json: async () => ({ candidates: [{ content: { role: 'model', parts: [{ text: 'ok' }] } }] }) };
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({ ok: false, status: 429, text: async () => 'RESOURCE_EXHAUSTED' })
+      .mockResolvedValue(ok);
+    await geminiProvider.generate({ systemInstruction: '', contents: [] });
+
+    // Primary is now cooling down: the next call goes straight to the fallback without any delay.
+    const previousEnv = env.nodeEnv;
+    env.nodeEnv = 'development';
+    jest.useFakeTimers();
+    try {
+      global.fetch = jest.fn().mockResolvedValue(ok);
+      const result = await geminiProvider.generate({ systemInstruction: '', contents: [] });
+      expect(result.content.parts[0].text).toBe('ok');
+      expect(global.fetch.mock.calls.map(([url]) => url.match(/models\/([^:]+)/)[1])).toEqual(['lite-a']);
+    } finally {
+      jest.useRealTimers();
+      env.nodeEnv = previousEnv;
+    }
+  });
+
+  it('tries the fallback model when the primary times out or is unreachable', async () => {
+    Object.assign(env.gemini, { apiKey: 'test-key', model: 'primary-model', fallbackModel: 'lite-a' });
+    global.fetch = jest.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' }))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ candidates: [{ content: { role: 'model', parts: [{ text: 'ok' }] } }] }),
+      });
+
+    const result = await geminiProvider.generate({ systemInstruction: '', contents: [] });
+
+    // The timed-out primary is not retried; the fallback answers.
+    expect(global.fetch.mock.calls.map(([url]) => url.match(/models\/([^:]+)/)[1])).toEqual(['primary-model', 'lite-a']);
+    expect(result.content.parts[0].text).toBe('ok');
+  });
+
+  it('reports a connection error when every model is unreachable', async () => {
+    Object.assign(env.gemini, { apiKey: 'test-key', model: 'primary-model', fallbackModel: 'lite-a' });
+    global.fetch = jest.fn().mockRejectedValue(new Error('getaddrinfo ENOTFOUND'));
+
+    await expect(geminiProvider.generate({ systemInstruction: '', contents: [] }))
+      .rejects.toMatchObject({ statusCode: 502, message: expect.stringContaining('Không kết nối được Gemini API') });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
   it('does not retry client errors such as an invalid key', async () => {
     Object.assign(env.gemini, { apiKey: 'test-key', model: 'primary-model', fallbackModel: 'backup-model' });
     global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 400, text: async () => 'API_KEY_INVALID' });

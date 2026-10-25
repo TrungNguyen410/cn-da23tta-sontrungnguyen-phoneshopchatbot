@@ -133,11 +133,16 @@ export default function ChatWidget() {
         : [...current, update({ id: STREAMING_ID, role: 'assistant', content: '', products: [] })]
     ));
     let streamedText = false;
+    // Set once the server has stored the message; after that a retry would save it twice.
+    let serverStored = false;
     try {
       let result;
       try {
         result = await chatApi.streamMessage(payload, (event) => {
-          if (event.type === 'delta') {
+          if (event.type === 'session') {
+            serverStored = true;
+            if (event.sessionId && event.sessionId !== sessionId) rememberSession(event.sessionId);
+          } else if (event.type === 'delta') {
             streamedText = true;
             updateStreaming((item) => ({ ...item, content: item.content + event.text }));
           } else if (event.type === 'reset') {
@@ -146,8 +151,9 @@ export default function ChatWidget() {
         });
       } catch (streamError) {
         const status = streamError.response?.status ?? streamError.status;
-        // Retry over the JSON endpoint (it refreshes expired tokens) when streaming failed before showing anything.
-        if (streamedText || NO_FALLBACK_STATUSES.includes(status)) throw streamError;
+        // Retry over the JSON endpoint (it refreshes expired tokens) only when the server never received
+        // the message; once it sent the session event the question is already saved and being answered.
+        if (serverStored || streamedText || NO_FALLBACK_STATUSES.includes(status)) throw streamError;
         result = await chatApi.sendMessage(payload);
       }
       if (result.sessionId !== sessionId) rememberSession(result.sessionId);

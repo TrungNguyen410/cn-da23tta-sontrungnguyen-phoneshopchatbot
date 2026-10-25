@@ -203,6 +203,18 @@ describe('AI chatbot', () => {
       });
       const response = await send({ message: 'Có mã giảm giá nào không', visitorId: VISITOR }).expect(201);
       expect(response.body.data.message.content).toContain('TECH10');
+
+      // Uppercase words that are not codes must still list the promotions.
+      for (const message of ['Có VOUCHER nào không?', 'CÓ MÃ KHUYẾN MÃI NÀO KHÔNG', 'Mã giảm giá khi trả bằng VNPAY']) {
+        const reply = await send({ message, visitorId: VISITOR }).expect(201);
+        expect(reply.body.data.message.content).toContain('Các mã giảm giá đang áp dụng');
+        expect(reply.body.data.message.content).not.toContain('chưa áp dụng được');
+      }
+
+      // An unknown code is reported, followed by the codes that do work.
+      const unknown = await send({ message: 'Mã GIAM99 dùng được không', visitorId: VISITOR }).expect(201);
+      expect(unknown.body.data.message.content).toContain('**GIAM99** chưa áp dụng được');
+      expect(unknown.body.data.message.content).toContain('TECH10');
     });
 
     it('checks a specific voucher code against the order value', async () => {
@@ -252,6 +264,12 @@ describe('AI chatbot', () => {
 
       const wrongPhone = await send({ message: 'Đơn TP2610200007 sđt 0999999999', visitorId: VISITOR }).expect(201);
       expect(wrongPhone.body.data.message.content).toContain('không tìm thấy');
+
+      // No separator word between the order number and the phone, and a phone written in groups.
+      for (const message of ['Đơn TP2610200007 0912345678', 'TP2610200007 0912 345 678', 'đơn TP2610200007, 0912.345.678']) {
+        const response = await send({ message, visitorId: VISITOR }).expect(201);
+        expect(response.body.data.message.content).toContain('Đang giao hàng');
+      }
     });
 
     it('recognises legacy short order numbers', async () => {
@@ -507,6 +525,36 @@ describe('AI chatbot', () => {
       expect(done.message).toMatchObject({ source: 'gemini', content: 'Bạn nên chọn **Redmi Note 14**.' });
       expect(done.message.products.map((item) => item.id)).toEqual(['p-redmi']);
       expect(geminiProvider.generate).not.toHaveBeenCalled();
+    });
+
+    it('separates text written before a tool call and stores the same answer as the JSON endpoint', async () => {
+      geminiProvider.isConfigured.mockReturnValue(true);
+      const toolStep = { role: 'model', parts: [{ text: 'Để mình tìm giúp bạn.' }, { functionCall: { name: 'search_products', args: {} } }] };
+      const answerStep = { role: 'model', parts: [{ text: 'Dưới đây là 3 mẫu.' }] };
+      geminiProvider.stream
+        .mockImplementationOnce(async (_request, onText) => {
+          onText('Để mình tìm giúp bạn.');
+          return { content: { role: 'model', parts: [toolStep.parts[1]] } };
+        })
+        .mockImplementationOnce(async (_request, onText) => {
+          onText('Dưới đây là 3 mẫu.');
+          return { content: answerStep };
+        });
+      geminiProvider.generate
+        .mockResolvedValueOnce({ content: toolStep })
+        .mockResolvedValueOnce({ content: answerStep });
+
+      const streamed = await request(app)
+        .post('/api/chat/messages/stream')
+        .send({ message: 'tư vấn máy', visitorId: VISITOR })
+        .expect(200);
+      const json = await send({ message: 'tư vấn máy', visitorId: VISITOR }).expect(201);
+
+      const expected = 'Để mình tìm giúp bạn.\n\nDưới đây là 3 mẫu.';
+      const events = parseEvents(streamed.text);
+      expect(events.filter((event) => event.type === 'delta').map((event) => event.text).join('')).toBe(expected);
+      expect(events.at(-1).message.content).toBe(expected);
+      expect(json.body.data.message.content).toBe(expected);
     });
 
     it('resets partial Gemini output before falling back', async () => {

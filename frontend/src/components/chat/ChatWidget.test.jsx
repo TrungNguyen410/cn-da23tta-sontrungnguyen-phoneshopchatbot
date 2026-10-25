@@ -118,6 +118,26 @@ describe('ChatWidget', () => {
     expect(chatApi.sendMessage).toHaveBeenCalledTimes(1);
   });
 
+  it('does not resend a message the server already stored and keeps its session', async () => {
+    chatApi.streamMessage.mockImplementationOnce(async (_payload, onEvent) => {
+      onEvent({ type: 'session', sessionId: 'session-new' });
+      throw Object.assign(new Error('Gateway Timeout'), { status: 504 });
+    });
+    renderWidget();
+    await openWidget();
+    fireEvent.click(screen.getByRole('button', { name: 'Máy nào pin trâu?' }));
+
+    expect(await screen.findByText(/trợ lý đang gặp sự cố/)).toBeInTheDocument();
+    expect(chatApi.sendMessage).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem(CHAT_STORAGE_KEYS.sessionId))).toBe('session-new');
+
+    // The next question continues the same conversation.
+    fireEvent.change(screen.getByRole('textbox', { name: 'Nội dung tin nhắn' }), { target: { value: 'Còn máy nào khác?' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi tin nhắn' }));
+    await waitFor(() => expect(chatApi.streamMessage).toHaveBeenCalledTimes(2));
+    expect(chatApi.streamMessage.mock.calls[1][0]).toMatchObject({ sessionId: 'session-new' });
+  });
+
   it('adds suggested products to the cart and records feedback', async () => {
     renderWidget();
     await openWidget();

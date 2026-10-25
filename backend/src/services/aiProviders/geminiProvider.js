@@ -52,10 +52,14 @@ const post = async (method, payload) => {
 
   const attempts = modelAttempts();
   let lastError = new AppError('Gemini API đã hết hạn mức, tạm dùng chế độ offline', 429);
-  for (let index = 0; index < attempts.length; index += 1) {
-    const model = attempts[index];
-    if (isCoolingDown(model)) continue;
-    if (index > 0) await wait(env.nodeEnv === 'test' ? 0 : RETRY_DELAY_MS);
+  // Models that timed out or could not be reached are not retried within this call.
+  const unreachable = new Set();
+  let sentRequest = false;
+  for (const model of attempts) {
+    if (isCoolingDown(model) || unreachable.has(model)) continue;
+    // Back off only between real requests; skipped (cooling down) models cost no time.
+    if (sentRequest) await wait(env.nodeEnv === 'test' ? 0 : RETRY_DELAY_MS);
+    sentRequest = true;
     let response;
     try {
       response = await fetch(`${API_BASE}/models/${encodeURIComponent(model)}:${method}`, {
@@ -68,7 +72,9 @@ const post = async (method, payload) => {
         signal: AbortSignal.timeout(env.gemini.timeoutMs),
       });
     } catch (error) {
-      throw new AppError(`Không kết nối được Gemini API: ${error.message}`, 502);
+      lastError = new AppError(`Không kết nối được Gemini API: ${error.message}`, 502);
+      unreachable.add(model);
+      continue;
     }
     if (response.ok) return response;
 
