@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../hooks/useAuth';
 import { isStrongEnoughPassword, isValidVietnamesePhone, validateRequired } from '../utils/validators';
+import StoreBrand from '../components/common/StoreBrand';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -64,7 +65,7 @@ export default function Register() {
     <main className="auth-page register-page">
       <div className="auth-visual"><div><FiUserPlus /><h1>Gia nhập cộng đồng<br />PhoneShopAI</h1><p>Theo dõi đơn hàng, nhận ưu đãi và chăm sóc cá nhân hóa.</p></div></div>
       <div className="auth-panel">
-        <Link className="brand" to="/"><span className="brand-mark">T</span><span>Tech<span>Phone</span></span></Link>
+        <StoreBrand />
         <form className="auth-form" onSubmit={step === 'details' ? submitDetails : submitOtp}>
           <span className="eyebrow">{step === 'details' ? 'Tạo tài khoản mới' : 'Xác minh qua SMS'}</span>
           <h1>{step === 'details' ? 'Đăng ký thành viên' : 'Nhập mã OTP'}</h1>

@@ -2579,6 +2579,13 @@ p {
   color: var(--text);
 }
 
+.success-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .success-card > .success-total {
   padding: 17px 0;
   border-top: 1px solid var(--border);

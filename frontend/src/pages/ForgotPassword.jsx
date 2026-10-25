@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { authApi } from '../api/authApi';
 import { isStrongEnoughPassword } from '../utils/validators';
+import StoreBrand from '../components/common/StoreBrand';
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
@@ -66,7 +67,7 @@ export default function ForgotPassword() {
         <div><FiKey /><h1>Khôi phục tài khoản<br />an toàn bằng OTP</h1><p>Mã chỉ có hiệu lực trong 10 phút và được dùng một lần.</p></div>
       </div>
       <div className="auth-panel">
-        <Link className="brand" to="/"><span className="brand-mark">T</span><span>Tech<span>Phone</span></span></Link>
+        <StoreBrand />
         <form className="auth-form" onSubmit={step === 'request' ? requestOtp : resetPassword}>
           <span className="eyebrow">Bảo mật tài khoản</span>
           <h1>{step === 'request' ? 'Quên mật khẩu' : 'Tạo mật khẩu mới'}</h1>

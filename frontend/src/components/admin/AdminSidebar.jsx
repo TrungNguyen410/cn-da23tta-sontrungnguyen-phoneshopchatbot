@@ -38,7 +38,7 @@ export default function AdminSidebar({ open, onClose }) {
   return (
     <aside className={`admin-sidebar ${open ? 'open' : ''}`}>
       <div className="admin-brand">
-        <span className="brand-mark">T</span>
+        <span className="brand-mark">P</span>
         <span>PhoneShopAI<small>ADMIN CENTER</small></span>
         <button onClick={onClose}><FiX /></button>
       </div>

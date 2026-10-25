@@ -9,7 +9,7 @@ function BrandName({ name }) {
 
 export default function StoreBrand({ className = '', onClick }) {
   const settings = useStoreSettings();
-  const initial = settings.storeName.trim().charAt(0).toUpperCase() || 'T';
+  const initial = settings.storeName.trim().charAt(0).toUpperCase() || 'P';
 
   return (
     <Link className={`brand ${className}`.trim()} to="/" onClick={onClick}>
