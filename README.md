@@ -39,7 +39,7 @@ Website bán điện thoại và phụ kiện, tích hợp **Chatbot AI** (Googl
 | Frontend | React 19, Vite 8, React Router, Bootstrap 5, Axios, Chart.js |
 | Backend | Node.js 22, Express 5, Mongoose 9 (Clean Architecture: routes → controllers → services → repositories → models) |
 | Cơ sở dữ liệu | MongoDB 7 (replica set) / MongoDB Atlas |
-| AI | Google Gemini API (`gemini-3.5-flash`, dự phòng `gemini-flash-latest`, function calling) |
+| AI | Google Gemini API (`gemini-3.5-flash`, dự phòng `gemini-3.5-flash-lite` → `gemini-flash-lite-latest`, function calling) |
 | Thanh toán | VietQR, SePay webhook, VNPay sandbox |
 | Kiểm thử | Jest + Supertest + mongodb-memory-server (backend), Vitest + Testing Library (frontend) |
 | Triển khai | Docker Compose, Nginx |
@@ -137,8 +137,8 @@ curl -X POST http://localhost:5000/api/payments/sepay/webhook \
 ## Kiểm thử
 
 ```bash
-cd backend && npm test        # 251 test, gồm chat.test.js, sepay-webhook.test.js, gemini-provider.test.js
-cd frontend && npm run test:run && npm run lint
+cd backend && npm test        # 279 test, gồm chat.test.js, sepay-webhook.test.js, gemini-provider.test.js
+cd frontend && npm run test:run && npm run lint   # 213 test
 ```
 
 ## Tiến độ
