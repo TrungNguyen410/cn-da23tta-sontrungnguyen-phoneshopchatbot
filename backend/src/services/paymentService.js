@@ -7,9 +7,9 @@ const paymentTransactionRepository = require('../repositories/paymentTransaction
 const orderService = require('./orderService');
 const vnpayProvider = require('./paymentProviders/vnpayProvider');
 const withTransaction = require('../utils/withTransaction');
+const { extractOrderNumber } = require('../utils/orderNumber');
 
 const PAYMENT_URL_TTL_MS = 15 * 60 * 1000;
-const ORDER_NUMBER_PATTERN = /TP\d{10}/i;
 const SETTLED_PAYMENT_STATUSES = ['paid', 'refund_required', 'refunded'];
 
 const safeEqual = (left, right) => {
@@ -354,8 +354,7 @@ class PaymentService {
   }
 
   extractOrderNumber(...texts) {
-    const match = ORDER_NUMBER_PATTERN.exec(texts.filter(Boolean).join(' '));
-    return match ? match[0].toUpperCase() : '';
+    return extractOrderNumber(...texts);
   }
 
   async processSepayWebhook(payload = {}, authorization = '') {
@@ -386,24 +385,39 @@ class PaymentService {
           return { matched: false, reason: 'order_not_found', orderNumber };
         }
 
-        const fullyPaid = amount >= order.total;
         const alreadySettled = SETTLED_PAYMENT_STATUSES.includes(order.paymentStatus);
+        // Customers may split a payment over several transfers (daily bank limits), so earlier
+        // short transfers count towards the total.
+        const earlier = alreadySettled
+          ? { total: 0, count: 0 }
+          : await paymentTransactionRepository.sumPartialTransfers(order.id, session);
+        const received = earlier.total + amount;
+        const fullyPaid = !alreadySettled && received >= order.total;
+        let responseCode = 'UNDERPAID';
+        if (alreadySettled) responseCode = 'OVERPAID';
+        else if (fullyPaid) responseCode = 'MATCHED';
         await paymentTransactionRepository.create({
           orderId: order.id,
           provider: 'sepay',
           method: 'bank',
           amount,
           reference,
-          status: fullyPaid && !alreadySettled ? 'paid' : 'failed',
+          status: fullyPaid ? 'paid' : 'failed',
           providerTransactionId,
           bankCode: String(payload.gateway || ''),
-          responseCode: fullyPaid ? 'MATCHED' : 'UNDERPAID',
+          responseCode,
           rawResponse: payload,
-          paidAt: fullyPaid && !alreadySettled ? new Date() : null,
+          paidAt: fullyPaid ? new Date() : null,
         }, session);
 
         if (alreadySettled) {
-          return { matched: true, orderNumber, paymentStatus: order.paymentStatus, duplicate: true };
+          // Money for an order that is already settled (e.g. the QR was paid twice) must be refunded,
+          // so it is written on the order where admins see the payment audit.
+          const extra = `Nhận thêm ${amount.toLocaleString('vi-VN')}đ (${reference}) sau khi đơn đã thanh toán, cần hoàn cho khách.`;
+          await orderRepository.updateState(order.id, {}, {
+            'paymentAudit.note': [order.paymentAudit?.note, extra].filter(Boolean).join(' '),
+          }, session);
+          return { matched: true, orderNumber, paymentStatus: order.paymentStatus, duplicate: true, overpaid: true };
         }
         if (!fullyPaid) {
           return { matched: true, orderNumber, paymentStatus: order.paymentStatus, underpaid: true };
@@ -419,7 +433,9 @@ class PaymentService {
             paymentAudit: {
               confirmedBy: null,
               confirmedAt: new Date(),
-              note: `Tự động xác nhận qua SePay (${payload.gateway || 'ngân hàng'})`,
+              note: earlier.count
+                ? `Tự động xác nhận qua SePay (${payload.gateway || 'ngân hàng'}), đã nhận đủ qua ${earlier.count + 1} lần chuyển`
+                : `Tự động xác nhận qua SePay (${payload.gateway || 'ngân hàng'})`,
             },
             ...(!cancelled && order.status === 'pending' ? { status: 'confirmed' } : {}),
           },

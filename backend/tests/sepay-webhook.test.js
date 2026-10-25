@@ -108,6 +108,44 @@ describe('SePay bank-transfer webhook', () => {
     expect(transaction.status).toBe('failed');
   });
 
+  it('confirms the order once several short transfers add up to the total', async () => {
+    await createBankOrder();
+
+    const first = await sendWebhook(webhookPayload({ id: 1, transferAmount: 2000000 })).expect(200);
+    expect(first.body.underpaid).toBe(true);
+    const second = await sendWebhook(webhookPayload({ id: 2, transferAmount: 3020000 })).expect(200);
+    expect(second.body.paymentStatus).toBe('paid');
+
+    const order = await Order.findOne({ orderNumber: 'TP2610200001' });
+    expect(order).toMatchObject({ paymentStatus: 'paid', status: 'confirmed', paymentReference: 'SEPAY-2' });
+    expect(order.paymentAudit.note).toContain('đã nhận đủ qua 2 lần chuyển');
+  });
+
+  it('flags money received after the order was already paid for a refund', async () => {
+    await createBankOrder();
+    await sendWebhook(webhookPayload({ id: 10 })).expect(200);
+
+    const response = await sendWebhook(webhookPayload({ id: 11 })).expect(200);
+
+    expect(response.body).toMatchObject({ duplicate: true, overpaid: true });
+    const order = await Order.findOne({ orderNumber: 'TP2610200001' });
+    expect(order.paymentStatus).toBe('paid');
+    expect(order.paymentAudit.note).toContain('Nhận thêm 5.020.000đ (SEPAY-11)');
+    expect(order.paymentAudit.note).toContain('cần hoàn cho khách');
+    const extra = await PaymentTransaction.findOne({ reference: 'SEPAY-11' });
+    expect(extra).toMatchObject({ status: 'failed', responseCode: 'OVERPAID' });
+  });
+
+  it('reads order numbers with a 5-digit daily sequence and glued transfer content', async () => {
+    await createBankOrder({ orderNumber: 'TP2610201000' });
+    await createBankOrder({ orderNumber: 'TP26102010000' });
+
+    await sendWebhook(webhookPayload({ content: 'thanhtoanTP26102010000 chuyen tien' })).expect(200);
+
+    expect((await Order.findOne({ orderNumber: 'TP26102010000' })).paymentStatus).toBe('paid');
+    expect((await Order.findOne({ orderNumber: 'TP2610201000' })).paymentStatus).toBe('pending');
+  });
+
   it('flags a refund when a cancelled order is paid', async () => {
     await createBankOrder({ status: 'cancelled' });
 
