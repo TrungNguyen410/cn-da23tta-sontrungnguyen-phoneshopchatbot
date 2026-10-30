@@ -18,3 +18,7 @@ frontend/dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Claude Code skills (local only, not pushed)
+.claude/skills/
+skills/
