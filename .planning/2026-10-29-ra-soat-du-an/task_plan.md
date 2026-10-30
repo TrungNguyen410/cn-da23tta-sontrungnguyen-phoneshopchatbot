@@ -46,9 +46,9 @@ Thứ tự ưu tiên. Mỗi mục sửa xong phải chạy lại test tương �
 - **Status:** complete
 
 ### Phase 7: Phần còn thiếu của đồ án (người dùng làm, Claude hỗ trợ)
-- [ ] M1 Báo cáo tiến độ tuần 1 (19–25/10) và tuần 2 (26/10–1/11) → `progress-report/`
-- [ ] M2 Hướng dẫn cài đặt + dữ liệu thử → `setup/`
-- [ ] M3 Sơ đồ ảnh cho báo cáo (use case, kiến trúc, tuần tự, ERD) → drawio-skill (cần cài draw.io desktop) hoặc xuất Mermaid
+- [x] M1 Báo cáo tiến độ: NGƯỜI DÙNG TỰ LÀM (30/10), Claude không làm
+- [x] M2 Hướng dẫn cài đặt + dữ liệu thử → `setup/README.md` (30/10)
+- [x] M3 Sơ đồ draw.io → `docs/diagrams/drawio/` (30/10)
 - [ ] M4 Quyển báo cáo đồ án (Word) → `thesis/doc`, xuất PDF → `thesis/pdf`
 - [ ] M5 Slide thuyết trình + video demo → `thesis/abs`
 - [ ] M6 Tài liệu tham khảo → `thesis/refs`
@@ -57,7 +57,7 @@ Thứ tự ưu tiên. Mỗi mục sửa xong phải chạy lại test tương �
 - **Status:** pending
 
 ## Next Step
-Phase 6 xong và đã push (30/10). Tiếp theo: hỏi người dùng muốn làm mục nào của Phase 7 trước (gợi ý M1 báo cáo tiến độ).
+Phase 8 xong (30/10). Tiếp theo: M4 quyển báo cáo, M5 slide + video, M6 tài liệu tham khảo, M7 triển khai, SCRUM-64 MongoDB Atlas — hỏi người dùng làm mục nào trước.
 
 ## Decisions Made
 | Decision | Rationale |
@@ -71,3 +71,15 @@ Phase 6 xong và đã push (30/10). Tiếp theo: hỏi người dùng muốn là
 | Error | Attempt | Resolution |
 |-------|---------|------------|
 | `npm run build`: VITE_SITE_URL is required in production | 1 | Không phải lỗi code: thiếu `frontend/.env`. Build lại với biến từ `.env.example` → pass |
+
+### Phase 8: Sơ đồ draw.io (M3) + hướng dẫn cài đặt (M2) — 30/10
+Skill: drawio-skill. Thư mục: `docs/diagrams/drawio/` (.drawio + .drawio.png có nhúng XML).
+- [x] usecase-khach-hang (Khách vãng lai, Khách hàng, Gemini, SePay)
+- [x] usecase-quan-tri (Quản trị viên)
+- [x] erd (15 collection + quan hệ)
+- [x] activity-dat-hang-thanh-toan (swimlane: Khách hàng | Hệ thống | SePay/Ngân hàng)
+- [x] activity-chatbot (swimlane: Khách | Hệ thống | Gemini)
+- [x] sequence-chatbot, sequence-sepay, sequence-dat-hang (seqlayout.py)
+- [x] M2 `setup/` hướng dẫn cài đặt + dữ liệu thử
+- [x] Jira: SCRUM-22 → Done khi xong sơ đồ
+- **Status:** complete

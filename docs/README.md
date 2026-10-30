@@ -7,6 +7,7 @@ Thư mục này có hai nhóm tài liệu. Khi viết quyển báo cáo đồ á
 | Tệp | Nội dung |
 |---|---|
 | [`phoneshopai-analysis-design.md`](phoneshopai-analysis-design.md) | Đặc tả yêu cầu, use case, kiến trúc, sơ đồ tuần tự, thiết kế CSDL cho Chatbot AI và thanh toán SePay (Chương 3) |
+| [`diagrams/drawio/`](diagrams/drawio/) | Sơ đồ draw.io cho báo cáo: Use case, ERD, Activity, Sequence (`.drawio` + ảnh PNG) |
 | [`chatbot-evaluation/`](chatbot-evaluation/) | Bộ đánh giá chatbot và kết quả các lần chạy |
 | [`otp-configuration.md`](otp-configuration.md) | Cấu hình gửi OTP qua SMS |
 

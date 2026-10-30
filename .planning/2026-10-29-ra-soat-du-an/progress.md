@@ -17,3 +17,9 @@
 - F2 README (build cần .env, số test), F8 CI bỏ nhánh devdhuy/devthuy + URL phoneshopai, CLAUDE.md, docs/README.md phân loại tài liệu.
 - F9 thêm `stockedRepository` (reserveStock/releaseStock); orderService và authMiddleware không gọi Model trực tiếp nữa.
 - Kiểm thử: backend 283/283, frontend 215/215, lint 0, build pass (có env).
+
+## Session 2026-10-30 (chiều)
+- Cài gh 2.103.3, draw.io 32.6.1, Python 3.12 (winget). CI commit 22fb60d: success.
+- Jira → Done: SCRUM-20, 47, 63, 65, 66, 67, 7, 8, 9 (epic), 18, 24 (báo cáo tuần do người dùng tự làm), 21, 49.
+- Sơ đồ (drawio-skill): 2 use case, ERD 15 collection, 2 activity swimlane, 3 sequence (seqlayout.py). validate.py: 0 lỗi. Xuất .drawio.png (-e -s 2) + repair_png.py.
+- setup/README.md: cài đặt 3 cách, biến môi trường, dữ liệu thử (tài khoản, đơn, voucher, câu hỏi chatbot, webhook SePay), lỗi thường gặp.
