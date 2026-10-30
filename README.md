@@ -50,7 +50,7 @@ Website bán điện thoại và phụ kiện, tích hợp **Chatbot AI** (Googl
 ├── backend/            # REST API (Express + MongoDB)
 │   └── src/services/   # chatService.js, chatTools.js, aiProviders/geminiProvider.js, paymentService.js ...
 ├── frontend/           # Giao diện React (components/chat/ChatWidget.jsx, pages/admin/ChatbotManagement.jsx ...)
-├── docs/               # Tài liệu phân tích thiết kế kế thừa từ TechPhone-Store
+├── docs/               # Phân tích thiết kế; sơ đồ draw.io trong docs/diagrams/drawio/
 ├── progress-report/    # Báo cáo tiến độ hằng tuần
 ├── thesis/             # Tài liệu đồ án: doc/, pdf/, html/, abs/ (slide, video), refs/
 ├── setup/              # Hướng dẫn cài đặt, dữ liệu thử
@@ -58,9 +58,53 @@ Website bán điện thoại và phụ kiện, tích hợp **Chatbot AI** (Googl
 └── docker-compose.yml
 ```
 
+## Sơ đồ thiết kế
+
+Tệp gốc `.drawio` và mô tả từng sơ đồ nằm trong [`docs/diagrams/drawio/`](docs/diagrams/drawio/). Màu xanh lá là phần mới của đồ án (Chatbot AI, thanh toán SePay), màu xanh dương là phần kế thừa.
+
+### Use case
+
+**Khách vãng lai và khách hàng**
+
+![Use case khách hàng](docs/diagrams/drawio/usecase-khach-hang.drawio.png)
+
+**Quản trị viên**
+
+![Use case quản trị viên](docs/diagrams/drawio/usecase-quan-tri.drawio.png)
+
+### Cơ sở dữ liệu (ERD)
+
+![ERD](docs/diagrams/drawio/erd.drawio.png)
+
+### Activity
+
+**Đặt hàng và thanh toán**
+
+![Activity đặt hàng và thanh toán](docs/diagrams/drawio/activity-dat-hang-thanh-toan.drawio.png)
+
+**Chatbot tư vấn**
+
+![Activity chatbot tư vấn](docs/diagrams/drawio/activity-chatbot.drawio.png)
+
+### Sequence
+
+**Đặt hàng**
+
+![Sequence đặt hàng](docs/diagrams/drawio/sequence-dat-hang.drawio.png)
+
+**Chatbot trả lời bằng function calling**
+
+![Sequence chatbot](docs/diagrams/drawio/sequence-chatbot.drawio.png)
+
+**Thanh toán chuyển khoản tự động qua SePay**
+
+![Sequence SePay](docs/diagrams/drawio/sequence-sepay.drawio.png)
+
 ## Cài đặt và chạy
 
 Yêu cầu: **Node.js 22**, **Docker** (hoặc MongoDB replica set / MongoDB Atlas).
+
+Hướng dẫn chi tiết, dữ liệu thử và lỗi thường gặp: [`setup/README.md`](setup/README.md).
 
 ### Cách 1 – Docker Compose (nhanh nhất)
 
