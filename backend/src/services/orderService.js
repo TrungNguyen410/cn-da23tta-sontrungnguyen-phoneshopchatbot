@@ -3,8 +3,6 @@ const AppError = require('../utils/AppError');
 const accessoryRepository = require('../repositories/accessoryRepository');
 const orderRepository = require('../repositories/orderRepository');
 const productRepository = require('../repositories/productRepository');
-const Accessory = require('../models/Accessory');
-const Product = require('../models/Product');
 const voucherService = require('./voucherService');
 const withTransaction = require('../utils/withTransaction');
 const { normalizeVietnamesePhone } = require('../utils/phone');
@@ -173,40 +171,37 @@ class OrderService {
   calculateDiscount(voucher, subtotal, shippingFee) {
     if (!voucher) return 0;
     if (voucher.type === 'percent') {
-      return Math.min((subtotal * voucher.value) / 100, voucher.maxDiscount || Infinity);
+      // Rounded to whole đồng so the total matches bank transfers (VietQR/SePay) and VNPay amounts.
+      return Math.round(Math.min((subtotal * voucher.value) / 100, voucher.maxDiscount || Infinity));
     }
     if (voucher.type === 'fixed') return Math.min(voucher.value, subtotal);
     if (voucher.type === 'shipping') return Math.min(voucher.value, shippingFee);
     return 0;
   }
 
+  catalogRepository(type) {
+    return type === 'accessory' ? accessoryRepository : productRepository;
+  }
+
   async rollbackInventory(decrements, session) {
-    for (const { Model, id, quantity } of decrements) {
-      await Model.updateOne(
-        { _id: id },
-        { $inc: { stock: quantity, sold: -quantity } },
-        { session },
-      );
+    for (const { repository, id, quantity } of decrements) {
+      await repository.releaseStock(id, quantity, session);
     }
   }
 
   async decrementInventory(items, session) {
     const decrements = [];
     for (const item of items) {
-      const Model = item.type === 'accessory' ? Accessory : Product;
+      const repository = this.catalogRepository(item.type);
       const id = item.type === 'accessory' ? item.accessoryId : item.productId;
-      const updated = await Model.findOneAndUpdate(
-        { _id: id, isDeleted: false, status: 'active', stock: { $gte: item.quantity } },
-        { $inc: { stock: -item.quantity, sold: item.quantity } },
-        { returnDocument: 'after', runValidators: true, session },
-      );
+      const updated = await repository.reserveStock(id, item.quantity, session);
 
       if (!updated) {
         if (!session) await this.rollbackInventory(decrements);
         throw new AppError(`${item.name} không đủ số lượng tồn kho`, 400);
       }
 
-      decrements.push({ Model, id, quantity: item.quantity });
+      decrements.push({ repository, id, quantity: item.quantity });
     }
     return decrements;
   }
@@ -214,13 +209,8 @@ class OrderService {
   async restoreInventory(items = [], session) {
     for (const item of items) {
       const type = item.type === 'accessory' || item.accessoryId ? 'accessory' : 'product';
-      const Model = type === 'accessory' ? Accessory : Product;
       const id = type === 'accessory' ? item.accessoryId || item.id : item.productId || item.id;
-      await Model.updateOne(
-        { _id: id },
-        { $inc: { stock: item.quantity, sold: -item.quantity } },
-        { session },
-      );
+      await this.catalogRepository(type).releaseStock(id, item.quantity, session);
     }
   }
 
@@ -264,8 +254,9 @@ class OrderService {
         const total = Math.max(0, subtotal + shippingFee - discount);
 
         await this.decrementInventory(items, session);
+        const orderNumber = await this.generateOrderNumber(session);
         return orderRepository.create({
-          orderNumber: await this.generateOrderNumber(session),
+          orderNumber,
           idempotencyKey: idempotencyKey || undefined,
           requestFingerprint,
           userId: user?.id || null,
@@ -279,7 +270,8 @@ class OrderService {
           paymentStatus: 'pending',
           paymentReference: payload.paymentReference || '',
           shippingProvider: 'PhoneShopAI Express',
-          trackingNumber: `TPX${Date.now().toString().slice(-10)}`,
+          // Derived from the unique order number so two orders created together never share one.
+          trackingNumber: `TPX${orderNumber.slice(2)}`,
           estimatedDelivery: new Date(Date.now() + shipping.days * 24 * 60 * 60 * 1000),
           note: payload.note || '',
           voucherCode: voucher?.code || null,

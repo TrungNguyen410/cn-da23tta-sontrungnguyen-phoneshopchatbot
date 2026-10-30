@@ -32,6 +32,34 @@ h4,
 :where(h1, h2, .section-heading h2, .page-title-row h1, .dashboard-welcome h2) {
   min-width: 0;
   overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+:where(.price-row, .detail-price, .summary-total, .success-total, .cart-line-total) {
+  font-variant-numeric: tabular-nums;
+}
+
+.skip-link {
+  position: fixed;
+  top: var(--space-xs);
+  left: var(--space-xs);
+  z-index: calc(var(--z-admin-navigation) + 1);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-control);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(calc(-100% - var(--space-md)));
+  transition: transform 200ms ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+:where(#main-content, #admin-main-content):focus {
+  outline: none;
 }
 
 :where(a, button, input, select, textarea):focus-visible {

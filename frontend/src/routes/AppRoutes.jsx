@@ -48,8 +48,9 @@ const KnowledgeManagement = lazy(() => import('../pages/admin/KnowledgeManagemen
 function StoreLayout() {
   return (
     <div className="store-layout">
+      <a className="skip-link" href="#main-content">Bỏ qua tới nội dung chính</a>
       <Header />
-      <div className="store-content"><Outlet /></div>
+      <div className="store-content" id="main-content" tabIndex={-1}><Outlet /></div>
       <Footer />
       <SupportLauncher />
       <ChatWidget />

@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const env = require('../config/env');
-const User = require('../models/User');
+const userRepository = require('../repositories/userRepository');
 const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -10,10 +10,10 @@ const protect = asyncHandler(async (req, _res, next) => {
   if (!token) throw new AppError('Vui lòng đăng nhập để tiếp tục', 401);
 
   const payload = jwt.verify(token, env.jwtAccessSecret);
-  const user = await User.findOne({ _id: payload.sub, isDeleted: false });
+  const user = await userRepository.findById(payload.sub);
   if (!user || user.status !== 'active') throw new AppError('Tài khoản không có quyền truy cập', 401);
 
-  req.user = user.toJSON();
+  req.user = user;
   return next();
 });
 
@@ -26,9 +26,9 @@ const optionalProtect = asyncHandler(async (req, _res, next) => {
 
   try {
     const payload = jwt.verify(token, env.jwtAccessSecret);
-    const user = await User.findOne({ _id: payload.sub, isDeleted: false });
+    const user = await userRepository.findById(payload.sub);
     if (!user || user.status !== 'active') throw new AppError('Tài khoản không có quyền truy cập', 401);
-    req.user = user.toJSON();
+    req.user = user;
   } catch {
     throw new AppError('Phiên đăng nhập không hợp lệ hoặc đã hết hạn', 401);
   }

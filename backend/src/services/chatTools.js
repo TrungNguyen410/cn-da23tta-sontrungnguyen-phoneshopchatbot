@@ -5,12 +5,16 @@ const knowledgeArticleRepository = require('../repositories/knowledgeArticleRepo
 const productRepository = require('../repositories/productRepository');
 const settingRepository = require('../repositories/settingRepository');
 const voucherRepository = require('../repositories/voucherRepository');
+const { consumeRateLimit } = require('../repositories/rateLimitRepository');
 const orderService = require('./orderService');
 const voucherService = require('./voucherService');
 const { buildRegex } = require('../utils/query');
 const { normalizeVi } = require('../utils/vietnamese');
 
 const MAX_RESULTS = 5;
+// Same budget as GET /api/orders/lookup so the chatbot cannot be used to guess orders faster.
+const ORDER_LOOKUP_WINDOW_MS = 15 * 60 * 1000;
+const ORDER_LOOKUP_MAX = 10;
 const ORDER_STATUS_LABELS = {
   pending: 'Chờ xác nhận',
   confirmed: 'Đã xác nhận',
@@ -297,7 +301,19 @@ const handlers = {
     };
   },
 
-  async lookup_order(args = {}) {
+  async lookup_order(args = {}, context = {}) {
+    const bucket = await consumeRateLimit({
+      key: `order-lookup-chat:${context.clientKey || 'unknown'}`,
+      windowMs: ORDER_LOOKUP_WINDOW_MS,
+      max: ORDER_LOOKUP_MAX,
+    });
+    if (!bucket.allowed) {
+      return {
+        found: false,
+        limited: true,
+        message: 'Bạn đã tra cứu đơn hàng quá nhiều lần. Vui lòng thử lại sau 15 phút.',
+      };
+    }
     try {
       const order = await orderService.lookup(String(args.orderNumber || '').trim(), args.phone);
       return {
@@ -362,11 +378,11 @@ function publicVoucher(voucher) {
   };
 }
 
-const execute = async (name, args = {}) => {
+const execute = async (name, args = {}, context = {}) => {
   const handler = handlers[name];
   if (!handler) return { ok: false, result: { error: `Công cụ ${name} không tồn tại` }, cards: [] };
   try {
-    const { cards = [], ...result } = await handler(args || {});
+    const { cards = [], ...result } = await handler(args || {}, context);
     return { ok: true, result, cards };
   } catch (error) {
     return { ok: false, result: { error: error.message }, cards: [] };

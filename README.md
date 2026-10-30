@@ -87,6 +87,7 @@ cd frontend
 cp .env.example .env          # VITE_USE_MOCK=false để dùng backend thật
 npm install
 npm run dev                   # http://localhost:5173
+npm run build                 # cần có frontend/.env (VITE_SITE_URL) – thiếu file này build sẽ báo lỗi
 ```
 
 ### Cách 3 – Chỉ chạy frontend bằng Docker (dữ liệu mock)
@@ -137,8 +138,8 @@ curl -X POST http://localhost:5000/api/payments/sepay/webhook \
 ## Kiểm thử
 
 ```bash
-cd backend && npm test        # 279 test, gồm chat.test.js, sepay-webhook.test.js, gemini-provider.test.js
-cd frontend && npm run test:run && npm run lint   # 213 test
+cd backend && npm test        # 283 test, gồm chat.test.js, sepay-webhook.test.js, gemini-provider.test.js
+cd frontend && npm run test:run && npm run lint   # 215 test
 ```
 
 ## Tiến độ

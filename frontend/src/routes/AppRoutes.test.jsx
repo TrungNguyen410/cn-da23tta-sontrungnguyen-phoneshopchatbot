@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider } from '../context/AuthContext';
 import AppRoutes from './AppRoutes';
 
@@ -11,6 +11,8 @@ vi.mock('../pages/ProductDetail', () => ({ default: () => <h1>Product detail rou
 vi.mock('../pages/Login', () => ({ default: () => <h1>Login route</h1> }));
 
 describe('AppRoutes', () => {
+  afterEach(cleanup);
+
   it('keeps the product detail route available', async () => {
     render(
       <MemoryRouter initialEntries={['/products/product-1']}>
@@ -19,6 +21,19 @@ describe('AppRoutes', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Product detail route' })).toBeInTheDocument();
+  });
+
+  it('offers a skip link that targets the store content', async () => {
+    render(
+      <MemoryRouter initialEntries={['/products/product-1']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole('heading', { name: 'Product detail route' });
+    const skipLink = screen.getByRole('link', { name: 'Bỏ qua tới nội dung chính' });
+    expect(skipLink).toHaveAttribute('href', '#main-content');
+    expect(document.getElementById('main-content')).toHaveAttribute('tabindex', '-1');
   });
 
   it('redirects an unauthenticated checkout deep link to login', async () => {

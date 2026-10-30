@@ -183,6 +183,7 @@ describe('Orders and dashboard APIs', () => {
 
     expect(created.status).toBe(201);
     expect(created.body.data.orderNumber).toMatch(/^TP/);
+    expect(created.body.data.trackingNumber).toBe(`TPX${created.body.data.orderNumber.slice(2)}`);
     expect(created.body.data.customer.phone).toBe('0911111111');
     expect(created.body.data.subtotal).toBe(product.price);
     expect(created.body.data.total).toBe(product.price);

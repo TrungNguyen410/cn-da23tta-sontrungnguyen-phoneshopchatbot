@@ -155,3 +155,23 @@ describe('Voucher service unit coverage', () => {
     await expect(voucherService.getById('missing')).rejects.toThrow('Không tìm thấy mã giảm giá');
   });
 });
+
+describe('Order discount calculation', () => {
+  const orderService = require('../src/services/orderService');
+
+  it('rounds percent discounts to whole đồng', () => {
+    const voucher = { type: 'percent', value: 10, maxDiscount: 0 };
+    expect(orderService.calculateDiscount(voucher, 12345678, 30000)).toBe(1234568);
+  });
+
+  it('caps percent discounts at the voucher maximum', () => {
+    const voucher = { type: 'percent', value: 10, maxDiscount: 1000000 };
+    expect(orderService.calculateDiscount(voucher, 33990000, 0)).toBe(1000000);
+  });
+
+  it('limits fixed and shipping discounts to what they can cover', () => {
+    expect(orderService.calculateDiscount({ type: 'fixed', value: 200000 }, 150000, 30000)).toBe(150000);
+    expect(orderService.calculateDiscount({ type: 'shipping', value: 50000 }, 900000, 30000)).toBe(30000);
+    expect(orderService.calculateDiscount(null, 900000, 30000)).toBe(0);
+  });
+});

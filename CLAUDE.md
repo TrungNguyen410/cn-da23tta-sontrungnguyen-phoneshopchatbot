@@ -2,16 +2,44 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Working Rules (bắt buộc)
+
+- **Khi có điểm mơ hồ thì phải hỏi lại người dùng trước khi làm.** Không tự chọn hướng, không tự mở rộng phạm vi, không tự quyết thay người dùng (yêu cầu, giao diện, thư viện, xoá/ghi đè file, commit/push).
+- **Làm việc theo skill trong `.claude/skills/`.** Trước mỗi nhiệm vụ, chọn skill khớp với nhiệm vụ theo bảng dưới; nếu người dùng chỉ định skill thì dùng đúng skill đó. Nếu không rõ nên dùng skill nào thì hỏi lại.
+- Các skill thiết kế UI mặc định viết cho landing page/marketing và có thể đòi đổi font, bỏ thư viện icon, thêm GSAP… Dự án này đang dùng **React 19 + Bootstrap 5 + react-icons + Chart.js**. Mọi thay đổi stack hoặc thêm thư viện phải hỏi người dùng trước.
+
+### Skill → Nhiệm vụ
+
+| Skill | Dùng khi |
+|---|---|
+| `planning-with-files` | Lập kế hoạch nhiệm vụ nhiều bước (ghi `task_plan.md`, `findings.md`, `progress.md`) |
+| `full-output-enforcement` | Cần viết code/tài liệu đầy đủ, không được bỏ dở hay để placeholder |
+| `redesign-existing-projects` | Nâng cấp giao diện trang có sẵn mà không phá chức năng |
+| `design-taste-frontend` | Thiết kế giao diện mới (bản v2, mặc định) |
+| `design-taste-frontend-v1` | Bản v1 cũ, chỉ dùng khi người dùng yêu cầu |
+| `high-end-visual-design` | Phong cách cao cấp kiểu agency (font, spacing, shadow, animation) |
+| `minimalist-ui` | Phong cách tối giản, editorial, đơn sắc ấm |
+| `industrial-brutalist-ui` | Phong cách brutalist/terminal, hợp dashboard dày dữ liệu |
+| `gpt-taste` | Trang nhiều chuyển động GSAP, bento grid, kiểu Awwwards |
+| `stitch-design-taste` | Sinh file `DESIGN.md` cho Google Stitch |
+| `image-to-code` | Tạo ảnh thiết kế trước rồi code theo ảnh |
+| `imagegen-frontend-web` | Chỉ tạo ảnh mockup website (mỗi section một ảnh) |
+| `imagegen-frontend-mobile` | Chỉ tạo ảnh mockup app mobile |
+| `brandkit` | Tạo ảnh bộ nhận diện thương hiệu (logo, brand board) |
+| `drawio-skill` | Vẽ sơ đồ (kiến trúc, ERD, UML, sequence, flowchart) ra `.drawio`/PNG/SVG; cần cài draw.io desktop |
+
 ## Project Overview
 
-TechPhone Store is a Vietnamese phone/accessory e-commerce app. The repo is a monorepo with two independent Node.js projects: `frontend/` (React + Vite SPA) and `backend/` (Express + MongoDB REST API). They share no code and each has its own `package.json`.
+PhoneShopAI is a Vietnamese phone/accessory e-commerce app (thesis project, 19/10/2026 – 31/12/2026). The store core is inherited from TechPhone-Store (some internal names still say `techphone`: database name, JWT issuer, storage keys — keep them). New in this project: the AI chatbot (Google Gemini function calling, `backend/src/services/chatService.js`, `chatTools.js`, `frontend/src/components/chat/`) and automatic bank-transfer payment via SePay webhook (`backend/src/services/paymentService.js`). Design doc: `docs/phoneshopai-analysis-design.md`.
+
+The repo is a monorepo with two independent Node.js projects: `frontend/` (React + Vite SPA) and `backend/` (Express + MongoDB REST API). They share no code and each has its own `package.json`. Guests can browse; placing an order requires registering and logging in (`POST /api/orders` uses `protect`) — keep it that way unless the user says otherwise.
 
 ## Commands
 
 ### Frontend (`cd frontend`)
 ```bash
 npm run dev        # dev server at http://localhost:5173
-npm run build      # production build → dist/
+npm run build      # production build → dist/ (needs frontend/.env with VITE_SITE_URL)
 npm run preview    # serve the dist/ build
 npm run lint       # ESLint
 ```

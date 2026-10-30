@@ -12,6 +12,7 @@ const sendMessage = asyncHandler(async (req, res) => {
     sessionId: req.body.sessionId,
     visitorId: req.body.visitorId,
     user: req.user,
+    clientKey: req.ip,
   });
   successResponse(res, result, 'Chat reply generated', 201);
 });
@@ -41,6 +42,7 @@ const streamMessage = async (req, res, next) => {
         sessionId: req.body.sessionId,
         visitorId: req.body.visitorId,
         user: req.user,
+        clientKey: req.ip,
       },
       {
         onSession: (sessionId) => send({ type: 'session', sessionId }),

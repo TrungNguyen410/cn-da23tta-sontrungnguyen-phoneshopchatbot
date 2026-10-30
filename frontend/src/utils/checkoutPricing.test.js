@@ -14,6 +14,11 @@ describe('calculateVoucherDiscount', () => {
     const voucher = { type: 'fixed', value: 200000, minOrder: 3000000 };
     expect(calculateVoucherDiscount(voucher, 2000000, 30000)).toBe(0);
   });
+
+  it('rounds percent discounts to whole đồng', () => {
+    const voucher = { type: 'percent', value: 10 };
+    expect(calculateVoucherDiscount(voucher, 12345678, 30000)).toBe(1234568);
+  });
 });
 
 describe('mock checkout invariants', () => {

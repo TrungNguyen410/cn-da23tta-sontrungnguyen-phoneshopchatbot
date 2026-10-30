@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 
 const DEFAULT_TITLE = 'PhoneShopAI | Điện thoại & Phụ kiện';
 const DEFAULT_DESCRIPTION = 'PhoneShopAI - Điện thoại và phụ kiện chính hãng, giá tốt, giao nhanh.';
+// Shared-link preview used by pages without their own product image (public/og-image.png, 1200×630).
+const DEFAULT_IMAGE = '/og-image.png';
 
 const upsertMeta = (selector, attribute, key, value) => {
   let node = document.head.querySelector(selector);
@@ -31,8 +33,8 @@ const resetPageMeta = () => {
   upsertMeta('meta[property="og:description"]', 'property', 'og:description', DEFAULT_DESCRIPTION);
   upsertMeta('meta[property="og:type"]', 'property', 'og:type', 'website');
   upsertMeta('meta[property="og:url"]', 'property', 'og:url', canonicalUrl);
-  upsertMeta('meta[name="twitter:card"]', 'name', 'twitter:card', 'summary');
-  document.head.querySelector('meta[property="og:image"]')?.remove();
+  upsertMeta('meta[name="twitter:card"]', 'name', 'twitter:card', 'summary_large_image');
+  upsertMeta('meta[property="og:image"]', 'property', 'og:image', new URL(DEFAULT_IMAGE, window.location.origin).href);
   setCanonical(canonicalUrl);
 };
 
@@ -47,12 +49,8 @@ export function usePageMeta({ title, description, image, canonicalPath, type = '
     upsertMeta('meta[property="og:description"]', 'property', 'og:description', metaDescription);
     upsertMeta('meta[property="og:type"]', 'property', 'og:type', type);
     upsertMeta('meta[property="og:url"]', 'property', 'og:url', canonicalUrl);
-    upsertMeta('meta[name="twitter:card"]', 'name', 'twitter:card', image ? 'summary_large_image' : 'summary');
-    if (image) {
-      upsertMeta('meta[property="og:image"]', 'property', 'og:image', new URL(image, window.location.origin).href);
-    } else {
-      document.head.querySelector('meta[property="og:image"]')?.remove();
-    }
+    upsertMeta('meta[name="twitter:card"]', 'name', 'twitter:card', 'summary_large_image');
+    upsertMeta('meta[property="og:image"]', 'property', 'og:image', new URL(image || DEFAULT_IMAGE, window.location.origin).href);
     setCanonical(canonicalUrl);
 
     const scriptId = 'page-structured-data';

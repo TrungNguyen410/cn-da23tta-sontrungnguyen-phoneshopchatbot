@@ -286,6 +286,26 @@ describe('AI chatbot', () => {
       expect(found.body.data.message.toolCalls[0].name).toBe('lookup_order');
       expect(found.body.data.message.content).toContain('Đã giao hàng');
     });
+
+    it('limits order lookups through the chatbot like the public lookup API', async () => {
+      await Order.create({
+        orderNumber: 'TP2610200008',
+        subtotal: 100,
+        total: 100,
+        status: 'shipping',
+        items: [{ name: 'Case', price: 100, quantity: 1 }],
+        customer: { fullName: 'D', email: 'd@example.com', phone: '0912345678', address: 'HCM' },
+      });
+
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const response = await send({ message: `Đơn TP2610200008 sđt 091234560${attempt}`, visitorId: VISITOR }).expect(201);
+        expect(response.body.data.message.content).toContain('không tìm thấy');
+      }
+
+      const limited = await send({ message: 'Đơn TP2610200008 sđt 0912345678', visitorId: VISITOR }).expect(201);
+      expect(limited.body.data.message.content).toContain('quá nhiều lần');
+      expect(limited.body.data.message.content).not.toContain('Đang giao hàng');
+    });
   });
 
   describe('Gemini mode', () => {

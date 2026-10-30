@@ -160,7 +160,7 @@ class ChatService {
   }
 
   // hooks: onSession(sessionId), onDelta(text), onReset() — used by the streaming endpoint.
-  async sendMessage({ message, sessionId, visitorId, user }, hooks = {}) {
+  async sendMessage({ message, sessionId, visitorId, user, clientKey }, hooks = {}) {
     const text = String(message || '').trim();
     if (!text) throw new AppError('Vui lòng nhập nội dung tin nhắn', 422);
     if (!user && !visitorId) throw new AppError('Thiếu mã khách truy cập', 422);
@@ -177,15 +177,15 @@ class ChatService {
     let result;
     if (geminiProvider.isConfigured()) {
       try {
-        result = await this.answerWithGemini({ history, text, user, onDelta: hooks.onDelta });
+        result = await this.answerWithGemini({ history, text, user, clientKey, onDelta: hooks.onDelta });
       } catch (error) {
         if (process.env.NODE_ENV !== 'test') console.error('[chatbot] Gemini error:', error.message);
         hooks.onReset?.();
-        result = { ...(await this.answerOffline(text)), source: 'fallback' };
+        result = { ...(await this.answerOffline(text, { clientKey })), source: 'fallback' };
         this.emitWords(result.reply, hooks.onDelta);
       }
     } else {
-      result = await this.answerOffline(text);
+      result = await this.answerOffline(text, { clientKey });
       this.emitWords(result.reply, hooks.onDelta);
     }
 
@@ -210,7 +210,7 @@ class ChatService {
     for (const piece of String(reply).match(/\S+\s*|\s+/g) || []) onDelta(piece);
   }
 
-  async answerWithGemini({ history, text, user, onDelta }) {
+  async answerWithGemini({ history, text, user, clientKey, onDelta }) {
     const store = await this.getStoreInfo();
     const systemInstruction = buildSystemInstruction(store, user);
     const contents = history.map((item) => ({
@@ -263,7 +263,7 @@ class ChatService {
       contents.push(content);
       const responses = [];
       for (const { functionCall } of calls) {
-        const output = await chatTools.execute(functionCall.name, functionCall.args);
+        const output = await chatTools.execute(functionCall.name, functionCall.args, { clientKey });
         toolCalls.push({ name: functionCall.name, args: functionCall.args || {}, ok: output.ok });
         for (const card of output.cards) {
           if (!products.some((item) => item.id === card.id)) products.push(card);
@@ -282,11 +282,11 @@ class ChatService {
   }
 
   // Rule-based answers used when no GEMINI_API_KEY is configured or Gemini fails.
-  async answerOffline(text) {
+  async answerOffline(text, { clientKey } = {}) {
     const normalized = normalize(text);
     const toolCalls = [];
     const run = async (name, args) => {
-      const output = await chatTools.execute(name, args);
+      const output = await chatTools.execute(name, args, { clientKey });
       toolCalls.push({ name, args, ok: output.ok });
       return output;
     };
@@ -302,6 +302,7 @@ class ChatService {
         return done('Để tra cứu đơn hàng, bạn vui lòng gửi **mã đơn** (bắt đầu bằng TP) và **số điện thoại người nhận** nhé.');
       }
       const { result } = await run('lookup_order', { orderNumber, phone });
+      if (result.limited) return done(result.message);
       if (!result.found) return done(`Mình không tìm thấy đơn ${orderNumber.toUpperCase()} với số điện thoại này. Bạn kiểm tra lại giúp mình nhé.`);
       const { order } = result;
       return done([

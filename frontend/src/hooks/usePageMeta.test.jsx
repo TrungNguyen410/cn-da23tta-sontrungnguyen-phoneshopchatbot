@@ -27,7 +27,7 @@ describe('usePageMeta', () => {
     document.head.querySelectorAll('meta[property^="og:"], meta[name="twitter:card"], link[rel="canonical"]').forEach((node) => node.remove());
   });
 
-  it('removes product-only image and structured data when metadata changes', () => {
+  it('falls back to the default share image and drops product structured data when metadata changes', () => {
     const view = render(<MetaHarness />);
 
     expect(document.head.querySelector('meta[property="og:image"]')).toHaveAttribute(
@@ -39,7 +39,10 @@ describe('usePageMeta', () => {
     view.rerender(<MetaHarness product={false} />);
 
     expect(document.title).toBe('Liên hệ | PhoneShopAI');
-    expect(document.head.querySelector('meta[property="og:image"]')).not.toBeInTheDocument();
+    expect(document.head.querySelector('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      'http://localhost:3000/og-image.png',
+    );
     expect(document.getElementById('page-structured-data')).not.toBeInTheDocument();
     expect(document.head.querySelector('meta[property="og:type"]')).toHaveAttribute('content', 'website');
     expect(document.head.querySelector('link[rel="canonical"]')).toHaveAttribute(
