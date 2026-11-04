@@ -89,8 +89,138 @@ describe('AI chatbot', () => {
     it('parses Vietnamese budgets', () => {
       expect(parseBudget('duoi 10 trieu')).toEqual({ maxPrice: 10000000 });
       expect(parseBudget('tren 20tr')).toEqual({ minPrice: 20000000 });
-      expect(parseBudget('tam 7 trieu')).toEqual({ minPrice: 5600000, maxPrice: 8050000 });
+      expect(parseBudget('tam 7 trieu')).toEqual({ minPrice: 5600000, maxPrice: 7000000 });
       expect(parseBudget('may nao tot')).toEqual({});
+    });
+
+    describe('with a 2.000đ test phone in the catalog', () => {
+      beforeEach(async () => {
+        await Product.create(product('p-test', 'Điện thoại test', 'brand-xiaomi', 2000, { sold: 500 }));
+        await Accessory.create({
+          _id: 'acc-cable',
+          name: 'Cáp sạc test',
+          brandId: 'brand-apple',
+          categoryId: 'cat-charger',
+          price: 2000,
+          stock: 10,
+          sold: 500,
+        });
+      });
+
+      const productIds = (response) => response.body.data.message.products.map((item) => item.id);
+
+      it.each([
+        'điện thoại trên 20 triệu',
+        'điện thoại 20 triệu trở lên',
+        'điện thoại ngoài 20 triệu',
+        'máy hơn 20 củ',
+        'điện thoại trên 20.000.000',
+        'dt tren 20tr',
+      ])('keeps "%s" to phones from 20.000.000đ', async (message) => {
+        const response = await send({ message, visitorId: VISITOR }).expect(201);
+        const ids = productIds(response);
+        expect(ids.length).toBeGreaterThan(0);
+        expect(ids).not.toContain('p-test');
+        expect(ids.every((id) => ['p-iphone', 'p-s25'].includes(id))).toBe(true);
+        expect(response.body.data.message.content).not.toContain('Điện thoại test');
+      });
+
+      it('offers the phones closest to an empty range instead of the cheapest ones', async () => {
+        const response = await send({ message: 'điện thoại từ 15 đến 25 triệu', visitorId: VISITOR }).expect(201);
+        const { content } = response.body.data.message;
+        expect(content).toContain('chưa có');
+        expect(productIds(response)).not.toContain('p-test');
+        expect(productIds(response)).toEqual(['p-a56', 'p-s25', 'p-redmi']);
+      });
+
+      it('may list the test phone when the customer asks for the cheapest one', async () => {
+        const response = await send({ message: 'điện thoại rẻ nhất', visitorId: VISITOR }).expect(201);
+        expect(productIds(response)[0]).toBe('p-test');
+      });
+
+      it('applies a minimum price to accessories', async () => {
+        const response = await send({ message: 'sạc trên 1 triệu', visitorId: VISITOR }).expect(201);
+        expect(productIds(response)).toEqual(['acc-charger']);
+      });
+
+      it('reads prices the model sends in millions', async () => {
+        geminiProvider.isConfigured.mockReturnValue(true);
+        geminiProvider.generate
+          .mockResolvedValueOnce({
+            content: {
+              role: 'model',
+              parts: [{ functionCall: { name: 'search_products', args: { minPrice: 20 } } }],
+            },
+          })
+          .mockResolvedValueOnce({
+            content: { role: 'model', parts: [{ text: 'Có iPhone 16 Pro Max và Galaxy S25 Ultra.' }] },
+          });
+
+        const response = await send({ message: 'điện thoại trên 20 triệu', visitorId: VISITOR }).expect(201);
+
+        expect(productIds(response).sort()).toEqual(['p-iphone', 'p-s25']);
+        const toolTurn = geminiProvider.generate.mock.calls[1][0].contents.at(-1);
+        expect(toolTurn.parts[0].functionResponse.response.criteria).toEqual({ minPrice: 20000000 });
+      });
+    });
+
+    describe('restating criteria, needs and remembering them in the session', () => {
+      const ids = (response) => response.body.data.message.products.map((item) => item.id);
+      const content = (response) => response.body.data.message.content;
+
+      it('opens the answer with the understood budget', async () => {
+        const above = await send({ message: 'điện thoại trên 20 triệu', visitorId: VISITOR }).expect(201);
+        expect(content(above).startsWith('Điện thoại từ 20.000.000đ trở lên')).toBe(true);
+
+        const range = await send({ message: 'điện thoại từ 15 đến 20 triệu', visitorId: VISITOR }).expect(201);
+        expect(content(range)).toContain('15.000.000đ – 20.000.000đ');
+        expect(content(range)).toContain('chưa có');
+
+        const brand = await send({ message: 'Samsung dưới 10 triệu', visitorId: VISITOR }).expect(201);
+        expect(content(brand).startsWith('Điện thoại hãng Samsung, tối đa 10.000.000đ')).toBe(true);
+        expect(ids(brand)).toEqual(['p-a56']);
+      });
+
+      it('ranks phones by the stated need and shows that spec', async () => {
+        await Product.create(product('p-pixel', 'Pixel 9 Pro', 'brand-xiaomi', 25000000, { sold: 1, battery: '5340 mAh' }));
+        const response = await send({ message: 'máy pin trâu trên 20 triệu', visitorId: VISITOR }).expect(201);
+        expect(ids(response)[0]).toBe('p-pixel');
+        expect(content(response)).toContain('ưu tiên pin trâu');
+        expect(content(response)).toMatch(/Pixel 9 Pro\*\*: 25\.000\.000đ — pin 5340 mAh/);
+      });
+
+      it('says when a brand has nothing in budget before suggesting the closest phones of that brand', async () => {
+        const response = await send({ message: 'Samsung dưới 5 triệu', visitorId: VISITOR }).expect(201);
+        expect(content(response)).toContain('chưa có');
+        expect(ids(response).every((id) => ['p-a56', 'p-s25'].includes(id))).toBe(true);
+      });
+
+      it('keeps budget, brand and need for follow-up questions in the same session', async () => {
+        const first = await send({ message: 'điện thoại trên 20 triệu', visitorId: VISITOR }).expect(201);
+        const { sessionId } = first.body.data;
+        const ask = (message) => send({ message, sessionId, visitorId: VISITOR }).expect(201);
+
+        const samsung = await ask('có Samsung không?');
+        expect(ids(samsung)).toEqual(['p-s25']);
+        expect(content(samsung).startsWith('Điện thoại hãng Samsung, từ 20.000.000đ trở lên')).toBe(true);
+
+        const cheaper = await ask('dưới 35 triệu thôi');
+        expect(ids(cheaper).sort()).toEqual(['p-a56', 'p-s25']);
+
+        const policy = await ask('chính sách bảo hành thế nào?');
+        expect(content(policy)).toContain('12 tháng');
+
+        const anyBrand = await ask('hãng nào cũng được');
+        expect(ids(anyBrand).sort()).toEqual(['p-iphone', 'p-redmi', 'p-s25']);
+        expect(content(anyBrand).startsWith('Điện thoại tối đa 35.000.000đ')).toBe(true);
+
+        const restart = await ask('tư vấn lại từ đầu');
+        expect(content(restart)).toContain('ngân sách');
+
+        const other = await send({ message: 'có Samsung không?', visitorId: VISITOR }).expect(201);
+        expect(other.body.data.sessionId).not.toBe(sessionId);
+        expect(ids(other).sort()).toEqual(['p-a56', 'p-s25']);
+      });
     });
 
     it('recommends in-budget phones with product cards and stores the session', async () => {
@@ -136,7 +266,7 @@ describe('AI chatbot', () => {
     it('suggests the closest-priced phones when nothing fits the budget', async () => {
       const response = await send({ message: 'Điện thoại dưới 5 triệu', visitorId: VISITOR }).expect(201);
 
-      expect(response.body.data.message.content).toContain('chưa có điện thoại dưới 5.000.000đ');
+      expect(response.body.data.message.content).toContain('chưa có điện thoại tối đa 5.000.000đ');
       expect(response.body.data.message.products[0].id).toBe('p-redmi');
       expect(response.body.data.message.products.map((item) => item.price)).toEqual([6990000, 9490000, 30990000]);
     });

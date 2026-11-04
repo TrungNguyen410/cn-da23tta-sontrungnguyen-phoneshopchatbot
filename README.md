@@ -182,8 +182,8 @@ curl -X POST http://localhost:5000/api/payments/sepay/webhook \
 ## Kiểm thử
 
 ```bash
-cd backend && npm test        # 283 test, gồm chat.test.js, sepay-webhook.test.js, gemini-provider.test.js
-cd frontend && npm run test:run && npm run lint   # 215 test
+cd backend && npm test        # 364 test, gồm chat.test.js, sepay-webhook.test.js, gemini-provider.test.js
+cd frontend && npm run test:run && npm run lint   # 273 test
 ```
 
 ## Tiến độ

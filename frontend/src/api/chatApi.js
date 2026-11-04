@@ -1,6 +1,7 @@
 import { API_URL, STORAGE_KEYS, USE_MOCK } from '../utils/constants';
 import { mockDb } from '../mock/mockDb';
 import { storage } from '../utils/storage';
+import { normalizeVi, parseBudget } from '../utils/budget';
 import axiosClient from './axiosClient';
 
 const MOCK_KNOWLEDGE_KEY = 'mock_knowledge';
@@ -68,13 +69,21 @@ const readEventStream = async (payload, onEvent) => {
 };
 const mockId = (prefix) => `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
+const formatVnd = (value) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+
+const describeBudget = ({ minPrice, maxPrice }) => {
+  if (minPrice && maxPrice) return `Điện thoại ${formatVnd(minPrice)} – ${formatVnd(maxPrice)}`;
+  if (minPrice) return `Điện thoại từ ${formatVnd(minPrice)} trở lên`;
+  if (maxPrice) return `Điện thoại tối đa ${formatVnd(maxPrice)}`;
+  return 'Một số mẫu phù hợp';
+};
+
 // Minimal offline reply used only in VITE_USE_MOCK mode so the widget is demoable without a backend.
+// Reads the budget with the same rules as the backend chatbot.
 const mockReply = async (message) => {
-  const text = message.toLowerCase();
-  const budget = /(\d+)\s*(triệu|tr)/.exec(text);
-  const maxPrice = budget ? Number(budget[1]) * 1000000 : Infinity;
+  const budget = parseBudget(normalizeVi(message));
   const products = (await mockDb.listPublicCatalog('products'))
-    .filter((item) => item.price <= maxPrice)
+    .filter((item) => (!budget.minPrice || item.price >= budget.minPrice) && (!budget.maxPrice || item.price <= budget.maxPrice))
     .sort((a, b) => (b.sold || 0) - (a.sold || 0))
     .slice(0, 3);
   const cards = products.map((item) => ({
@@ -89,7 +98,7 @@ const mockReply = async (message) => {
   }));
   return {
     content: products.length
-      ? `Chế độ demo (mock). Một số mẫu phù hợp:\n${products.map((item) => `- **${item.name}**: ${item.price.toLocaleString('vi-VN')}đ`).join('\n')}`
+      ? `Chế độ demo (mock). ${describeBudget(budget)}:\n${products.map((item) => `- **${item.name}**: ${formatVnd(item.price)}`).join('\n')}`
       : 'Chế độ demo (mock): chưa tìm thấy sản phẩm phù hợp.',
     products: cards,
   };

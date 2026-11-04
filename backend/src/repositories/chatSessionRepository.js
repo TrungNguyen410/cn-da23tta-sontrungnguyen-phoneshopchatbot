@@ -19,6 +19,15 @@ class ChatSessionRepository extends BaseRepository {
     return doc?.toJSON() || null;
   }
 
+  async updateContext(id, { minPrice = null, maxPrice = null, brand = '', need = '' } = {}) {
+    const doc = await ChatSession.findOneAndUpdate(
+      { _id: id, isDeleted: false },
+      { $set: { context: { minPrice, maxPrice, brand, need, updatedAt: new Date() } } },
+      { returnDocument: 'after' },
+    );
+    return doc?.toJSON() || null;
+  }
+
   async findAdminPage({ page, limit, search = '' }) {
     const filter = search ? { title: buildRegex(search) } : {};
     const [items, total] = await Promise.all([

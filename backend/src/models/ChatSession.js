@@ -10,6 +10,14 @@ const chatSessionSchema = new mongoose.Schema(
     title: { type: String, default: 'Cuộc trò chuyện mới', trim: true },
     messageCount: { type: Number, default: 0, min: 0 },
     lastMessageAt: { type: Date, default: Date.now, index: true },
+    // Advice criteria remembered between offline answers in this conversation.
+    context: {
+      minPrice: { type: Number, default: null },
+      maxPrice: { type: Number, default: null },
+      brand: { type: String, default: '' },
+      need: { type: String, default: '' },
+      updatedAt: { type: Date, default: null },
+    },
   },
   baseSchemaOptions,
 );

@@ -23,3 +23,12 @@
 - Jira → Done: SCRUM-20, 47, 63, 65, 66, 67, 7, 8, 9 (epic), 18, 24 (báo cáo tuần do người dùng tự làm), 21, 49.
 - Sơ đồ (drawio-skill): 2 use case, ERD 15 collection, 2 activity swimlane, 3 sequence (seqlayout.py). validate.py: 0 lỗi. Xuất .drawio.png (-e -s 2) + repair_png.py.
 - setup/README.md: cài đặt 3 cách, biến môi trường, dữ liệu thử (tài khoản, đơn, voucher, câu hỏi chatbot, webhook SePay), lỗi thường gặp.
+
+## Session 2026-11-04 — Spec Kit: chatbot tư vấn chính xác
+- Lỗi người dùng báo: hỏi điện thoại trên 20 triệu ra sản phẩm test 2.000đ. Nguyên nhân: parseBudget hiểu sai "trở lên", "ngoài", "từ A đến B", "củ", số đầy đủ.
+- Bootstrap `.specify/` (PowerShell), constitution v1.0.0, spec `specs/001-chatbot-tu-van-chinh-xac/` (Q1: không lọc theo ngưỡng giá; Q2: nhớ điều kiện trong phiên).
+- Plan + research (R1–R8) + data-model + contracts + quickstart. Chờ người dùng xác nhận R2 rồi /speckit-tasks.
+- R2 người dùng chốt: "20 triệu" → 20–22 triệu (+10%); "tầm 20 triệu" → 16–20 triệu. `.specify/`, `specs/` không push (đã thêm .gitignore).
+- Implement T001–T028: `utils/budget.js` (51 câu test, backend + bản sao frontend), `utils/needs.js`, lớp kiểm tra cuối + gần khoảng giá nhất trong `chatTools`, nhớ điều kiện theo phiên (`ChatSession.context`), dòng điều kiện đầu câu trả lời, prompt Gemini, mock frontend, eval 38 câu.
+- Kiểm thử: backend 364/364, frontend 273/273, lint 0, build pass, coverage đạt ngưỡng. Eval offline đầu-cuối (DB có điện thoại 2.000đ): 38/38, trung bình 87ms.
+- Người dùng đồng ý push (04/11): commit, chờ CI, tạo task Jira riêng.

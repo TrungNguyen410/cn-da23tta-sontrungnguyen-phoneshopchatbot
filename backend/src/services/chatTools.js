@@ -8,6 +8,8 @@ const voucherRepository = require('../repositories/voucherRepository');
 const { consumeRateLimit } = require('../repositories/rateLimitRepository');
 const orderService = require('./orderService');
 const voucherService = require('./voucherService');
+const { normalizePriceArgs } = require('../utils/budget');
+const { NEEDS, rankByNeed } = require('../utils/needs');
 const { buildRegex } = require('../utils/query');
 const { normalizeVi } = require('../utils/vietnamese');
 
@@ -34,8 +36,13 @@ const declarations = [
       properties: {
         keyword: { type: 'string', description: 'Từ khóa: tên máy, chip, nhu cầu như "chơi game", "camera", "pin trâu"' },
         brand: { type: 'string', description: 'Tên hãng, ví dụ Apple, Samsung, Xiaomi' },
-        minPrice: { type: 'number', description: 'Giá thấp nhất (VND)' },
-        maxPrice: { type: 'number', description: 'Giá cao nhất (VND)' },
+        minPrice: { type: 'number', description: 'Giá thấp nhất, số tiền đầy đủ bằng đồng, ví dụ 20000000 cho 20 triệu' },
+        maxPrice: { type: 'number', description: 'Giá cao nhất, số tiền đầy đủ bằng đồng, ví dụ 25000000 cho 25 triệu' },
+        need: {
+          type: 'string',
+          enum: NEEDS,
+          description: 'Nhu cầu chính: battery (pin trâu), camera (chụp ảnh), gaming (chơi game), big_screen (màn hình lớn), compact (nhỏ gọn)',
+        },
         sortBy: { type: 'string', enum: ['price_asc', 'price_desc', 'best_selling', 'rating'] },
       },
     },
@@ -69,7 +76,8 @@ const declarations = [
       type: 'object',
       properties: {
         keyword: { type: 'string' },
-        maxPrice: { type: 'number' },
+        minPrice: { type: 'number', description: 'Giá thấp nhất, số tiền đầy đủ bằng đồng' },
+        maxPrice: { type: 'number', description: 'Giá cao nhất, số tiền đầy đủ bằng đồng' },
       },
     },
   },
@@ -180,9 +188,18 @@ const matchingCategoryIds = async (keyword) => {
 
 const priceFilter = ({ minPrice, maxPrice }) => {
   const range = {};
-  if (Number(minPrice) > 0) range.$gte = Number(minPrice);
-  if (Number(maxPrice) > 0) range.$lte = Number(maxPrice);
+  if (minPrice) range.$gte = minPrice;
+  if (maxPrice) range.$lte = maxPrice;
   return Object.keys(range).length ? { price: range } : {};
+};
+
+const inBudget = (price, { minPrice, maxPrice }) => (!minPrice || price >= minPrice) && (!maxPrice || price <= maxPrice);
+
+// How far a price sits outside the budget; 0 when inside.
+const budgetDistance = (price, { minPrice, maxPrice }) => {
+  if (minPrice && price < minPrice) return minPrice - price;
+  if (maxPrice && price > maxPrice) return price - maxPrice;
+  return 0;
 };
 
 // Matches every word of the requested name; if nothing matches, retries without
@@ -202,38 +219,53 @@ const findProductsByName = async (name, limit = 1) => {
 
 const handlers = {
   async search_products(args = {}) {
+    const budget = normalizePriceArgs(args);
+    const need = NEEDS.includes(args.need) ? args.need : null;
+    const criteria = { ...budget, ...(args.brand ? { brand: args.brand } : {}), ...(need ? { need } : {}) };
     const brandIds = await findBrandIds(args.brand);
-    if (brandIds && !brandIds.length) return { products: [], note: `Cửa hàng chưa kinh doanh hãng ${args.brand}` };
+    if (brandIds && !brandIds.length) {
+      return { products: [], criteria, note: `Cửa hàng chưa kinh doanh hãng ${args.brand}`, cards: [] };
+    }
+    // Last check before answering: whatever the query returned, only products matching the budget and brand are kept.
+    const matches = (product) => inBudget(product.price, budget) && (!brandIds || brandIds.includes(product.brandId));
 
     const base = {
       status: 'active',
-      ...priceFilter(args),
+      ...priceFilter(budget),
       ...(brandIds ? { brandId: { $in: brandIds } } : {}),
     };
     const sort = SORTS[args.sortBy] || { sold: -1 };
-    let products = await productRepository.findAll(
+    // With a need every matching phone is ranked by its specs, otherwise the best sellers come first.
+    const limit = need ? 0 : MAX_RESULTS;
+    let products = (await productRepository.findAll(
       { ...base, ...keywordFilter(args.keyword, ['name', 'chip', 'description', 'camera', 'battery', 'ram', 'storage']) },
-      { sort, limit: MAX_RESULTS },
-    );
+      { sort, limit },
+    )).filter(matches);
     let note = '';
     let outOfBudget = false;
     if (!products.length && args.keyword) {
-      products = await productRepository.findAll(base, { sort, limit: MAX_RESULTS });
+      products = (await productRepository.findAll(base, { sort, limit })).filter(matches);
       if (products.length) note = 'Không có máy khớp từ khóa, đây là các máy phù hợp tiêu chí giá/hãng.';
     }
-    // Nothing in the budget: offer the closest-priced phones instead of an empty answer.
-    if (!products.length && (Number(args.maxPrice) > 0 || Number(args.minPrice) > 0)) {
+    // Nothing in the budget: offer the phones priced closest to the asked range, never simply the cheapest ones.
+    if (!products.length && (budget.minPrice || budget.maxPrice)) {
       const { price, ...withoutPrice } = base;
-      const closest = Number(args.maxPrice) > 0 ? { price: 1 } : { price: -1 };
-      products = await productRepository.findAll(withoutPrice, { sort: closest, limit: 3 });
+      const candidates = await productRepository.findAll(withoutPrice, { sort: { sold: -1 } });
+      products = candidates
+        .map((product, index) => ({ product, index, distance: budgetDistance(product.price, budget) }))
+        .sort((a, b) => a.distance - b.distance || a.index - b.index)
+        .slice(0, 3)
+        .map(({ product }) => product);
       if (products.length) {
         outOfBudget = true;
-        note = 'Không có máy trong tầm giá khách yêu cầu. Đây là các máy có giá gần nhất — hãy nói rõ với khách là vượt ngân sách.';
+        note = 'Không có máy trong tầm giá khách yêu cầu. Đây là các máy có giá gần nhất — hãy nói rõ với khách là ngoài ngân sách.';
       }
     }
+    if (need && !outOfBudget) products = rankByNeed(products, need).slice(0, MAX_RESULTS);
     const names = await brandNameMap();
     return {
       products: products.map((product) => productSummary(product, names)),
+      criteria,
       ...(note ? { note } : {}),
       ...(outOfBudget ? { outOfBudget } : {}),
       cards: products.map((product) => toProductCard(product)),
@@ -275,21 +307,23 @@ const handlers = {
   },
 
   async search_accessories(args = {}) {
+    const budget = normalizePriceArgs(args);
     const textFilter = keywordFilter(args.keyword, ['name', 'description']);
     const categoryIds = await matchingCategoryIds(args.keyword);
     const alternatives = [
       ...(Object.keys(textFilter).length ? [textFilter] : []),
       ...(categoryIds.length ? [{ categoryId: { $in: categoryIds } }] : []),
     ];
-    const accessories = await accessoryRepository.findAll(
+    const accessories = (await accessoryRepository.findAll(
       {
         status: 'active',
-        ...priceFilter({ maxPrice: args.maxPrice }),
+        ...priceFilter(budget),
         ...(alternatives.length ? { $or: alternatives } : {}),
       },
       { sort: { sold: -1 }, limit: MAX_RESULTS },
-    );
+    )).filter((item) => inBudget(item.price, budget));
     return {
+      criteria: budget,
       accessories: accessories.map((item) => ({
         id: item.id,
         name: item.name,

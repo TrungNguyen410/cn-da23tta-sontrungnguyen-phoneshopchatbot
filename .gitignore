@@ -22,3 +22,7 @@ yarn-error.log*
 # Claude Code skills (local only, not pushed)
 .claude/skills/
 skills/
+
+# Spec Kit (local only, not pushed)
+.specify/
+specs/

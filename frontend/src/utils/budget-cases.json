@@ -1,0 +1,316 @@
+[
+  {
+    "input": "điện thoại trên 20 triệu",
+    "expected": {
+      "minPrice": 20000000
+    }
+  },
+  {
+    "input": "dt tren 20tr",
+    "expected": {
+      "minPrice": 20000000
+    }
+  },
+  {
+    "input": "điện thoại 20 triệu trở lên",
+    "expected": {
+      "minPrice": 20000000
+    }
+  },
+  {
+    "input": "20tr tro len",
+    "expected": {
+      "minPrice": 20000000
+    }
+  },
+  {
+    "input": "điện thoại từ 20 triệu trở lên",
+    "expected": {
+      "minPrice": 20000000
+    }
+  },
+  {
+    "input": "điện thoại ngoài 20 triệu",
+    "expected": {
+      "minPrice": 20000000
+    }
+  },
+  {
+    "input": "máy hơn 20 củ",
+    "expected": {
+      "minPrice": 20000000
+    }
+  },
+  {
+    "input": "điện thoại lớn hơn 20 triệu",
+    "expected": {
+      "minPrice": 20000000
+    }
+  },
+  {
+    "input": "ít nhất 20 triệu",
+    "expected": {
+      "minPrice": 20000000
+    }
+  },
+  {
+    "input": "tối thiểu 20 triệu",
+    "expected": {
+      "minPrice": 20000000
+    }
+  },
+  {
+    "input": "điện thoại trên 20.000.000",
+    "expected": {
+      "minPrice": 20000000
+    }
+  },
+  {
+    "input": "trên 20000000đ",
+    "expected": {
+      "minPrice": 20000000
+    }
+  },
+  {
+    "input": "trên 20 triệu rưỡi",
+    "expected": {
+      "minPrice": 20500000
+    }
+  },
+  {
+    "input": "trên 20,5 triệu",
+    "expected": {
+      "minPrice": 20500000
+    }
+  },
+  {
+    "input": "từ 15 đến 20 triệu",
+    "expected": {
+      "minPrice": 15000000,
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "điện thoại 15-20 triệu",
+    "expected": {
+      "minPrice": 15000000,
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "15tr - 20tr",
+    "expected": {
+      "minPrice": 15000000,
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "15 – 20 triệu",
+    "expected": {
+      "minPrice": 15000000,
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "từ 15 tới 20 củ",
+    "expected": {
+      "minPrice": 15000000,
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "từ 20 đến 15 triệu",
+    "expected": {
+      "minPrice": 15000000,
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "trong khoảng 15 đến 20 triệu",
+    "expected": {
+      "minPrice": 15000000,
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "từ 15tr đến 20tr",
+    "expected": {
+      "minPrice": 15000000,
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "từ 8 đến 12tr pin trâu",
+    "expected": {
+      "minPrice": 8000000,
+      "maxPrice": 12000000
+    }
+  },
+  {
+    "input": "điện thoại dưới 20 triệu",
+    "expected": {
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "20 triệu đổ lại",
+    "expected": {
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "20tr trở xuống",
+    "expected": {
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "không quá 20 triệu",
+    "expected": {
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "tối đa 20 triệu",
+    "expected": {
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "ít hơn 20 triệu",
+    "expected": {
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "nhỏ hơn 20 củ",
+    "expected": {
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "dưới 15 triệu rưỡi",
+    "expected": {
+      "maxPrice": 15500000
+    }
+  },
+  {
+    "input": "iPhone 16 dưới 30 triệu",
+    "expected": {
+      "maxPrice": 30000000
+    }
+  },
+  {
+    "input": "điện thoại 5G dưới 10 triệu",
+    "expected": {
+      "maxPrice": 10000000
+    }
+  },
+  {
+    "input": "tai nghe dưới 4 triệu",
+    "expected": {
+      "maxPrice": 4000000
+    }
+  },
+  {
+    "input": "sạc dưới 500k",
+    "expected": {
+      "maxPrice": 500000
+    }
+  },
+  {
+    "input": "tầm 20 triệu",
+    "expected": {
+      "minPrice": 16000000,
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "khoảng 20 củ",
+    "expected": {
+      "minPrice": 16000000,
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "cỡ 20tr",
+    "expected": {
+      "minPrice": 16000000,
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "quanh 20 triệu",
+    "expected": {
+      "minPrice": 16000000,
+      "maxPrice": 20000000
+    }
+  },
+  {
+    "input": "tam 7 trieu",
+    "expected": {
+      "minPrice": 5600000,
+      "maxPrice": 7000000
+    }
+  },
+  {
+    "input": "điện thoại 20 triệu",
+    "expected": {
+      "minPrice": 20000000,
+      "maxPrice": 22000000
+    }
+  },
+  {
+    "input": "giá 20 triệu",
+    "expected": {
+      "minPrice": 20000000,
+      "maxPrice": 22000000
+    }
+  },
+  {
+    "input": "máy 10 triệu",
+    "expected": {
+      "minPrice": 10000000,
+      "maxPrice": 11000000
+    }
+  },
+  {
+    "input": "30tr",
+    "expected": {
+      "minPrice": 30000000,
+      "maxPrice": 33000000
+    }
+  },
+  {
+    "input": "Samsung trên 20 triệu chụp ảnh đẹp",
+    "expected": {
+      "minPrice": 20000000
+    }
+  },
+  {
+    "input": "trên 20 triệu, có Samsung không",
+    "expected": {
+      "minPrice": 20000000
+    }
+  },
+  {
+    "input": "iPhone 16 RAM 12GB pin 5000 mAh",
+    "expected": {}
+  },
+  {
+    "input": "Galaxy S25 Ultra",
+    "expected": {}
+  },
+  {
+    "input": "màn hình 6.7 inch 120Hz",
+    "expected": {}
+  },
+  {
+    "input": "camera 50MP sạc 65W",
+    "expected": {}
+  },
+  {
+    "input": "máy nào tốt",
+    "expected": {}
+  }
+]

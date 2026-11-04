@@ -6,8 +6,25 @@ import { writeFileSync } from 'node:fs';
 const API = process.argv[2] || 'http://127.0.0.1:5000/api';
 const OUT = process.argv[3] || new URL(`../../docs/chatbot-evaluation/result-${new Date().toISOString().slice(0, 10)}.json`, import.meta.url);
 
+const M = 1000000;
+// Every suggested product lies in the budget (and the answer is not empty).
+const inRange = (min, max) => (r) => r.products.length > 0
+  && r.products.every((p) => (!min || p.price >= min) && (!max || p.price <= max));
+
 const cases = [
-  // [group, question, check(reply) -> true when the answer is acceptable]
+  // [group, question, check(reply) -> true when the answer is acceptable, { followUp: reuse previous session }]
+  ['Giá', 'Điện thoại trên 20 triệu', inRange(20 * M)],
+  ['Giá', 'Điện thoại 20 triệu trở lên', inRange(20 * M)],
+  ['Giá', 'Điện thoại ngoài 20 triệu', inRange(20 * M)],
+  ['Giá', 'Máy hơn 20 củ', inRange(20 * M)],
+  ['Giá', 'Điện thoại trên 20.000.000đ', inRange(20 * M)],
+  ['Giá', 'Điện thoại từ 15 đến 20 triệu', inRange(15 * M, 20 * M)],
+  ['Giá', 'Điện thoại tầm 20 triệu', inRange(16 * M, 20 * M)],
+  ['Giá', 'Điện thoại 25 triệu', inRange(25 * M, 27.5 * M)],
+  ['Giá', 'Điện thoại dưới 20 triệu', inRange(0, 20 * M)],
+  ['Nhu cầu', 'Máy pin trâu trên 20 triệu', (r) => inRange(20 * M)(r) && /mAh/i.test(r.content)],
+  ['Hỏi tiếp', 'Điện thoại trên 25 triệu', inRange(25 * M)],
+  ['Hỏi tiếp', 'Có Samsung không?', (r) => inRange(25 * M)(r) && r.products.every((p) => /galaxy/i.test(p.name)), { followUp: true }],
   ['Tư vấn', 'Tư vấn giúp mình điện thoại dưới 25 triệu', (r) => r.products.length > 0 && r.products.every((p) => p.price <= 25000000)],
   ['Tư vấn', 'Mình thích chụp ảnh đẹp, ngân sách khoảng 24 triệu thì nên mua máy nào?', (r) => r.products.length > 0],
   ['Tư vấn', 'Có máy Samsung nào không?', (r) => r.products.some((p) => /galaxy/i.test(p.name))],
@@ -38,7 +55,8 @@ const cases = [
 
 const visitorId = `v-eval-${Date.now()}`;
 const results = [];
-for (const [group, question, check] of cases) {
+let lastSessionId;
+for (const [group, question, check, options = {}] of cases) {
   const started = Date.now();
   let status = 0;
   let reply = { content: '', products: [], toolCalls: [], source: '' };
@@ -46,11 +64,12 @@ for (const [group, question, check] of cases) {
     const response = await fetch(`${API}/chat/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: question, visitorId }),
+      body: JSON.stringify({ message: question, visitorId, ...(options.followUp && lastSessionId ? { sessionId: lastSessionId } : {}) }),
     });
     status = response.status;
     const json = await response.json();
     reply = json.data?.message || { ...reply, content: json.message || '' };
+    lastSessionId = json.data?.sessionId;
   } catch (error) {
     reply.content = `ERROR: ${error.message}`;
   }

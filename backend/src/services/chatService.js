@@ -7,6 +7,8 @@ const geminiProvider = require('./aiProviders/geminiProvider');
 const chatTools = require('./chatTools');
 const { ORDER_NUMBER_PATTERN } = require('../utils/orderNumber');
 const { normalizeVi, tokenizeVi: tokenize } = require('../utils/vietnamese');
+const { parseAmount, parseBudget, stripBudget } = require('../utils/budget');
+const { NEED_LABELS, NEED_WORDS, needDetail, parseNeed } = require('../utils/needs');
 
 const HISTORY_LIMIT = 12;
 const MAX_TOOL_STEPS = 4;
@@ -34,6 +36,8 @@ const buildSystemInstruction = (store = {}, user = null) => [
   '1. Luôn trả lời bằng tiếng Việt, thân thiện, ngắn gọn (tối đa khoảng 150 từ), dùng gạch đầu dòng khi liệt kê.',
   '2. Mọi thông tin về sản phẩm, giá, tồn kho, khuyến mãi, đơn hàng, chính sách PHẢI lấy từ công cụ (function). Tuyệt đối không tự bịa giá, cấu hình hay chính sách.',
   '3. Khi tư vấn chọn máy: hỏi thêm ngân sách/nhu cầu nếu khách chưa nói; gợi ý 2-3 máy phù hợp nhất kèm lý do ngắn và giá. Nếu công cụ báo outOfBudget thì nói rõ cửa hàng chưa có máy trong tầm giá đó và giới thiệu các máy giá gần nhất.',
+  '3b. Khi gọi search_products: giá truyền bằng số đồng đầy đủ (20 triệu = 20000000). "trên / hơn / ngoài / từ X trở lên" → minPrice = X; "dưới / không quá / X đổ lại" → maxPrice = X; "từ A đến B" → minPrice = A, maxPrice = B; "tầm / khoảng X" → minPrice = 80% X, maxPrice = X; chỉ nói "X" → minPrice = X, maxPrice = X + 10%. Khách nêu nhu cầu thì truyền need (battery, camera, gaming, big_screen, compact).',
+  '3c. Mở đầu câu tư vấn bằng điều kiện đã hiểu (khoảng giá, hãng, nhu cầu). Chỉ nêu sản phẩm có trong kết quả công cụ của lượt hiện tại.',
   '4. Khi so sánh: nêu khác biệt chính (chip, RAM, camera, pin, giá) và kết luận nên chọn máy nào cho nhu cầu nào.',
   '5. Tra cứu đơn hàng cần mã đơn (bắt đầu bằng TP, ví dụ TP2610200001) và số điện thoại người nhận; nếu thiếu thì hỏi khách.',
   '6. Nếu công cụ không có dữ liệu, nói rõ là cửa hàng chưa có thông tin và mời khách gọi hotline.',
@@ -51,7 +55,9 @@ const BRAND_ALIASES = {
 const STOPWORDS = new Set(tokenize(
   'toi minh em anh chi ban can muon tim mua tu van giup cho xem co nao may dien thoai dt smartphone loai cai chiec '
   + 'duoi tren tam khoang tu den trieu tr gia re tot nhat hay va voi la thi nhe a o di de nhu cau dung ngan sach '
-  + 'shop cua hang hien con khong ko gi sao the ra ve mac cao cap nhat tiet kiem binh dan sinh vien hoc',
+  + 'shop cua hang hien con khong ko gi sao the ra ve mac cao cap nhat tiet kiem binh dan sinh vien hoc '
+  + 'ngoai tro len xuong do lai doi qua vuot toi da thieu it nho be lon nhieu thap xap xi quanh chung dong vnd '
+  + 'thoi hang cung duoc dc',
 ));
 // Price direction for short questions: "rẻ" lists the cheapest phones, "mắc"/"cao cấp" the most expensive.
 const CHEAP_WORDS = ['re', 'gia re', 'tiet kiem', 'binh dan', 'sinh vien', 'hoc sinh'];
@@ -78,25 +84,44 @@ const POLICY_WORDS = ['bao hanh', 'doi tra', 'tra lai', 'tra hang', 'doi may', '
 const PROMO_WORDS = ['voucher', 'ma giam', 'khuyen mai', 'giam gia', 'uu dai', 'coupon'];
 const GREETING = /^(xin chao|chao|hello|hi|alo)\b/;
 
-const BUDGET_PATTERN = /(duoi|tam|khoang|tren|tu|hon)?\s*(\d+(?:[.,]\d+)?)\s*(trieu|tr|m)\b/;
+// Phrases that drop remembered criteria ("hãng nào cũng được", "tư vấn lại từ đầu").
+const RESET_BRAND_WORDS = ['hang nao cung duoc', 'hang nao cung dc', 'hang gi cung duoc', 'bat ky hang', 'khong can hang'];
+const RESET_BUDGET_WORDS = ['gia nao cung duoc', 'gia bao nhieu cung duoc', 'bo qua ngan sach', 'khong gioi han gia', 'khong quan trong gia'];
+const RESET_ALL_WORDS = ['tu van lai tu dau', 'lam lai tu dau', 'bat dau lai', 'xoa dieu kien'];
 
-const extractKeyword = (normalizedText) => normalizedText
-  .replace(new RegExp(BUDGET_PATTERN.source, 'g'), ' ')
+const removeNeedWords = (normalizedText) => Object.values(NEED_WORDS).flat()
+  .reduce((text, word) => text.replace(new RegExp(`(^|[^a-z0-9])${word}(?=$|[^a-z0-9])`, 'g'), '$1 '), normalizedText);
+
+const rememberedCriteria = (session) => {
+  const context = session?.context || {};
+  return {
+    budget: {
+      ...(context.minPrice ? { minPrice: context.minPrice } : {}),
+      ...(context.maxPrice ? { maxPrice: context.maxPrice } : {}),
+    },
+    brand: context.brand || undefined,
+    need: context.need || undefined,
+  };
+};
+
+// "Điện thoại hãng Samsung, từ 20.000.000đ trở lên, ưu tiên pin trâu" — repeated to the customer so a
+// misunderstanding is visible at once.
+const describeCriteria = ({ minPrice, maxPrice, brand, need }) => {
+  let price = '';
+  if (minPrice && maxPrice) price = `${formatVnd(minPrice)} – ${formatVnd(maxPrice)}`;
+  else if (minPrice) price = `từ ${formatVnd(minPrice)} trở lên`;
+  else if (maxPrice) price = `tối đa ${formatVnd(maxPrice)}`;
+  const parts = [brand && `hãng ${brand}`, price, need && `ưu tiên ${NEED_LABELS[need]}`].filter(Boolean);
+  return parts.length ? `Điện thoại ${parts.join(', ')}` : '';
+};
+
+const lowerFirst = (value) => value.charAt(0).toLowerCase() + value.slice(1);
+
+const extractKeyword = (normalizedText) => stripBudget(normalizedText)
   .split(/\s+/)
   .map((word) => word.replace(/[^a-z0-9]/g, ''))
   .filter((word) => word.length > 1 && !STOPWORDS.has(word) && !BRAND_ALIASES[word])
   .join(' ');
-
-const parseBudget = (text) => {
-  const match = BUDGET_PATTERN.exec(text);
-  if (!match) return {};
-  const amount = Number(match[2].replace(',', '.')) * 1000000;
-  if (['tren', 'tu', 'hon'].includes(match[1])) return { minPrice: amount };
-  if (['tam', 'khoang'].includes(match[1])) {
-    return { minPrice: Math.round(amount * 0.8), maxPrice: Math.round(amount * 1.15) };
-  }
-  return { maxPrice: amount };
-};
 
 class ChatService {
   async getStoreInfo() {
@@ -181,11 +206,11 @@ class ChatService {
       } catch (error) {
         if (process.env.NODE_ENV !== 'test') console.error('[chatbot] Gemini error:', error.message);
         hooks.onReset?.();
-        result = { ...(await this.answerOffline(text, { clientKey })), source: 'fallback' };
+        result = { ...(await this.answerOffline(text, { clientKey, session })), source: 'fallback' };
         this.emitWords(result.reply, hooks.onDelta);
       }
     } else {
-      result = await this.answerOffline(text, { clientKey });
+      result = await this.answerOffline(text, { clientKey, session });
       this.emitWords(result.reply, hooks.onDelta);
     }
 
@@ -282,7 +307,8 @@ class ChatService {
   }
 
   // Rule-based answers used when no GEMINI_API_KEY is configured or Gemini fails.
-  async answerOffline(text, { clientKey } = {}) {
+  // session (optional) carries the advice criteria remembered from earlier questions.
+  async answerOffline(text, { clientKey, session } = {}) {
     const normalized = normalize(text);
     const toolCalls = [];
     const run = async (name, args) => {
@@ -330,7 +356,7 @@ class ChatService {
         && !BRAND_ALIASES[code.toLowerCase()]
         && !NOT_VOUCHER_WORDS.has(code));
     if (voucherCode && (/\bma\b/.test(normalized) || PROMO_WORDS.some((word) => hasPhrase(normalized, word)))) {
-      const subtotal = parseBudget(normalized).maxPrice;
+      const subtotal = parseAmount(normalized);
       const { result } = await run('list_promotions', { code: voucherCode, ...(subtotal ? { subtotal } : {}) });
       if (!result.valid) return listPromotions(`Mã **${voucherCode}** chưa áp dụng được: ${result.message}.`);
       const { voucher } = result;
@@ -354,7 +380,7 @@ class ChatService {
     const asksAboutBot = /giup (duoc )?gi|lam (duoc )?gi|ban la ai/.test(normalized);
     const greetingOnly = GREETING.test(normalized)
       && normalized.split(/\s+/).length <= 8
-      && !BUDGET_PATTERN.test(normalized)
+      && !Object.keys(parseBudget(normalized)).length
       && !Object.keys(BRAND_ALIASES).some((alias) => normalized.includes(alias));
     if (greetingOnly || asksAboutBot) {
       return done('Xin chào! Mình là trợ lý AI của cửa hàng. Mình có thể tư vấn chọn điện thoại theo ngân sách, so sánh máy, tra cứu đơn hàng và giải đáp chính sách. Bạn cần gì ạ?');
@@ -389,13 +415,17 @@ class ChatService {
       }
     }
 
-    const budget = parseBudget(normalized);
+    const resetAll = RESET_ALL_WORDS.some((word) => hasPhrase(normalized, word));
+    const resetBrand = resetAll || RESET_BRAND_WORDS.some((word) => hasPhrase(normalized, word));
+    const resetBudget = resetAll || RESET_BUDGET_WORDS.some((word) => hasPhrase(normalized, word));
+    const askedBudget = parseBudget(normalized);
+    const askedNeed = parseNeed(normalized);
     const sortBy = (CHEAP_WORDS.some((word) => hasPhrase(normalized, word)) && 'price_asc')
       || (PREMIUM_WORDS.some((word) => hasPhrase(normalized, word)) && 'price_desc')
       || undefined;
-    const keyword = extractKeyword(normalized);
-    const looksLikeShopping = brand || sortBy
-      || budget.minPrice || budget.maxPrice
+    const keyword = resetAll ? '' : extractKeyword(removeNeedWords(normalized));
+    const looksLikeShopping = brand || sortBy || askedNeed || resetBrand || resetBudget
+      || askedBudget.minPrice || askedBudget.maxPrice
       || SHOPPING_WORDS.some((word) => hasPhrase(normalized, word))
       || /\d/.test(keyword);
     if (!looksLikeShopping) {
@@ -405,22 +435,41 @@ class ChatService {
       return done(`Xin lỗi, mình chỉ hỗ trợ các câu hỏi về mua sắm tại cửa hàng: tư vấn chọn điện thoại, phụ kiện, so sánh máy, đơn hàng, khuyến mãi và chính sách. Bạn có thể hỏi như: ${EXAMPLE_QUESTIONS}.`);
     }
 
-    const output = await run('search_products', { keyword, brand, sortBy, ...budget });
+    // Criteria the customer did not repeat come from earlier questions in this conversation;
+    // a new value of the same kind replaces the remembered one.
+    const remembered = rememberedCriteria(session);
+    const hasAskedBudget = Boolean(askedBudget.minPrice || askedBudget.maxPrice);
+    const rememberedBudget = resetBudget ? {} : remembered.budget;
+    const criteria = {
+      ...(hasAskedBudget ? askedBudget : rememberedBudget),
+      brand: brand || (resetBrand ? undefined : remembered.brand),
+      need: askedNeed || (resetAll ? undefined : remembered.need),
+    };
+    if (session) await chatSessionRepository.updateContext(session.id, criteria);
+
+    const args = Object.fromEntries(Object.entries({ keyword, sortBy, ...criteria }).filter(([, value]) => value));
+    const output = await run('search_products', args);
     const items = output.result.products || [];
     if (!items.length) {
       return done('Hiện mình chưa tìm thấy điện thoại phù hợp. Bạn cho mình biết thêm ngân sách (ví dụ "dưới 10 triệu") hoặc hãng bạn thích nhé.');
     }
     // Nothing concrete to search on ("tư vấn"): show best sellers but ask for budget and needs.
-    const isVague = !keyword && !brand && !sortBy && !budget.minPrice && !budget.maxPrice;
-    const budgetText = budget.maxPrice ? `dưới ${formatVnd(budget.maxPrice)}` : `từ ${formatVnd(budget.minPrice)}`;
+    const isVague = !keyword && !sortBy && !criteria.brand && !criteria.need && !criteria.minPrice && !criteria.maxPrice;
+    const understood = describeCriteria(criteria);
     let heading = 'Mình gợi ý một số mẫu phù hợp:';
-    if (output.result.outOfBudget) heading = `Hiện cửa hàng chưa có điện thoại ${budgetText}. Các mẫu có giá gần nhất:`;
+    if (output.result.outOfBudget) heading = `Hiện cửa hàng chưa có ${lowerFirst(understood)}. Các mẫu có giá gần nhất:`;
     else if (isVague) heading = 'Để tư vấn sát hơn, bạn cho mình biết **ngân sách** (ví dụ dưới 10 triệu, 15–20 triệu) và **nhu cầu chính** (chơi game, chụp ảnh, pin trâu, nhỏ gọn) nhé. Trong lúc đó, đây là các mẫu bán chạy nhất:';
+    else if (understood) heading = `${understood}:`;
     else if (sortBy === 'price_asc') heading = 'Các mẫu có giá dễ chịu nhất hiện có:';
     else if (sortBy === 'price_desc') heading = 'Các mẫu cao cấp nhất hiện có:';
     return done([
       heading,
-      ...items.slice(0, 3).map((item) => `- **${item.name}**: ${formatVnd(item.price)} — ${[item.chip, item.ram && `RAM ${item.ram}`, item.storage, item.battery && `pin ${item.battery}`].filter(Boolean).join(', ')}${item.inStock ? ` — còn hàng (${item.stock} máy)` : ' (tạm hết hàng)'}`),
+      ...items.slice(0, 3).map((item) => {
+        const first = needDetail(item, criteria.need);
+        const details = [first, item.chip, item.ram && `RAM ${item.ram}`, item.storage, item.battery && `pin ${item.battery}`]
+          .filter((detail, index, all) => detail && all.indexOf(detail) === index);
+        return `- **${item.name}**: ${formatVnd(item.price)} — ${details.join(', ')}${item.inStock ? ` — còn hàng (${item.stock} máy)` : ' (tạm hết hàng)'}`;
+      }),
       'Bạn muốn mình so sánh chi tiết hay tư vấn thêm theo nhu cầu (chơi game, chụp ảnh, pin trâu) không?',
     ].join('\n'), output.cards.slice(0, 3));
   }

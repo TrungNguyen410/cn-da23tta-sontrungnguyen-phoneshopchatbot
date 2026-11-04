@@ -285,4 +285,4 @@ erDiagram
 
 ## 7. Đánh giá chatbot
 
-Bộ 26 câu hỏi tại [`backend/scripts/evaluateChatbot.mjs`](../backend/scripts/evaluateChatbot.mjs) (`npm run eval:chatbot`), gồm tư vấn, so sánh, chi tiết, phụ kiện, tra đơn, khuyến mãi, chính sách, câu ngoài phạm vi và câu tấn công (đòi xem system prompt, ép giảm giá, xin dữ liệu khách). Kết quả mỗi lần chạy lưu tại [`docs/chatbot-evaluation/`](chatbot-evaluation/).
+Bộ 38 câu hỏi tại [`backend/scripts/evaluateChatbot.mjs`](../backend/scripts/evaluateChatbot.mjs) (`npm run eval:chatbot`), gồm cách nói ngân sách (trên/dưới/trở lên/từ…đến/tầm/củ), nhu cầu, hỏi tiếp trong cùng phiên, tư vấn, so sánh, chi tiết, phụ kiện, tra đơn, khuyến mãi, chính sách, câu ngoài phạm vi và câu tấn công (đòi xem system prompt, ép giảm giá, xin dữ liệu khách). Kết quả mỗi lần chạy lưu tại [`docs/chatbot-evaluation/`](chatbot-evaluation/).
