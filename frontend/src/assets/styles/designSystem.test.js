@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 const stylesDir = dirname(fileURLToPath(import.meta.url));
 const sourceDir = resolve(stylesDir, '../..');
-const implementationFiles = ['main.css', 'admin.css', 'responsive.css', 'redesign.css'];
+const implementationFiles = ['main.css', 'admin.css', 'responsive.css', 'redesign.css', 'nebula.css'];
 
 const readStyle = (file) => readFileSync(resolve(stylesDir, file), 'utf8');
 

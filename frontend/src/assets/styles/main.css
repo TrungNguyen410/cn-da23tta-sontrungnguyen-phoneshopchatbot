@@ -95,7 +95,7 @@ p {
 .btn-light {
   color: var(--text);
   border: 1px solid var(--border);
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
 }
 
 .btn-light:hover {
@@ -169,7 +169,7 @@ p {
 
 /* Header */
 .topbar {
-  color: var(--color-cobalt-pale);
+  color: var(--color-on-dark-soft);
   background: var(--color-graphite-blue);
   font-size: 12px;
 }
@@ -284,7 +284,7 @@ p {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   box-shadow: var(--shadow);
 }
 
@@ -390,7 +390,7 @@ p {
   place-items: center;
   padding: 0 4px;
   color: var(--color-static-white);
-  border: 2px solid var(--color-static-white);
+  border: 2px solid var(--color-paper);
   border-radius: 50%;
   background: var(--danger);
   font-size: 9px;
@@ -570,7 +570,7 @@ p {
 .page-hero p {
   max-width: 610px;
   margin: 0;
-  color: var(--color-cobalt-pale);
+  color: var(--color-on-dark-soft);
   font-size: 17px;
 }
 
@@ -581,7 +581,7 @@ p {
 
 .page-hero > div > span,
 .page-hero.centered > span {
-  color: var(--color-cobalt-rule);
+  color: var(--color-on-dark-soft);
 }
 
 .page-hero.small {
@@ -608,7 +608,7 @@ p {
 
 .page-hero.centered > svg {
   margin-bottom: 16px;
-  color: var(--color-cobalt-rule);
+  color: var(--color-on-dark-soft);
   font-size: 58px;
 }
 
@@ -645,7 +645,7 @@ p {
 }
 
 .section-heading.light > div > span {
-  color: var(--color-cobalt-rule);
+  color: var(--color-on-dark-soft);
 }
 
 .breadcrumbs {
@@ -752,7 +752,7 @@ p {
 }
 
 .slider-dots button.active {
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
 }
 
 .slider-pause-button,
@@ -837,7 +837,7 @@ p {
   padding: 24px 12px 19px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   box-shadow: var(--shadow-sm);
   text-align: center;
   transition:
@@ -899,7 +899,7 @@ p {
   margin-top: 80px;
   padding: 80px 0;
   color: var(--color-static-white);
-  background: var(--color-ink);
+  background: var(--color-graphite);
 }
 
 .store-story-grid {
@@ -970,7 +970,7 @@ p {
   padding: 20px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
 }
 
 .benefit-grid > div > svg {
@@ -1006,7 +1006,7 @@ p {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   box-shadow: var(--shadow-sm);
   transition:
     border-color var(--dur-short) var(--ease-out),
@@ -1061,7 +1061,7 @@ p {
   padding: 5px 10px;
   color: var(--color-static-white);
   border-radius: 7px;
-  background: var(--color-ink);
+  background: var(--color-graphite-raised);
   font-size: 11px;
   font-weight: 850;
 }
@@ -1220,7 +1220,7 @@ p {
   padding: 0 15px;
   border: 1px solid var(--border);
   border-radius: 11px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
 }
 
 .search-box > svg {
@@ -1254,7 +1254,7 @@ p {
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 11px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   white-space: nowrap;
 }
 
@@ -1288,7 +1288,7 @@ p {
   padding: 22px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   box-shadow: var(--shadow-sm);
 }
 
@@ -1336,7 +1336,7 @@ p {
   border: 1px solid var(--border);
   border-radius: 9px;
   outline: none;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   font-size: 12px;
 }
 
@@ -1368,7 +1368,7 @@ p {
   color: var(--color-ink-muted);
   border: 1px solid var(--border);
   border-radius: 9px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   font-size: 12px;
   font-weight: 700;
 }
@@ -1392,7 +1392,7 @@ p {
   padding: 32px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   box-shadow: var(--shadow-sm);
 }
 
@@ -1578,7 +1578,7 @@ p {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 9px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
 }
 
 .quantity-control button {
@@ -2038,7 +2038,7 @@ p {
   padding: 0 11px;
   color: var(--color-static-white);
   border-radius: 0 9px 9px 0;
-  background: var(--navy);
+  background: var(--color-accent);
   font-size: 11px;
   font-weight: 750;
 }
@@ -2205,7 +2205,7 @@ p {
   border: 1px solid var(--border);
   border-radius: 9px;
   outline: none;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   font-size: 13px;
   transition:
     border-color var(--dur-short) var(--ease-out),
@@ -2282,7 +2282,7 @@ p {
 
 .bank-transfer-section {
   border-color: var(--color-cobalt-rule);
-  background: linear-gradient(180deg, var(--color-static-white), var(--color-paper-blue));
+  background: linear-gradient(180deg, var(--color-paper-raised), var(--color-paper-blue));
 }
 
 .bank-transfer-grid {
@@ -2299,7 +2299,7 @@ p {
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: 16px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
 }
 
 .bank-qr-card img {
@@ -2392,7 +2392,7 @@ p {
   color: var(--primary);
   border: 1px solid var(--color-cobalt-rule);
   border-radius: 12px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   font-weight: 800;
 }
 
@@ -2602,7 +2602,7 @@ p {
   display: grid;
   min-height: 100dvh;
   grid-template-columns: minmax(400px, 0.9fr) minmax(550px, 1.1fr);
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
 }
 
 .auth-visual {
@@ -2653,7 +2653,7 @@ p {
 
 .auth-visual p {
   max-width: 480px;
-  color: var(--color-cobalt-rule);
+  color: var(--color-on-dark-soft);
   font-size: 16px;
 }
 
@@ -2710,7 +2710,7 @@ p {
   padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
 }
 
 .input-with-icon > div:focus-within {
@@ -3131,7 +3131,7 @@ p {
   color: var(--color-ink-muted);
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   font-size: 11px;
   font-weight: 700;
 }
@@ -3187,7 +3187,7 @@ p {
   padding: 20px;
   border: 1px solid var(--border);
   border-radius: 13px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
 }
 
 .contact-cards > div > svg {
@@ -3255,7 +3255,7 @@ p {
   justify-content: center;
   flex-direction: column;
   padding: 30px;
-  color: var(--color-cobalt-pale);
+  color: var(--color-on-dark-soft);
   border-radius: var(--radius);
   background:
     linear-gradient(var(--color-overlay-ink-70), var(--color-overlay-cobalt-75)),
@@ -3282,7 +3282,7 @@ p {
   padding: 9px 16px;
   color: var(--primary);
   border-radius: 8px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   font-size: 11px;
   font-weight: 800;
 }
@@ -3302,7 +3302,7 @@ p {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 11px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
 }
 
 .faq-list button {
@@ -3438,7 +3438,7 @@ p {
   height: 38px;
   place-items: center;
   color: var(--color-ink-subtle);
-  border: 3px solid var(--color-static-white);
+  border: 3px solid var(--color-paper);
   border-radius: 50%;
   background: var(--border);
   font-size: 11px;
@@ -3520,7 +3520,7 @@ p {
 
 .not-found-page strong {
   display: block;
-  color: var(--color-cobalt-pale);
+  color: var(--color-on-dark-soft);
   font-size: clamp(100px, 18vw, 180px);
   font-weight: 950;
   line-height: 1;
@@ -3576,7 +3576,7 @@ dialog.accessible-dialog.mobile-drawer[open] {
   width: min(430px, 100%);
   padding: 34px;
   border-radius: 18px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   box-shadow: var(--shadow);
   text-align: center;
 }
@@ -3642,7 +3642,7 @@ dialog.accessible-dialog.mobile-drawer[open] {
   overflow-y: auto;
   padding: 32px;
   border-radius: 18px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
 }
 
 .order-detail-modal > h2 {

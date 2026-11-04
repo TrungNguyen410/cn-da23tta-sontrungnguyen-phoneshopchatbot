@@ -128,7 +128,7 @@
     width: min(340px, 88vw);
     padding: 18px;
     transform: translateX(-105%);
-    background: var(--color-static-white);
+    background: var(--color-paper-raised);
     box-shadow: var(--shadow);
     transition: transform var(--dur-short) var(--ease-out);
   }
@@ -231,7 +231,7 @@
     padding: 50px 16px 16px;
     overflow-y: auto;
     transform: translateX(-105%);
-    background: var(--color-static-white);
+    background: var(--color-paper-raised);
     transition: transform var(--dur-short) var(--ease-out);
   }
 

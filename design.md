@@ -14,16 +14,15 @@ Modern-minimal retail. The storefront should make product comparison and purchas
 
 ## Theme
 
-- `--color-paper`: `oklch(98% 0.006 250)`
-- `--color-paper-raised`: `oklch(100% 0 0)`
-- `--color-ink`: `oklch(22% 0.035 255)`
-- `--color-ink-muted`: `oklch(48% 0.028 255)`
-- `--color-rule`: `oklch(90% 0.012 255)`
-- `--color-accent`: `oklch(50% 0.19 255)`
-- `--color-accent-strong`: `oklch(42% 0.18 255)`
-- `--color-focus`: `oklch(56% 0.16 255)`
+Nebula 3D: one dark neon-glass theme for storefront and admin (no light variant).
 
-One cobalt accent anchors links, focus treatment, active navigation, and primary actions. Status colors remain semantic and are not used as decoration.
+- `--color-paper`: `oklch(13% 0.035 285)` deep indigo canvas with an animated aurora layer and a perspective grid floor (`body::before` / `body::after` in `nebula.css`).
+- `--color-paper-raised`: `oklch(18.5% 0.045 285)`; surfaces use translucent glass (`--color-glass`, `backdrop-filter`) with a violet edge (`--color-glass-edge`).
+- `--color-ink`: `oklch(96.5% 0.012 285)`; `--color-ink-muted`: `oklch(80% 0.03 285)`.
+- `--color-accent`: `oklch(64% 0.24 293)` electric violet; secondary glow cyan `#22d3ee`, highlight magenta `#e879f9`.
+- Primary actions, prices and headings use the gradient tokens `--gradient-neon`, `--gradient-neon-hot`, `--gradient-text`.
+
+All raw colors live in `frontend/src/assets/styles/tokens.css`. Status colors remain semantic.
 
 ## Typography
 
@@ -39,10 +38,11 @@ Use the named 4-point scale in `frontend/src/assets/styles/tokens.css`. Cards, p
 
 ## Motion
 
-- Easing: named CSS cubic-bezier tokens only.
-- Storefront: opacity and transform transitions for product images, controls, and drawer entry.
-- Admin: immediate feedback with short control transitions only.
-- Reduced motion: opacity-only transitions no longer than 150ms.
+- Easing: named CSS cubic-bezier tokens only (`--ease-out`, `--ease-spring`, ...).
+- 3D: product, category and stat cards tilt toward the pointer; the hero slider tilts gently inside an animated conic neon frame. `frontend/src/utils/visualEffects.js` only writes CSS variables (`--nb-rx`, `--nb-ry`, `--nb-mx`, `--nb-my`) and reveal classes; it never touches app state.
+- Scroll reveal: sections and cards rise in with a short stagger (`.nb-reveal` / `.is-in`).
+- Ambient: aurora drift, floating story stats, pulsing AI chat launcher, sheen sweep on primary buttons.
+- Reduced motion: all animation, tilt and reveal are disabled.
 
 ## Interaction stance
 

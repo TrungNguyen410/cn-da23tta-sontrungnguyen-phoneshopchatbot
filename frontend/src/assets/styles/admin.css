@@ -14,7 +14,7 @@
   width: 252px;
   flex-direction: column;
   color: var(--color-slate-300);
-  background: var(--color-ink-deep);
+  background: var(--color-graphite);
 }
 
 .admin-brand {
@@ -94,7 +94,7 @@
 
 .admin-sidebar-bottom a:hover {
   color: var(--color-static-white);
-  background: var(--color-ink);
+  background: var(--color-graphite-raised);
 }
 
 .admin-main {
@@ -159,7 +159,7 @@
   overflow: hidden;
   border: 1px solid var(--color-rule);
   border-radius: 12px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   box-shadow: 0 18px 45px var(--color-overlay-ink-18);
 }
 
@@ -255,7 +255,7 @@
   color: var(--color-ink-muted);
   border: 1px solid var(--color-rule);
   border-radius: 9px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
 }
 
 .notification-button span {
@@ -267,7 +267,7 @@
   height: 18px;
   padding: 0 4px;
   place-items: center;
-  border: 2px solid var(--color-static-white);
+  border: 2px solid var(--color-paper);
   border-radius: 12px;
   color: var(--color-static-white);
   background: var(--color-danger);
@@ -295,7 +295,7 @@
   overflow-y: auto;
   padding: 28px;
   border-radius: 18px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   box-shadow: 0 28px 80px var(--color-overlay-ink-24);
 }
 
@@ -380,7 +380,7 @@
 }
 
 .dashboard-welcome span {
-  color: var(--color-cobalt-rule);
+  color: var(--color-on-dark-soft);
   font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -395,14 +395,14 @@
 
 .dashboard-welcome p {
   margin: 0;
-  color: var(--color-cobalt-pale);
+  color: var(--color-on-dark-soft);
   font-size: 11px;
 }
 
 .dashboard-welcome .btn {
   color: var(--color-accent-strong);
   border: 0;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   font-size: 11px;
 }
 
@@ -421,7 +421,7 @@
   padding: 18px;
   border: 1px solid var(--color-rule-cool);
   border-radius: 13px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   box-shadow: 0 3px 12px var(--color-overlay-ink-4);
 }
 
@@ -470,7 +470,7 @@
   min-width: 0;
   border: 1px solid var(--color-rule-cool);
   border-radius: 13px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   box-shadow: 0 3px 12px var(--color-overlay-ink-4);
 }
 
@@ -667,7 +667,7 @@
   padding: 0 13px;
   border: 1px solid var(--color-rule);
   border-radius: 9px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
 }
 
 .admin-search svg {
@@ -692,7 +692,7 @@
   border: 1px solid var(--color-rule);
   border-radius: 9px;
   outline: none;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   font-size: 10px;
 }
 
@@ -921,7 +921,7 @@
   overflow-y: auto;
   padding: 25px;
   border-radius: 16px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   box-shadow: 0 24px 70px var(--color-overlay-ink-25);
 }
 
@@ -1002,7 +1002,7 @@
   overflow: hidden;
   border: 1px solid var(--color-rule);
   border-radius: 10px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
 }
 
 .admin-image-grid article.primary {
@@ -1068,7 +1068,7 @@
   color: var(--color-ink-subtle);
   border: 1px solid var(--color-rule);
   border-radius: 10px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
   flex-direction: column;
 }
 
@@ -1083,7 +1083,7 @@
   place-items: center;
   border: 1px solid var(--color-rule);
   border-radius: 10px;
-  background: var(--color-static-white);
+  background: var(--color-paper-raised);
 }
 
 .admin-image-preview img {
