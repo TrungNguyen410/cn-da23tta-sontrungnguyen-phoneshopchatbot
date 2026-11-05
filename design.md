@@ -14,16 +14,16 @@ Modern-minimal retail. The storefront should make product comparison and purchas
 
 ## Theme
 
-- `--color-paper`: `oklch(98% 0.006 250)`
-- `--color-paper-raised`: `oklch(100% 0 0)`
-- `--color-ink`: `oklch(22% 0.035 255)`
-- `--color-ink-muted`: `oklch(48% 0.028 255)`
-- `--color-rule`: `oklch(90% 0.012 255)`
-- `--color-accent`: `oklch(50% 0.19 255)`
-- `--color-accent-strong`: `oklch(42% 0.18 255)`
-- `--color-focus`: `oklch(56% 0.16 255)`
+Noir & Gold: one dark, luxurious theme for storefront and admin (no light variant).
 
-One cobalt accent anchors links, focus treatment, active navigation, and primary actions. Status colors remain semantic and are not used as decoration.
+- `--color-paper`: `oklch(12.5% 0.006 70)` obsidian black, with a slow warm-gold light drift and a fine film grain (`body::before` / `body::after` in `luxe.css`).
+- Surfaces are smoked glass (`--color-glass`, `backdrop-filter`) edged with a thin champagne hairline (`--color-glass-edge`).
+- `--color-ink`: `oklch(95% 0.018 85)` ivory; `--color-ink-muted`: `oklch(80% 0.022 80)`.
+- `--color-accent`: `oklch(80% 0.105 82)` champagne gold, with dark espresso text on gold (`--color-accent-ink`, `--color-on-gold`). Rose gold is reserved for discount badges.
+- Primary actions use brushed gold (`--gradient-gold`); headings, prices and stats use gold foil text (`--gradient-text`, `--gradient-gold-rich`).
+- Bootstrap's `--bs-*` variables follow the same palette.
+
+All raw colors live in `frontend/src/assets/styles/tokens.css`. Status colors remain semantic.
 
 ## Typography
 
@@ -39,10 +39,11 @@ Use the named 4-point scale in `frontend/src/assets/styles/tokens.css`. Cards, p
 
 ## Motion
 
-- Easing: named CSS cubic-bezier tokens only.
-- Storefront: opacity and transform transitions for product images, controls, and drawer entry.
-- Admin: immediate feedback with short control transitions only.
-- Reduced motion: opacity-only transitions no longer than 150ms.
+- Easing: named CSS cubic-bezier tokens only (`--ease-out`, `--ease-spring`, ...).
+- 3D: product, category and stat cards tilt toward the pointer; the hero slider tilts gently inside a slowly turning gold frame with a periodic light sweep. `frontend/src/utils/visualEffects.js` only writes CSS variables (`--nb-rx`, `--nb-ry`, `--nb-mx`, `--nb-my`) and reveal classes; it never touches app state.
+- Scroll reveal: sections and cards rise in with a short stagger (`.nb-reveal` / `.is-in`).
+- Ambient: slow gold light drift, animated hairlines before eyebrows, floating story stats, pulsing AI chat launcher, light sweep on gold buttons; product images rest slightly dimmed and light up on hover like a showcase.
+- Reduced motion: all animation, tilt and reveal are disabled.
 
 ## Interaction stance
 

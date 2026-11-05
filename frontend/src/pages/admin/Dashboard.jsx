@@ -24,6 +24,8 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Le
 const readChartColors = () => {
   const styles = getComputedStyle(document.documentElement);
   const token = (name) => styles.getPropertyValue(name).trim();
+  ChartJS.defaults.color = token('--color-ink-muted');
+  ChartJS.defaults.borderColor = token('--color-rule-soft');
   return {
     accent: token('--color-accent'),
     danger: token('--color-danger'),

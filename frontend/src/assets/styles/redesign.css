@@ -609,7 +609,7 @@ h4,
 .admin-sidebar nav a:hover,
 .admin-sidebar nav a.active,
 .admin-sidebar-bottom a:hover {
-  color: var(--color-on-dark);
+  color: var(--color-accent-ink);
   background: var(--color-accent);
 }
 
