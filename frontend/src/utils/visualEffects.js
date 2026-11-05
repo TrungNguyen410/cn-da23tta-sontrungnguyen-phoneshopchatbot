@@ -1,4 +1,4 @@
-// Purely decorative motion for the Nebula 3D theme.
+// Purely decorative motion for the Noir & Gold theme.
 // - Pointer tilt: writes CSS variables (--nb-rx, --nb-ry, --nb-mx, --nb-my) on cards so CSS can rotate them in 3D.
 // - Scroll reveal: adds .nb-reveal / .is-in classes so sections rise into view.
 // Nothing here reads or changes app state, routes or data. Skipped entirely for reduced-motion users.

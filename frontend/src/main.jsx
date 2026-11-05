@@ -17,7 +17,7 @@ import './assets/styles/main.css';
 import './assets/styles/admin.css';
 import './assets/styles/responsive.css';
 import './assets/styles/redesign.css';
-import './assets/styles/nebula.css';
+import './assets/styles/luxe.css';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';

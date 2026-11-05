@@ -270,7 +270,7 @@ p {
 .header-search > button {
   align-self: stretch;
   padding: 0 20px;
-  color: var(--color-static-white);
+  color: var(--color-accent-ink);
   background: var(--primary);
   font-weight: 700;
 }
@@ -491,7 +491,7 @@ p {
 }
 
 .social-links a:hover {
-  color: var(--color-static-white);
+  color: var(--color-accent-ink);
   border-color: var(--primary);
   background: var(--primary);
 }
@@ -1188,7 +1188,7 @@ p {
 }
 
 .add-cart-button:hover {
-  color: var(--color-static-white);
+  color: var(--color-accent-ink);
   border-color: var(--primary);
   background: var(--primary);
 }
@@ -1374,7 +1374,7 @@ p {
 }
 
 .pagination-wrap button.active {
-  color: var(--color-static-white);
+  color: var(--color-accent-ink);
   border-color: var(--primary);
   background: var(--primary);
 }
@@ -2036,7 +2036,7 @@ p {
 
 .voucher-box form button {
   padding: 0 11px;
-  color: var(--color-static-white);
+  color: var(--color-accent-ink);
   border-radius: 0 9px 9px 0;
   background: var(--color-accent);
   font-size: 11px;

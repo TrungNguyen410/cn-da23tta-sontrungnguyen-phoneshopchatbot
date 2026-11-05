@@ -183,7 +183,7 @@
 
   .mobile-search button {
     width: 43px;
-    color: var(--color-static-white);
+    color: var(--color-accent-ink);
     background: var(--primary);
   }
 
