@@ -26,6 +26,7 @@ const readChartColors = () => {
   const token = (name) => styles.getPropertyValue(name).trim();
   ChartJS.defaults.color = token('--color-ink-muted');
   ChartJS.defaults.borderColor = token('--color-rule-soft');
+  ChartJS.defaults.font.family = token('--font-body');
   return {
     accent: token('--color-accent'),
     danger: token('--color-danger'),

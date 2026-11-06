@@ -1479,7 +1479,6 @@ table tbody tr:hover {
 
 @media (max-width: 767.98px) {
   body::after {
-    height: 35%;
     opacity: 0.45;
   }
 
@@ -1556,4 +1555,169 @@ table tbody tr:hover {
   color: var(--color-gold) !important;
   border-right-color: var(--color-transparent);
   filter: drop-shadow(0 0 10px var(--color-glow-gold));
+}
+
+/* ---------- Polish pass (rà soát 05/11): fixes found in screenshots, same Noir & Gold look ---------- */
+
+/* Canvas: the aurora gradients are already soft, so the extra blur only cost a full-screen repaint every frame. */
+body::before {
+  filter: none;
+  will-change: transform;
+}
+
+/* Headlines and copy wrap without orphans. */
+h1,
+h2,
+h3,
+.hero-mobile-copy strong {
+  text-wrap: balance;
+}
+
+p,
+.auth-form p,
+.page-hero p {
+  text-wrap: pretty;
+}
+
+/* Product detail: the gallery wrapper drew a black block behind the thumbnails. */
+.gallery {
+  border: 0;
+  background: var(--color-transparent) !important;
+}
+
+.thumbnail-row button {
+  border: 1px solid var(--color-glass-edge);
+  background: var(--color-glass-light);
+  transition: transform var(--dur-short) var(--ease-spring), border-color var(--dur-short) var(--ease-out), box-shadow var(--dur-short) var(--ease-out);
+}
+
+.thumbnail-row button:hover {
+  border-color: var(--color-glass-edge-strong);
+  transform: translateY(-2px);
+}
+
+.thumbnail-row button.active {
+  border-color: var(--color-gold-bright);
+  box-shadow: 0 0 0 2px var(--color-glow-gold-soft), 0 10px 22px -12px var(--color-glow-gold);
+}
+
+/* Price block: current and old price share a baseline on every screen size. */
+.detail-price {
+  align-items: baseline;
+}
+
+.detail-price > span {
+  border-radius: var(--radius-pill);
+  align-self: center;
+}
+
+/* Stock chip: was a square highlight behind the text. */
+.in-stock {
+  display: inline-flex;
+  width: fit-content;
+  padding: var(--space-2xs) var(--space-sm);
+  border: 1px solid var(--color-success-rule);
+  border-radius: var(--radius-pill);
+}
+
+.in-stock.out-of-stock {
+  color: var(--color-danger-deep);
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+/* Cart summary: the secure note collapsed to a 1px strip. */
+.secure-note {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-control);
+  font-size: var(--text-xs);
+}
+
+/* Cart summary: labels stay on one line, long values wrap on the right instead. */
+.summary-lines > div {
+  gap: var(--space-md);
+}
+
+.summary-lines span {
+  flex: none;
+  white-space: nowrap;
+}
+
+.summary-lines strong {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Chat: an empty input left the send button as a muddy half-transparent gold. */
+.chat-input button:disabled {
+  color: var(--color-ink-subtle) !important;
+  border: 1px solid var(--color-glass-edge) !important;
+  background: var(--color-glass-light) !important;
+  box-shadow: none;
+  opacity: 1;
+}
+
+/* Footer: on desktop the brand sat alone on the left with half the width empty. */
+.footer-link-rail a {
+  position: relative;
+  width: fit-content;
+  transition: color var(--dur-short) var(--ease-out);
+}
+
+.footer-link-rail a::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -3px;
+  left: 0;
+  height: 1px;
+  background: var(--gradient-hairline);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--dur-short) var(--ease-out);
+}
+
+.footer-link-rail a:hover::after,
+.footer-link-rail a:focus-visible::after {
+  transform: scaleX(1);
+}
+
+.footer-bottom {
+  color: var(--color-ink-subtle);
+  border-top-color: var(--color-glass-edge);
+}
+
+@media (min-width: 992px) {
+  .footer-masthead {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: var(--space-2xl);
+    align-items: start;
+  }
+
+  .footer-link-rail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-sm) var(--space-xl);
+    padding-block: var(--space-xs) 0;
+    border-block: 0;
+  }
+
+  .footer-grid.footer-masthead > .footer-contact-line {
+    grid-column: 1 / -1;
+    align-items: center;
+    flex-direction: row;
+    gap: var(--space-sm) var(--space-xl);
+    border-block-start: 1px solid var(--color-glass-edge);
+  }
+}
+
+/* Touch screens keep hover styles after a tap; only lift product images for real pointers. */
+@media (hover: none) {
+  .product-card:hover .product-image-wrap img {
+    transform: none !important;
+  }
+
+  .product-card:hover {
+    box-shadow: var(--shadow-glass) !important;
+  }
 }
