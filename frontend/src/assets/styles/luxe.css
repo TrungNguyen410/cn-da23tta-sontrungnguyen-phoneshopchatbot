@@ -1562,7 +1562,13 @@ table tbody tr:hover {
 /* Canvas: the aurora gradients are already soft, so the extra blur only cost a full-screen repaint every frame. */
 body::before {
   filter: none;
-  will-change: transform;
+}
+
+/* Only promote the drifting aurora to its own layer while it actually animates. */
+@media (prefers-reduced-motion: no-preference) {
+  body::before {
+    will-change: transform;
+  }
 }
 
 /* Headlines and copy wrap without orphans. */
@@ -1583,6 +1589,11 @@ p,
 .gallery {
   border: 0;
   background: var(--color-transparent) !important;
+}
+
+/* redesign.css gives every thumbnail image the sunken (near-black) fill; let the glass button show through. */
+.thumbnail-row img {
+  background: var(--color-transparent);
 }
 
 .thumbnail-row button {
@@ -1711,13 +1722,33 @@ p,
   }
 }
 
-/* Touch screens keep hover styles after a tap; only lift product images for real pointers. */
+/* Touch screens keep hover styles after a tap; reset every card hover effect back to its resting look. */
 @media (hover: none) {
   .product-card:hover .product-image-wrap img {
     transform: none !important;
   }
 
   .product-card:hover {
+    border-color: var(--color-glass-edge) !important;
     box-shadow: var(--shadow-glass) !important;
+  }
+
+  .product-card:hover::before,
+  .category-card:hover::before {
+    opacity: 0;
+  }
+
+  .product-card:hover .product-image-wrap::after {
+    opacity: 0.6;
+    transform: none;
+  }
+
+  .category-card:hover {
+    border-color: var(--color-glass-edge) !important;
+    box-shadow: var(--shadow-glass);
+  }
+
+  .category-card:hover .category-icon {
+    transform: translateZ(30px);
   }
 }

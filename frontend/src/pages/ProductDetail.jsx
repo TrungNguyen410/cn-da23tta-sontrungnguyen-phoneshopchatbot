@@ -9,6 +9,7 @@ import {
   FiShoppingBag,
   FiStar,
   FiTruck,
+  FiX,
   FiZap,
 } from 'react-icons/fi';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -179,7 +180,7 @@ export default function ProductDetail() {
                 <button disabled={isOutOfStock || quantity >= product.stock} onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}><FiPlus /></button>
               </div>
               <span className={`in-stock ${isOutOfStock ? 'out-of-stock' : ''}`}>
-                <FiCheck /> {isOutOfStock ? 'Hết hàng' : `Còn ${product.stock} sản phẩm`}
+                {isOutOfStock ? <FiX /> : <FiCheck />} {isOutOfStock ? 'Hết hàng' : `Còn ${product.stock} sản phẩm`}
               </span>
             </div>
             <div className="detail-actions">

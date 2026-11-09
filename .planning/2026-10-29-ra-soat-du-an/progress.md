@@ -32,3 +32,11 @@
 - Implement T001–T028: `utils/budget.js` (51 câu test, backend + bản sao frontend), `utils/needs.js`, lớp kiểm tra cuối + gần khoảng giá nhất trong `chatTools`, nhớ điều kiện theo phiên (`ChatSession.context`), dòng điều kiện đầu câu trả lời, prompt Gemini, mock frontend, eval 38 câu.
 - Kiểm thử: backend 364/364, frontend 273/273, lint 0, build pass, coverage đạt ngưỡng. Eval offline đầu-cuối (DB có điện thoại 2.000đ): 38/38, trung bình 87ms.
 - Người dùng đồng ý push (04/11): commit, chờ CI, tạo task Jira riêng.
+- Commit 343faa0 đã push; CI run 41830348683: Backend tests, Frontend quality, Docker build đều success. Jira SCRUM-73 (con của E3) tạo mới và chuyển Done.
+
+## Session 2026-11-09 — code-review + security-review, sửa lỗi giao diện
+- Atlas đã kết nối và seed (người dùng tự làm). Đổi tên repo trong 3 file Word báo cáo tiến độ cho khớp GitHub.
+- security-review toàn bộ backend/frontend: không có lỗ hổng đạt ngưỡng.
+- code-review (commit Noir & Gold): sửa 1) màu oklch cho Chart.js qua `utils/canvasColor.js` (+test); 2) nền đen `.thumbnail-row img`; 3) icon FiX cho "Hết hàng"; 4) reset hover trên màn hình cảm ứng cho product/category card; 5) Dashboard chờ `document.fonts.ready` trước khi vẽ biểu đồ; 7) `will-change` chỉ khi không bật reduced-motion.
+- Không sửa mục 6 (grain phủ toàn màn hình mobile): bỏ `height: 35%` là chủ ý để không có vệt cắt ngang; lớp này tĩnh. Mục 8–10 (CSS trùng) chưa làm.
+- Kiểm thử: frontend lint 0, vitest 275/275, build pass.

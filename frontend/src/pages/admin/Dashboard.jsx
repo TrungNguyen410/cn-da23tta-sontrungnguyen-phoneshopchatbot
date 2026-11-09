@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import {
   CategoryScale,
@@ -16,26 +16,31 @@ import DataTable from '../../components/admin/DataTable';
 import StatCard from '../../components/admin/StatCard';
 import Loading from '../../components/common/Loading';
 import { useAuth } from '../../hooks/useAuth';
+import { toCanvasColor } from '../../utils/canvasColor';
 import { formatCurrency, formatDate } from '../../utils/formatCurrency';
 import { getOrderStatus } from '../../utils/orderStatus';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
 
+// Tokens use the OKLCH color space; Chart.js needs them converted before it derives hover colors.
 const readChartColors = () => {
   const styles = getComputedStyle(document.documentElement);
   const token = (name) => styles.getPropertyValue(name).trim();
-  ChartJS.defaults.color = token('--color-ink-muted');
-  ChartJS.defaults.borderColor = token('--color-rule-soft');
+  ChartJS.defaults.color = toCanvasColor(token('--color-ink-muted'));
+  ChartJS.defaults.borderColor = toCanvasColor(token('--color-rule-soft'));
   ChartJS.defaults.font.family = token('--font-body');
   return {
-    accent: token('--color-accent'),
-    danger: token('--color-danger'),
-    rule: token('--color-rule-soft'),
-    success: token('--color-success'),
-    violet: token('--color-violet'),
-    warning: token('--color-warning'),
+    accent: toCanvasColor(token('--color-accent')),
+    danger: toCanvasColor(token('--color-danger')),
+    rule: toCanvasColor(token('--color-rule-soft')),
+    success: toCanvasColor(token('--color-success')),
+    violet: toCanvasColor(token('--color-violet')),
+    warning: toCanvasColor(token('--color-warning')),
   };
 };
+
+// Charts are drawn once on canvas, so wait for the web font before the first draw.
+const fontsAreLoaded = () => typeof document === 'undefined' || !document.fonts || document.fonts.status === 'loaded';
 
 const greetingFor = (hour) => {
   if (hour < 11) return 'Chào buổi sáng';
@@ -47,9 +52,17 @@ const greetingFor = (hour) => {
 export default function Dashboard() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
+  const [fontsReady, setFontsReady] = useState(fontsAreLoaded);
   useEffect(() => { adminApi.getDashboard().then(setData); }, []);
-  if (!data) return <Loading />;
-  const chartColors = readChartColors();
+  useEffect(() => {
+    if (fontsReady) return undefined;
+    let active = true;
+    const markReady = () => { if (active) setFontsReady(true); };
+    document.fonts.ready.then(markReady, markReady);
+    return () => { active = false; };
+  }, [fontsReady]);
+  const chartColors = useMemo(() => (fontsReady ? readChartColors() : null), [fontsReady]);
+  if (!data || !chartColors) return <Loading />;
 
   const orderColumns = [
     { key: 'orderNumber', label: 'Mã đơn', render: (order) => <strong>{order.orderNumber}</strong> },

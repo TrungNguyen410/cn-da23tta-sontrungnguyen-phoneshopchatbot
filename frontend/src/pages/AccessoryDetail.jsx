@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FiCheck, FiChevronRight, FiMinus, FiPlus, FiShoppingBag, FiStar } from 'react-icons/fi';
+import { FiCheck, FiChevronRight, FiMinus, FiPlus, FiShoppingBag, FiStar, FiX } from 'react-icons/fi';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { accessoryApi } from '../api/accessoryApi';
@@ -111,7 +111,7 @@ export default function AccessoryDetail() {
                 <button disabled={isOutOfStock || quantity >= accessory.stock} onClick={() => setQuantity(Math.min(accessory.stock, quantity + 1))}><FiPlus /></button>
               </div>
               <span className={`in-stock ${isOutOfStock ? 'out-of-stock' : ''}`}>
-                <FiCheck /> {isOutOfStock ? 'Hết hàng' : `Còn ${accessory.stock} sản phẩm`}
+                {isOutOfStock ? <FiX /> : <FiCheck />} {isOutOfStock ? 'Hết hàng' : `Còn ${accessory.stock} sản phẩm`}
               </span>
             </div>
             <div className="detail-actions">
