@@ -155,6 +155,8 @@
   --color-logo-plate: #faf6ee;
   --color-logo-plate-shade: #ece4d3;
   --color-logo-plate-edge: rgba(255, 248, 232, 0.55);
+  /* Facebook's own brand blue for its sign-in icon. */
+  --color-brand-facebook: #1877f2;
   --color-glass: rgba(24, 21, 17, 0.62);
   --color-glass-strong: rgba(14, 12, 10, 0.84);
   --color-glass-light: rgba(255, 244, 220, 0.035);

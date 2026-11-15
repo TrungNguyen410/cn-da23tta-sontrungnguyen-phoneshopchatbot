@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { useAuth } from '../hooks/useAuth';
 import { safeInternalRedirect } from '../utils/authSession';
 import { USE_MOCK } from '../utils/constants';
+import SocialLoginButtons from '../components/common/SocialLoginButtons';
 import StoreBrand from '../components/common/StoreBrand';
 
 export default function Login() {
@@ -23,14 +24,17 @@ export default function Login() {
 
   if (isAuthenticated) return <Navigate to={isAdmin ? adminDestination : customerDestination} replace />;
 
+  const enter = (session) => {
+    toast.success(`Chào mừng ${session.user.fullName}`);
+    navigate(session.user.role === 'admin' ? adminDestination : customerDestination, { replace: true });
+  };
+
   const submit = async (event) => {
     event.preventDefault();
     if (!form.identifier.trim() || !form.password) return toast.error('Vui lòng nhập đầy đủ thông tin');
     setLoading(true);
     try {
-      const session = await login(form);
-      toast.success(`Chào mừng ${session.user.fullName}`);
-      navigate(session.user.role === 'admin' ? adminDestination : customerDestination, { replace: true });
+      enter(await login(form));
     } catch (error) {
       toast.error(error.friendlyMessage || error.message);
     } finally {
@@ -53,6 +57,7 @@ export default function Login() {
           <label className="input-with-icon"><span>Mật khẩu</span><div><FiLock /><input type={showPassword ? 'text' : 'password'} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder="Nhập mật khẩu" /><button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <FiEyeOff /> : <FiEye />}</button></div></label>
           <div className="auth-forgot-link"><Link to="/forgot-password">Quên mật khẩu?</Link></div>
           <button className="btn btn-primary auth-submit" disabled={loading}><FiLogIn /> {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}</button>
+          <SocialLoginButtons onSignedIn={enter} disabled={loading} />
           {USE_MOCK && <div className="mock-accounts">
             <strong>Tài khoản dùng thử</strong>
             <button type="button" onClick={() => setForm({ identifier: '0911111111', password: '123456' })}>Khách hàng: 0911111111</button>

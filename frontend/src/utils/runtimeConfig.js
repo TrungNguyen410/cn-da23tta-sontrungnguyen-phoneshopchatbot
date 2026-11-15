@@ -30,11 +30,22 @@ export const createRuntimeConfig = (env = {}) => {
     throw new Error('VITE_SITE_URL is required in production');
   }
 
+  const firebase = {
+    apiKey: String(env.VITE_FIREBASE_API_KEY || '').trim(),
+    authDomain: String(env.VITE_FIREBASE_AUTH_DOMAIN || '').trim(),
+    projectId: String(env.VITE_FIREBASE_PROJECT_ID || '').trim(),
+    appId: String(env.VITE_FIREBASE_APP_ID || '').trim(),
+  };
+  // Google/Facebook buttons need the real backend, which checks the Firebase ID token.
+  const socialLogin = Boolean(!useMock && firebase.apiKey && firebase.authDomain && firebase.projectId);
+
   return {
     useMock,
     deploymentTarget,
     apiUrl,
     siteUrl,
+    firebase,
+    socialLogin,
     cloudinary: {
       cloudName: env.VITE_CLOUDINARY_CLOUD_NAME || '',
       uploadPreset: env.VITE_CLOUDINARY_UPLOAD_PRESET || '',

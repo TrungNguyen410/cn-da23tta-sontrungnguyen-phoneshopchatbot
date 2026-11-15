@@ -1,6 +1,10 @@
 # Cấu hình OTP qua SMS
 
-Luồng đăng ký và quên mật khẩu xác minh bằng số điện thoại Việt Nam đã chuẩn hóa (`0xxxxxxxxx`). Email vẫn là thông tin liên hệ cho đơn hàng và hỗ trợ, không phải kênh xác minh tài khoản.
+Mã OTP qua SMS hiện **chỉ dùng cho trang Quên mật khẩu**. Số điện thoại Việt Nam được chuẩn hóa về dạng `0xxxxxxxxx`.
+
+Trang **Đăng ký** không gửi mã nữa (gửi SMS thật đều tốn phí): khách đăng ký bằng số điện thoại + mật khẩu và đăng nhập được ngay, hoặc dùng Google/Facebook. Xem [social-login.md](social-login.md).
+
+Email vẫn là thông tin liên hệ cho đơn hàng và hỗ trợ, không phải kênh xác minh tài khoản.
 
 ## Phát triển và demo
 
@@ -9,6 +13,8 @@ Khi `NODE_ENV` khác `production`, backend tạo OTP, lưu bản băm và trả 
 Không dùng hoặc bật `debugOtp` trong production. Production không tự chuyển sang email khi SMS gặp lỗi.
 
 ## Production với Twilio
+
+> Lưu ý: theo hướng dẫn của Twilio cho Việt Nam, từ 25/08/2025 nhà mạng chặn hẳn tin nhắn từ Sender ID chưa đăng ký. Đăng ký Sender ID cần giấy phép kinh doanh, nên SMS Twilio tới số Việt Nam gần như không đến nơi.
 
 Production gửi SMS qua Twilio khi và chỉ khi cả ba biến sau có giá trị:
 
@@ -22,7 +28,7 @@ TWILIO_FROM=
 
 Nếu thiếu một trong các biến này, endpoint yêu cầu OTP ở production trả lỗi an toàn `503`. Nếu Twilio hết thời gian chờ hoặc trả lỗi, backend cũng trả `503`; OTP, token và nội dung phản hồi của Twilio không bị đưa vào lỗi. Số điện thoại Việt Nam được đổi sang E.164 (`0912345678` → `+84912345678`) trước khi gửi.
 
-OTP vẫn được băm, giới hạn số lần thử và chỉ được tiêu thụ theo các quy tắc hiện có. Tài khoản không được tạo khi việc gửi OTP thất bại.
+OTP vẫn được băm, giới hạn số lần thử và chỉ được tiêu thụ theo các quy tắc hiện có. Mật khẩu không đổi khi việc gửi OTP thất bại.
 
 ## Chuyển dữ liệu tài khoản cũ
 
@@ -48,12 +54,12 @@ npm run migrate:soft-delete-indexes
 npm run migrate:soft-delete-indexes -- --write
 ```
 
-`migrate:soft-delete-indexes` là owner duy nhất của các unique index trên User, bao gồm `user_phone_active_unique` và `user_email_active_unique`. Nếu migration index đã chạy trước đó, có thể chạy migration phone sau mà không làm đổi index; chạy lại migration index sau cùng vẫn an toàn và idempotent.
+`migrate:soft-delete-indexes` là owner duy nhất của các unique index trên User, bao gồm `user_phone_set_active_unique`, `user_email_active_unique` và `user_firebase_uid_active_unique` (index phone cũ `user_phone_active_unique` được migration bỏ đi). Nếu migration index đã chạy trước đó, có thể chạy migration phone sau mà không làm đổi index; chạy lại migration index sau cùng vẫn an toàn và idempotent.
 
 ## Kiểm tra luồng phát triển
 
 1. Chạy backend với `NODE_ENV=development`.
-2. Gọi `POST /api/auth/register/request-otp` cùng họ tên, số điện thoại và mật khẩu.
+2. Gọi `POST /api/auth/forgot-password/request-otp` với `identifier` là số điện thoại của một tài khoản.
 3. Lấy `debugOtp` từ response hoặc toast của frontend.
-4. Gửi mã đó tới `POST /api/auth/register/verify-otp`.
-5. Xác nhận tài khoản chỉ được tạo sau khi xác minh.
+4. Gửi mã đó cùng mật khẩu mới tới `POST /api/auth/forgot-password/reset`.
+5. Đăng nhập lại bằng mật khẩu mới.

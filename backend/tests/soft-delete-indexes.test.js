@@ -69,6 +69,12 @@ const uniqueCases = [
     original: userPayload({ email: 'reusable@test.com', phone: '0900000002' }),
     duplicate: userPayload({ email: 'reusable@test.com', phone: '0900000003' }),
   },
+  {
+    label: 'User.firebaseUid',
+    Model: User,
+    original: { fullName: 'Google User', authProvider: 'google', firebaseUid: 'firebase-uid-1' },
+    duplicate: { fullName: 'Google User Again', authProvider: 'google', firebaseUid: 'firebase-uid-1' },
+  },
 ];
 
 describe('soft-delete unique indexes', () => {
@@ -95,6 +101,13 @@ describe('soft-delete unique indexes', () => {
     await expect(User.create(userPayload({ phone: '0900000005' }))).resolves.toBeDefined();
   });
 
+  it('allows multiple active Google/Facebook users without a phone or password', async () => {
+    await User.create({ fullName: 'Google User', authProvider: 'google', firebaseUid: 'uid-google' });
+
+    await expect(User.create({ fullName: 'Facebook User', authProvider: 'facebook', firebaseUid: 'uid-facebook' }))
+      .resolves.toBeDefined();
+  });
+
   it('allows multiple active users with a null email address', async () => {
     await User.create(userPayload({ email: null, phone: '0900000006' }));
 
@@ -116,6 +129,11 @@ describe('soft-delete index migration', () => {
           key: { email: 1 },
           name: 'email_optional_unique',
           partialFilterExpression: { email: { $type: 'string' } },
+        },
+        {
+          key: { phone: 1 },
+          name: 'user_phone_active_unique',
+          partialFilterExpression: { isDeleted: false },
         },
       ],
     },
@@ -195,14 +213,14 @@ describe('soft-delete index migration', () => {
     },
     {
       model: 'User',
-      drop: ['phone_1', 'email_optional_unique'],
+      drop: ['phone_1', 'email_optional_unique', 'user_phone_active_unique'],
       create: [
         {
           key: { phone: 1 },
           options: {
-            name: 'user_phone_active_unique',
+            name: 'user_phone_set_active_unique',
             unique: true,
-            partialFilterExpression: { isDeleted: false },
+            partialFilterExpression: { phone: { $type: 'string' }, isDeleted: false },
           },
         },
         {
@@ -211,6 +229,14 @@ describe('soft-delete index migration', () => {
             name: 'user_email_active_unique',
             unique: true,
             partialFilterExpression: { email: { $type: 'string' }, isDeleted: false },
+          },
+        },
+        {
+          key: { firebaseUid: 1 },
+          options: {
+            name: 'user_firebase_uid_active_unique',
+            unique: true,
+            partialFilterExpression: { firebaseUid: { $type: 'string' }, isDeleted: false },
           },
         },
       ],

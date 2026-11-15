@@ -23,6 +23,12 @@ import { matchWard } from '../utils/wards';
 import { isStrongEnoughPassword, validateRequired } from '../utils/validators';
 
 // Customers may cancel only before the shop confirms the order (same rule as the backend).
+// Google/Facebook accounts have no login phone and no password.
+const SOCIAL_PROVIDER_NAMES = { google: 'Google', facebook: 'Facebook' };
+const accountTabs = (socialProvider) => (
+  socialProvider ? ['profile', 'orders', 'vouchers'] : ['profile', 'orders', 'vouchers', 'password']
+);
+
 const canSelfCancel = (order) =>
   order.status === 'pending'
   && !['paid', 'refund_required', 'refunded'].includes(order.paymentStatus);
@@ -31,7 +37,11 @@ export default function Account() {
   const [searchParams] = useSearchParams();
   const { user, updateProfile, changePassword, logout } = useAuth();
   const { addToCart } = useCart();
-  const [tab, setTab] = useState(searchParams.get('tab') || 'profile');
+  const socialProvider = SOCIAL_PROVIDER_NAMES[user.authProvider];
+  const [tab, setTab] = useState(() => {
+    const requestedTab = searchParams.get('tab');
+    return accountTabs(socialProvider).includes(requestedTab) ? requestedTab : 'profile';
+  });
   const [profile, setProfile] = useState({ fullName: user.fullName, phone: user.phone });
   const [profileErrors, setProfileErrors] = useState({});
   const [shippingAddress, setShippingAddress] = useState(() => (
@@ -50,8 +60,8 @@ export default function Account() {
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
-    if (['profile', 'orders', 'vouchers', 'password'].includes(requestedTab)) setTab(requestedTab);
-  }, [searchParams]);
+    if (accountTabs(socialProvider).includes(requestedTab)) setTab(requestedTab);
+  }, [searchParams, socialProvider]);
 
   const loadOrders = useCallback(
     () => {
@@ -176,11 +186,11 @@ export default function Account() {
         <div className="page-title-row"><div><span className="eyebrow">Khu vực thành viên</span><h1>Tài khoản của tôi</h1></div></div>
         <div className="account-layout">
           <aside className="account-sidebar panel">
-            <div className="account-user"><div>{(user.fullName || user.phone || '?').charAt(0)}</div><span><strong>{user.fullName}</strong><small>{user.phone}</small></span></div>
+            <div className="account-user"><div>{(user.fullName || user.phone || '?').charAt(0)}</div><span><strong>{user.fullName}</strong><small>{user.phone || user.email || `Tài khoản ${socialProvider}`}</small></span></div>
             <button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}><FiUser /> Thông tin cá nhân</button>
             <button className={tab === 'orders' ? 'active' : ''} onClick={() => setTab('orders')}><FiPackage /> Đơn hàng của tôi</button>
             <button className={tab === 'vouchers' ? 'active' : ''} onClick={() => setTab('vouchers')}><FiGift /> Voucher của tôi</button>
-            <button className={tab === 'password' ? 'active' : ''} onClick={() => setTab('password')}><FiLock /> Đổi mật khẩu</button>
+            {!socialProvider && <button className={tab === 'password' ? 'active' : ''} onClick={() => setTab('password')}><FiLock /> Đổi mật khẩu</button>}
             <button className="logout" onClick={logout}><FiLogOut /> Đăng xuất</button>
           </aside>
           <section className="account-content panel">
@@ -189,7 +199,11 @@ export default function Account() {
                 <div className="content-heading"><h2>Thông tin cá nhân</h2><p>Cập nhật thông tin dùng cho đơn hàng và liên hệ.</p></div>
                 <div className="form-grid">
                   <label className="form-field"><span>Họ và tên *</span><input aria-invalid={Boolean(profileErrors.fullName)} aria-describedby={profileErrors.fullName ? 'profile-fullName-error' : undefined} value={profile.fullName} onChange={(event) => updateProfileField('fullName', event.target.value)} />{profileErrors.fullName && <small id="profile-fullName-error">{profileErrors.fullName}</small>}</label>
-                  <label className="form-field"><span>Số điện thoại đăng nhập</span><input value={profile.phone} readOnly /><small>Đã xác minh qua SMS</small></label>
+                  {socialProvider ? (
+                    <label className="form-field"><span>Đăng nhập bằng</span><input value={user.email ? `${socialProvider} · ${user.email}` : socialProvider} readOnly /><small>Số điện thoại nhận hàng nhập ở địa chỉ bên dưới hoặc khi đặt hàng</small></label>
+                  ) : (
+                    <label className="form-field"><span>Số điện thoại đăng nhập</span><input value={profile.phone || ''} readOnly /><small>Dùng để đăng nhập, không thay đổi được</small></label>
+                  )}
                 </div>
                 <button className="btn btn-primary">Lưu thay đổi</button>
               </form>
@@ -211,7 +225,7 @@ export default function Account() {
             {tab === 'orders' && (
               <div>
                 <div className="content-heading"><h2>Đơn hàng của tôi</h2><p>Theo dõi trạng thái và xem lại lịch sử mua sắm.</p></div>
-                <OrderLookupPanel initialPhone={user.phone} />
+                <OrderLookupPanel initialPhone={user.phone || user.shippingAddress?.phone || ''} />
                 {loadingOrders ? <Loading /> : ordersError ? (
                   <LoadError message={ordersError} onRetry={loadOrders} />
                 ) : orders.length === 0 ? <EmptyState title="Bạn chưa có đơn hàng" actionLabel="Mua sắm ngay" actionTo="/products" /> : (
@@ -238,7 +252,7 @@ export default function Account() {
                 <MyVouchers />
               </div>
             )}
-            {tab === 'password' && (
+            {tab === 'password' && !socialProvider && (
               <form onSubmit={savePassword}>
                 <div className="content-heading"><h2>Đổi mật khẩu</h2><p>Sử dụng mật khẩu có ít nhất 6 ký tự để bảo vệ tài khoản.</p></div>
                 <div className="password-form">

@@ -13,14 +13,13 @@ export const authApi = {
     axiosClient.post('/auth/refresh', { refreshToken }, skipAuthRefresh),
   logout: (refreshToken) =>
     USE_MOCK ? Promise.resolve() : axiosClient.post('/auth/logout', { refreshToken }, skipAuthRefresh),
-  requestRegistrationOtp: (payload) =>
+  register: ({ fullName, phone, password }) =>
     USE_MOCK
-      ? mockDb.requestRegistrationOtp(payload)
-      : axiosClient.post('/auth/register/request-otp', payload, skipAuthRefresh),
-  verifyRegistrationOtp: ({ phone, otp }) =>
-    USE_MOCK
-      ? mockDb.verifyRegistrationOtp(phone, otp)
-      : axiosClient.post('/auth/register/verify-otp', { phone, otp }, skipAuthRefresh),
+      ? mockDb.register({ fullName, phone, password })
+      : axiosClient.post('/auth/register', { fullName, phone, password }, skipAuthRefresh),
+  // Google/Facebook (real backend only): trade the Firebase ID token for our own session.
+  loginWithSocial: (idToken) =>
+    axiosClient.post('/auth/social', { idToken }, skipAuthRefresh),
   requestPasswordReset: ({ identifier }) =>
     USE_MOCK
       ? mockDb.requestPasswordReset(identifier)

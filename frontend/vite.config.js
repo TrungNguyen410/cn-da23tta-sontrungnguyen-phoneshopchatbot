@@ -41,6 +41,13 @@ export default defineConfig(({ command, mode }) => {
     test: {
       environment: 'jsdom',
       setupFiles: './src/test/setup.js',
+      // Tests must not depend on a developer's local .env: Google/Facebook sign-in is switched on per test.
+      env: {
+        VITE_FIREBASE_API_KEY: '',
+        VITE_FIREBASE_AUTH_DOMAIN: '',
+        VITE_FIREBASE_PROJECT_ID: '',
+        VITE_FIREBASE_APP_ID: '',
+      },
     },
     build: {
       rolldownOptions: {

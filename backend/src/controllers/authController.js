@@ -3,13 +3,13 @@ const asyncHandler = require('../utils/asyncHandler');
 const { successResponse } = require('../utils/apiResponse');
 
 const register = asyncHandler(async (req, res) => {
-  const result = await authService.requestRegistrationOtp(req.body);
-  successResponse(res, result, 'Registration OTP sent', 202);
+  const result = await authService.register(req.body);
+  successResponse(res, result, 'Registered successfully', 201);
 });
 
-const verifyRegistrationOtp = asyncHandler(async (req, res) => {
-  const session = await authService.verifyRegistrationOtp(req.body);
-  successResponse(res, session, 'Registration verified', 201);
+const socialLogin = asyncHandler(async (req, res) => {
+  const session = await authService.loginWithSocial(req.body);
+  successResponse(res, session, 'Logged in successfully');
 });
 
 const requestPasswordReset = asyncHandler(async (req, res) => {
@@ -64,7 +64,7 @@ const logout = asyncHandler(async (req, res) => {
 
 module.exports = {
   register,
-  verifyRegistrationOtp,
+  socialLogin,
   requestPasswordReset,
   resetPassword,
   login,

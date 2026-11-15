@@ -63,6 +63,22 @@ describe('Account profile', () => {
     expect(authMock.updateProfile).toHaveBeenCalledWith({ fullName: 'Test User' });
   });
 
+  it('shows the Google sign-in instead of a login phone and hides the password tab', async () => {
+    const phoneUser = authMock.user;
+    authMock.user = { id: 'g1', fullName: 'Google User', email: 'google.user@gmail.com', authProvider: 'google' };
+    try {
+      render(<MemoryRouter initialEntries={['/account?tab=password']}><Account /></MemoryRouter>);
+
+      expect(screen.getByLabelText(/^Đăng nhập bằng/)).toHaveValue('Google · google.user@gmail.com');
+      expect(screen.queryByLabelText(/Số điện thoại đăng nhập/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Đổi mật khẩu/ })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Mật khẩu hiện tại')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Lưu thay đổi' })).toBeInTheDocument();
+    } finally {
+      authMock.user = phoneUser;
+    }
+  });
+
   it('saves the default shipping address with the new ward list', async () => {
     const user = userEvent.setup();
     render(<MemoryRouter><Account /></MemoryRouter>);

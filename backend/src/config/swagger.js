@@ -67,14 +67,6 @@ const swaggerDocument = {
           refreshToken: { type: 'string' },
         },
       },
-      OtpVerificationRequest: {
-        type: 'object',
-        required: ['phone', 'otp'],
-        properties: {
-          phone: { type: 'string', example: '0912345678' },
-          otp: { type: 'string', pattern: '^\\d{6}$' },
-        },
-      },
       PasswordResetOtpRequest: {
         type: 'object',
         required: ['identifier'],
@@ -167,23 +159,39 @@ const swaggerDocument = {
     '/auth/register': {
       post: {
         tags: ['Auth'],
-        summary: 'Request registration OTP through SMS',
+        summary: 'Create a customer account with phone number and password (no SMS code)',
         requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/RegisterRequest' } } } },
-        responses: { 202: { description: 'OTP sent', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiResponse' } } } } },
+        responses: {
+          201: { description: 'Account created: { user }. The client then signs in with POST /auth/login.' },
+          409: { description: 'Number already registered' },
+          422: { description: 'Invalid name, phone or password' },
+        },
       },
     },
-    '/auth/register/request-otp': {
+    '/auth/social': {
       post: {
         tags: ['Auth'],
-        summary: 'Request registration OTP through SMS',
-        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/RegisterRequest' } } } },
-      },
-    },
-    '/auth/register/verify-otp': {
-      post: {
-        tags: ['Auth'],
-        summary: 'Verify SMS phone OTP and create customer account',
-        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/OtpVerificationRequest' } } } },
+        summary: 'Sign in or sign up with Google/Facebook through Firebase Authentication',
+        description: 'The browser signs in with a Firebase popup and sends the Firebase ID token. The backend checks its signature (Google securetoken keys), audience/issuer = FIREBASE_PROJECT_ID, sign-in provider google.com or facebook.com and a sign-in at most 15 minutes old. Accounts are matched by Firebase uid; the first sign-in creates a customer account from the token name, email and picture. An email already used by another account is not merged (409).',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['idToken'],
+                properties: { idToken: { type: 'string', description: 'Firebase ID token from user.getIdToken()' } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Session returned: { token, accessToken, refreshToken, user }' },
+          401: { description: 'Invalid or expired Firebase token, or another sign-in provider' },
+          403: { description: 'Account locked or inactive' },
+          409: { description: 'Email already belongs to another account' },
+          503: { description: 'FIREBASE_PROJECT_ID not configured or Google keys unreachable' },
+        },
       },
     },
     '/auth/forgot-password/request-otp': {

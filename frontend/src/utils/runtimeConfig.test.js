@@ -8,6 +8,20 @@ describe('createRuntimeConfig', () => {
     expect(createRuntimeConfig({}).useMock).toBe(false);
   });
 
+  it('shows Google/Facebook sign-in only with a full Firebase config and the real backend', () => {
+    const firebaseEnv = {
+      VITE_FIREBASE_API_KEY: 'test-api-key',
+      VITE_FIREBASE_AUTH_DOMAIN: 'demo.firebaseapp.com',
+      VITE_FIREBASE_PROJECT_ID: 'demo',
+      VITE_FIREBASE_APP_ID: '1:1:web:1',
+    };
+    expect(createRuntimeConfig(firebaseEnv).socialLogin).toBe(true);
+    expect(createRuntimeConfig(firebaseEnv).firebase.projectId).toBe('demo');
+    expect(createRuntimeConfig({ ...firebaseEnv, VITE_USE_MOCK: 'true' }).socialLogin).toBe(false);
+    expect(createRuntimeConfig({ ...firebaseEnv, VITE_FIREBASE_PROJECT_ID: '' }).socialLogin).toBe(false);
+    expect(createRuntimeConfig({}).socialLogin).toBe(false);
+  });
+
   it('requires an API URL for a production API build', () => {
     expect(() => createRuntimeConfig({ PROD: true, VITE_USE_MOCK: 'false' }))
       .toThrow('VITE_API_URL');

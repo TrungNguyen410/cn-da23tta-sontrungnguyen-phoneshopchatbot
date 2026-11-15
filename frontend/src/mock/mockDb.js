@@ -153,39 +153,13 @@ export const mockDb = {
       createdAt: new Date().toISOString(),
       ...payload,
       phone,
+      authProvider: 'phone',
+      phoneVerified: false,
+      phoneVerifiedAt: null,
     };
     write('users', [...users, user]);
-    return wait({ token: tokenFor(user), user: publicUser(user) });
-  },
-
-  async requestRegistrationOtp(payload) {
-    const users = read('users');
-    const phone = normalizeVietnamesePhone(payload.phone);
-    if (!phone) fail('Số điện thoại Việt Nam không hợp lệ');
-    if (users.some((user) => user.phone === phone)) fail('Số điện thoại đã được sử dụng');
-    const request = {
-      id: createId('otp'),
-      purpose: 'register',
-      target: phone,
-      otp: mockOtp,
-      payload: { ...payload, phone },
-      expiresAt: Date.now() + 10 * 60 * 1000,
-    };
-    writeOtpRequests([
-      request,
-      ...readOtpRequests().filter((item) => !(item.purpose === request.purpose && item.target === request.target)),
-    ]);
-    return wait({ deliveryTarget: `${phone.slice(0, 3)}***${phone.slice(-3)}`, expiresInSeconds: 600, debugOtp: mockOtp });
-  },
-
-  async verifyRegistrationOtp(phone, otp) {
-    const target = normalizeVietnamesePhone(phone);
-    const request = readOtpRequests().find(
-      (item) => item.purpose === 'register' && item.target === target && item.expiresAt > Date.now(),
-    );
-    if (!request || request.otp !== otp) fail('Mã OTP không hợp lệ hoặc đã hết hạn');
-    writeOtpRequests(readOtpRequests().filter((item) => item.id !== request.id));
-    return this.register({ ...request.payload, phoneVerified: true, phoneVerifiedAt: new Date().toISOString() });
+    // Like the backend: the account is created but no session is opened.
+    return wait({ user: publicUser(user) });
   },
 
   async requestPasswordReset(identifier) {

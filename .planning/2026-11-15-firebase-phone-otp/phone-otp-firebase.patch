@@ -1,0 +1,3867 @@
+diff --git a/.env.example b/.env.example
+index fc81218..900775f 100644
+--- a/.env.example
++++ b/.env.example
+@@ -18,3 +18,12 @@ SEPAY_WEBHOOK_API_KEY=
+ # COMPOSE_PROFILES=tunnel
+ NGROK_AUTHTOKEN=
+ NGROK_DOMAIN=
++
++# Firebase Phone Auth for sign-up OTP (optional; empty = backend OTP, which needs an SMS provider in Docker).
++# Values come from Firebase console > Project settings > Your apps > firebaseConfig (public web config).
++VITE_FIREBASE_API_KEY=
++VITE_FIREBASE_AUTH_DOMAIN=
++VITE_FIREBASE_PROJECT_ID=
++VITE_FIREBASE_APP_ID=
++# Backend checks Firebase ID tokens against this project (same value as VITE_FIREBASE_PROJECT_ID).
++FIREBASE_PROJECT_ID=
+diff --git a/backend/.env.example b/backend/.env.example
+index cef810a..52e1ceb 100644
+--- a/backend/.env.example
++++ b/backend/.env.example
+@@ -17,6 +17,9 @@ DEPLOYMENT_TARGET=local
+ # serverless platform and cannot be hidden by DEPLOYMENT_TARGET.
+ SEED_DEMO_PASSWORD=123456
+ 
++# Firebase Phone Auth: project whose ID tokens are accepted by POST /api/auth/register/firebase
++FIREBASE_PROJECT_ID=
++
+ # Twilio SMS OTP (required when NODE_ENV=production; leave empty for development)
+ TWILIO_ACCOUNT_SID=
+ TWILIO_AUTH_TOKEN=
+diff --git a/backend/src/config/env.js b/backend/src/config/env.js
+index cbb4bf9..9c11fb4 100644
+--- a/backend/src/config/env.js
++++ b/backend/src/config/env.js
+@@ -176,6 +176,10 @@ const env = {
+     phone: process.env.MOMO_PHONE || '',
+     accountName: process.env.MOMO_ACCOUNT_NAME || '',
+   },
++  // Firebase Phone Auth: the sign-up page sends the code, the backend checks the ID token against this project.
++  firebase: {
++    projectId: String(process.env.FIREBASE_PROJECT_ID || '').trim(),
++  },
+   sms: {
+     accountSid: process.env.TWILIO_ACCOUNT_SID || '',
+     authToken: process.env.TWILIO_AUTH_TOKEN || '',
+diff --git a/backend/src/config/swagger.js b/backend/src/config/swagger.js
+index fd4783f..1a50618 100644
+--- a/backend/src/config/swagger.js
++++ b/backend/src/config/swagger.js
+@@ -186,6 +186,52 @@ const swaggerDocument = {
+         requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/OtpVerificationRequest' } } } },
+       },
+     },
++    '/auth/register/check-phone': {
++      post: {
++        tags: ['Auth'],
++        summary: 'Check that a phone number is free before the browser sends a Firebase SMS',
++        requestBody: {
++          required: true,
++          content: { 'application/json': { schema: { type: 'object', required: ['phone'], properties: { phone: { type: 'string', example: '0912345678' } } } } },
++        },
++        responses: {
++          200: { description: 'Number can be registered: { available: true }' },
++          409: { description: 'Number already registered' },
++          422: { description: 'Not a Vietnamese mobile number' },
++        },
++      },
++    },
++    '/auth/register/firebase': {
++      post: {
++        tags: ['Auth'],
++        summary: 'Create a customer account from a Firebase Phone Auth ID token',
++        description: 'The browser verifies the SMS code with Firebase, then sends the Firebase ID token. The backend checks its signature (Google securetoken keys), audience/issuer = FIREBASE_PROJECT_ID, sign-in provider "phone", a sign-in at most 15 minutes old, and that phone_number matches the submitted phone.',
++        requestBody: {
++          required: true,
++          content: {
++            'application/json': {
++              schema: {
++                type: 'object',
++                required: ['fullName', 'phone', 'password', 'idToken'],
++                properties: {
++                  fullName: { type: 'string' },
++                  phone: { type: 'string', example: '0912345678' },
++                  password: { type: 'string', minLength: 6 },
++                  idToken: { type: 'string', description: 'Firebase ID token from confirmationResult.confirm(code)' },
++                },
++              },
++            },
++          },
++        },
++        responses: {
++          201: { description: 'Account created, session returned' },
++          400: { description: 'Verified phone differs from the submitted phone' },
++          401: { description: 'Invalid or expired Firebase token' },
++          409: { description: 'Number already registered' },
++          503: { description: 'FIREBASE_PROJECT_ID not configured or Google keys unreachable' },
++        },
++      },
++    },
+     '/auth/forgot-password/request-otp': {
+       post: {
+         tags: ['Auth'],
+diff --git a/backend/src/controllers/authController.js b/backend/src/controllers/authController.js
+index db7acc0..3e9ea87 100644
+--- a/backend/src/controllers/authController.js
++++ b/backend/src/controllers/authController.js
+@@ -12,6 +12,16 @@ const verifyRegistrationOtp = asyncHandler(async (req, res) => {
+   successResponse(res, session, 'Registration verified', 201);
+ });
+ 
++const checkRegistrationPhone = asyncHandler(async (req, res) => {
++  const result = await authService.checkRegistrationPhone(req.body);
++  successResponse(res, result, 'Phone number is available');
++});
++
++const registerWithFirebase = asyncHandler(async (req, res) => {
++  const session = await authService.registerWithFirebase(req.body);
++  successResponse(res, session, 'Registration verified', 201);
++});
++
+ const requestPasswordReset = asyncHandler(async (req, res) => {
+   const result = await authService.requestPasswordReset(req.body);
+   successResponse(res, result, 'Password reset OTP requested');
+@@ -64,6 +74,8 @@ const logout = asyncHandler(async (req, res) => {
+ 
+ module.exports = {
+   register,
++  checkRegistrationPhone,
++  registerWithFirebase,
+   verifyRegistrationOtp,
+   requestPasswordReset,
+   resetPassword,
+diff --git a/backend/src/routes/authRoutes.js b/backend/src/routes/authRoutes.js
+index 8b291cf..5e342bb 100644
+--- a/backend/src/routes/authRoutes.js
++++ b/backend/src/routes/authRoutes.js
+@@ -11,6 +11,7 @@ const router = express.Router();
+ const otpRequestLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 5 });
+ const otpVerifyLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
+ const loginLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 15 });
++const phoneCheckLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
+ const otpPhoneLimit = rateLimit({
+   windowMs: 15 * 60 * 1000,
+   max: 5,
+@@ -27,6 +28,9 @@ const otpPhoneDailyLimit = rateLimit({
+ router.post('/register', otpRequestLimit, otpPhoneLimit, otpPhoneDailyLimit, validators.register, validate, authController.register);
+ router.post('/register/request-otp', otpRequestLimit, otpPhoneLimit, otpPhoneDailyLimit, validators.register, validate, authController.register);
+ router.post('/register/verify-otp', otpVerifyLimit, validators.verifyRegistrationOtp, validate, authController.verifyRegistrationOtp);
++// Firebase Phone Auth: check the number before the browser spends an SMS, then trade the ID token for an account.
++router.post('/register/check-phone', phoneCheckLimit, validators.checkRegistrationPhone, validate, authController.checkRegistrationPhone);
++router.post('/register/firebase', otpVerifyLimit, validators.registerWithFirebase, validate, authController.registerWithFirebase);
+ router.post('/forgot-password/request-otp', otpRequestLimit, otpPhoneLimit, otpPhoneDailyLimit, validators.requestPasswordReset, validate, authController.requestPasswordReset);
+ router.post('/forgot-password/reset', otpVerifyLimit, validators.resetPassword, validate, authController.resetPassword);
+ router.post('/login', loginLimit, validators.login, validate, authController.login);
+diff --git a/backend/src/services/authService.js b/backend/src/services/authService.js
+index 3189114..134bdca 100644
+--- a/backend/src/services/authService.js
++++ b/backend/src/services/authService.js
+@@ -8,11 +8,15 @@ const refreshTokenRepository = require('../repositories/refreshTokenRepository')
+ const verificationCodeRepository = require('../repositories/verificationCodeRepository');
+ const userRepository = require('../repositories/userRepository');
+ const otpDeliveryService = require('./otpDeliveryService');
++const firebaseTokenVerifier = require('./firebaseTokenVerifier');
+ const { normalizeVietnamesePhone } = require('../utils/phone');
+ const { toShippingAddress } = require('../utils/shippingAddress');
+ 
+ const publicUser = (user) => (typeof user.toJSON === 'function' ? user.toJSON() : user);
+ 
++// Minimum wait between two registration codes for the same phone; the sign-up form counts it down.
++const OTP_RESEND_SECONDS = 60;
++
+ class AuthService {
+   createOtp() {
+     return String(crypto.randomInt(100000, 1000000));
+@@ -22,7 +26,16 @@ class AuthService {
+     return hashToken(`${purpose}:${target}:${code}:${env.jwtAccessSecret}`);
+   }
+ 
+-  async storeAndDeliverOtp({ target, channel, purpose, payload = null }) {
++  async ensureResendAllowed(target, purpose) {
++    const latest = await verificationCodeRepository.findActive(target, purpose);
++    if (!latest?.createdAt) return;
++    const elapsedSeconds = (Date.now() - new Date(latest.createdAt).getTime()) / 1000;
++    const waitSeconds = Math.ceil(OTP_RESEND_SECONDS - elapsedSeconds);
++    if (waitSeconds > 0) throw new AppError(`Vui lòng đợi ${waitSeconds} giây rồi gửi lại mã.`, 429);
++  }
++
++  async storeAndDeliverOtp({ target, channel, purpose, payload = null, resendSeconds = null }) {
++    if (resendSeconds) await this.ensureResendAllowed(target, purpose);
+     const code = this.createOtp();
+     const verification = await verificationCodeRepository.replace({
+       target,
+@@ -42,6 +55,7 @@ class AuthService {
+     return {
+       deliveryTarget: delivery.deliveryTarget,
+       expiresInSeconds: 600,
++      ...(resendSeconds ? { resendInSeconds: resendSeconds } : {}),
+       ...(delivery.trackingId ? { trackingId: delivery.trackingId } : {}),
+       ...(env.nodeEnv !== 'production' ? { debugOtp: code } : {}),
+     };
+@@ -94,6 +108,7 @@ class AuthService {
+       target: phone,
+       channel: 'sms',
+       purpose: 'register',
++      resendSeconds: OTP_RESEND_SECONDS,
+       payload: {
+         fullName: payload.fullName,
+         phone,
+@@ -108,6 +123,35 @@ class AuthService {
+     return this.requestRegistrationOtp(payload);
+   }
+ 
++  // Called before the browser asks Firebase for an SMS, so no message is spent on a taken number.
++  async checkRegistrationPhone({ phone }) {
++    const target = normalizeVietnamesePhone(phone);
++    if (!target) throw new AppError('Số điện thoại Việt Nam không hợp lệ', 422);
++    if (await userRepository.findByPhone(target)) throw new AppError('Số điện thoại này đã được đăng ký', 409);
++    return { available: true };
++  }
++
++  async registerWithFirebase({ fullName, phone, password, idToken }) {
++    const target = normalizeVietnamesePhone(phone);
++    if (!target) throw new AppError('Số điện thoại Việt Nam không hợp lệ', 422);
++    const claims = await firebaseTokenVerifier.verifyPhoneToken(idToken, env.firebase.projectId);
++    if (normalizeVietnamesePhone(claims.phone_number) !== target) {
++      throw new AppError('Số điện thoại đã xác minh không khớp với số đăng ký', 400);
++    }
++    if (await userRepository.findByPhone(target)) throw new AppError('Số điện thoại này đã được đăng ký', 409);
++
++    const user = await userRepository.create({
++      fullName,
++      phone: target,
++      password: await bcrypt.hash(password, 12),
++      role: 'customer',
++      status: 'active',
++      phoneVerified: true,
++      phoneVerifiedAt: new Date(),
++    });
++    return this.issueSession(user);
++  }
++
+   async verifyRegistrationOtp({ phone, otp }) {
+     const target = normalizeVietnamesePhone(phone);
+     if (!target) throw new AppError('Số điện thoại Việt Nam không hợp lệ', 422);
+diff --git a/backend/src/validators/authValidators.js b/backend/src/validators/authValidators.js
+index 6c310e8..599e959 100644
+--- a/backend/src/validators/authValidators.js
++++ b/backend/src/validators/authValidators.js
+@@ -25,6 +25,19 @@ const register = [
+   body('phoneVerified').not().exists().withMessage('Không được tự xác minh số điện thoại'),
+ ];
+ 
++const checkRegistrationPhone = [
++  vietnamesePhone('phone'),
++];
++
++const registerWithFirebase = [
++  ...register,
++  body('idToken')
++    .isString().withMessage('Thiếu mã xác minh số điện thoại')
++    .bail()
++    .isLength({ min: 20, max: 4096 }).withMessage('Mã xác minh số điện thoại không hợp lệ'),
++  body('otp').not().exists().withMessage('Không gửi mã OTP khi xác minh bằng Firebase'),
++];
++
+ const login = [
+   body().custom((value) => {
+     if (!value.identifier && !value.email && !value.phone) {
+@@ -92,6 +105,8 @@ const logout = [body('refreshToken').optional().isString()];
+ 
+ module.exports = {
+   register,
++  checkRegistrationPhone,
++  registerWithFirebase,
+   verifyRegistrationOtp,
+   requestPasswordReset,
+   resetPassword,
+diff --git a/backend/tests/auth.test.js b/backend/tests/auth.test.js
+index dd7edad..899ad40 100644
+--- a/backend/tests/auth.test.js
++++ b/backend/tests/auth.test.js
+@@ -1,5 +1,6 @@
+ const request = require('supertest');
+ const User = require('../src/models/User');
++const VerificationCode = require('../src/models/VerificationCode');
+ const { app, createUser, login } = require('./helpers');
+ 
+ describe('Auth API', () => {
+@@ -26,6 +27,32 @@ describe('Auth API', () => {
+     expect(verified.body.data.user.password).toBeUndefined();
+   });
+ 
++  it('waits 60 seconds before sending another registration code to the same phone', async () => {
++    const details = { fullName: 'Le Gia Bao', phone: '0933333333', password: '123456' };
++    const first = await request(app).post('/api/auth/register/request-otp').send(details);
++    expect(first.status).toBe(202);
++    expect(first.body.data.resendInSeconds).toBe(60);
++
++    const tooSoon = await request(app).post('/api/auth/register/request-otp').send(details);
++    expect(tooSoon.status).toBe(429);
++    expect(tooSoon.body.message).toMatch(/đợi \d+ giây/);
++
++    // createdAt is immutable through Mongoose, so age the code with the raw driver.
++    await VerificationCode.collection.updateMany(
++      { target: '0933333333' },
++      { $set: { createdAt: new Date(Date.now() - 61 * 1000) } },
++    );
++    const resent = await request(app).post('/api/auth/register/request-otp').send(details);
++    expect(resent.status).toBe(202);
++
++    if (resent.body.data.debugOtp !== first.body.data.debugOtp) {
++      const stale = await request(app).post('/api/auth/register/verify-otp').send({ phone: details.phone, otp: first.body.data.debugOtp });
++      expect(stale.status).toBe(400);
++    }
++    const verified = await request(app).post('/api/auth/register/verify-otp').send({ phone: details.phone, otp: resent.body.data.debugOtp });
++    expect(verified.status).toBe(201);
++  });
++
+   it('resets a forgotten password with a one-time SMS code', async () => {
+     await createUser({ email: 'forgot@test.com', phone: '0977777777' });
+     const requested = await request(app).post('/api/auth/forgot-password/request-otp').send({
+diff --git a/docker-compose.yml b/docker-compose.yml
+index 00b45ca..945e596 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -46,6 +46,7 @@ services:
+       BANK_BIN: ${BANK_BIN:-}
+       BANK_ACCOUNT_NUMBER: ${BANK_ACCOUNT_NUMBER:-}
+       BANK_ACCOUNT_NAME: ${BANK_ACCOUNT_NAME:-}
++      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+     ports:
+       - "5000:5000"
+     volumes:
+@@ -67,6 +68,10 @@ services:
+         VITE_USE_MOCK: "false"
+         VITE_SITE_URL: http://localhost:3000
+         VITE_DEPLOYMENT_TARGET: docker
++        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-}
++        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-}
++        VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-}
++        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-}
+     container_name: phoneshopai-frontend
+     restart: unless-stopped
+     ports:
+diff --git a/docs/otp-configuration.md b/docs/otp-configuration.md
+index 1299ab5..ca52284 100644
+--- a/docs/otp-configuration.md
++++ b/docs/otp-configuration.md
+@@ -2,6 +2,61 @@
+ 
+ Luồng đăng ký và quên mật khẩu xác minh bằng số điện thoại Việt Nam đã chuẩn hóa (`0xxxxxxxxx`). Email vẫn là thông tin liên hệ cho đơn hàng và hỗ trợ, không phải kênh xác minh tài khoản.
+ 
++Có hai cách gửi mã cho trang **Đăng ký**:
++
++| Cách | Khi nào dùng | Ai gửi SMS |
++|---|---|---|
++| Firebase Phone Auth | `VITE_USE_MOCK=false` và đủ `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID` | Google (Firebase) |
++| OTP của backend | Các trường hợp còn lại (mock, dev chưa cấu hình Firebase) | Twilio (production) hoặc giả lập `debugOtp` (dev) |
++
++Trang **Quên mật khẩu** vẫn dùng OTP của backend.
++
++Ở cả hai cách, bước nhập mã có nút **"Gửi lại mã"** khóa 60 giây. Với OTP của backend, server cũng chặn cùng một số gửi lại trong 60 giây (trả `429`).
++
++## Firebase Phone Auth (trang Đăng ký)
++
++### Luồng
++
++1. Trình duyệt gọi `POST /api/auth/register/check-phone` để kiểm tra số chưa đăng ký, tránh tốn SMS cho số đã có tài khoản.
++2. Firebase JS SDK gửi SMS (`signInWithPhoneNumber`, reCAPTCHA ẩn). SDK chỉ được tải ở trang Đăng ký.
++3. Người dùng nhập mã. Firebase kiểm tra mã và trả về một **ID token**. Phiên Firebase chỉ giữ trong bộ nhớ và được đăng xuất ngay.
++4. Trình duyệt gửi `POST /api/auth/register/firebase` với `fullName`, `phone`, `password`, `idToken`.
++5. Backend (`src/services/firebaseTokenVerifier.js`) kiểm tra:
++   - chữ ký RS256 bằng khóa công khai của Google (có cache theo `max-age`);
++   - `aud` và `iss` khớp `FIREBASE_PROJECT_ID`;
++   - đăng nhập bằng phương thức `phone`, cách đây tối đa 15 phút;
++   - `phone_number` trùng số đăng ký.
++
++   Đạt hết thì tạo tài khoản khách hàng với `phoneVerified=true`. Backend không cần thư viện Firebase hay file service account.
++
++### Biến môi trường
++
++| Biến | Đặt ở đâu | Giá trị |
++|---|---|---|
++| `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID` | `.env` gốc (Docker build) và `frontend/.env` (dev) | Lấy từ khối `firebaseConfig` (Project settings → Your apps). Đây là cấu hình web công khai, nhưng vẫn để trong `.env`, không commit. |
++| `FIREBASE_PROJECT_ID` | `.env` gốc (Docker) và `backend/.env` (dev) | Trùng `VITE_FIREBASE_PROJECT_ID` |
++
++Sau khi đổi các biến này, phải build lại: `docker compose up -d --build`.
++
++### Việc làm trong Firebase console (người quản trị project)
++
++1. **Authentication → Sign-in method → Phone → Enable.**
++2. **Authentication → Settings → SMS region policy → Allow → Vietnam → Save.** Project mới mặc định chặn mọi nước. Khi chưa bật, Firebase báo `OPERATION_NOT_ALLOWED : SMS unable to be sent until this region enabled by the app developer`, kể cả với số thử nghiệm.
++3. **Sign-in method → Phone → Phone numbers for testing:** thêm số không có thật kèm mã 6 số (ví dụ `+84 900 000 111` / `246810`), tối đa 10 số. Số này không gửi SMS và không tính phí; dùng để demo.
++4. **Authentication → Settings → Authorized domains:** `localhost` có sẵn (dùng cho mọi cổng: 3000, 5173…). Khi deploy, thêm tên miền thật (ví dụ tên miền Render).
++5. **SMS thật** cần gói **Blaze**: gắn thẻ, trả theo từng tin. Nên đặt Budget alert. Ngân sách chỉ gửi email cảnh báo, không tự chặn chi tiêu.
++
++### Lỗi thường gặp
++
++| Thông báo trên trang | Nguyên nhân / cách sửa |
++|---|---|
++| "Firebase chưa cho phép gửi SMS…" (`auth/operation-not-allowed`) | Chưa bật Phone hoặc chưa cho phép Vietnam trong SMS region policy |
++| "Tên miền này chưa được thêm vào Authorized domains…" | Thêm tên miền đang mở web vào Authorized domains |
++| "Dự án Firebase chưa bật gói Blaze…" | Gửi SMS thật cần Blaze; dùng số thử nghiệm để demo |
++| "Bạn đã yêu cầu quá nhiều lần…" | Firebase giới hạn số tin cho mỗi số/thiết bị; đợi rồi thử lại |
++| "Xác minh bằng Firebase chưa được cấu hình." (503 từ backend) | Backend thiếu `FIREBASE_PROJECT_ID` |
++| "Xác minh số điện thoại không hợp lệ hoặc đã hết hạn…" (401) | Token sai project, quá 15 phút, hoặc không phải đăng nhập bằng số điện thoại |
++
+ ## Phát triển và demo
+ 
+ Khi `NODE_ENV` khác `production`, backend tạo OTP, lưu bản băm và trả thêm `debugOtp` trong response. Đây chỉ là giả lập: không có SMS nào được gửi. Frontend mock (`VITE_USE_MOCK=true`) dùng mã cố định `123456` và cũng không gọi dịch vụ bên ngoài.
+@@ -10,6 +65,8 @@ Không dùng hoặc bật `debugOtp` trong production. Production không tự ch
+ 
+ ## Production với Twilio
+ 
++> Lưu ý: theo hướng dẫn của Twilio cho Việt Nam, từ 25/08/2025 nhà mạng chặn hẳn tin nhắn từ Sender ID chưa đăng ký. Đăng ký Sender ID cần giấy phép kinh doanh, nên với số Việt Nam hãy dùng Firebase (phần trên). Twilio chỉ còn phục vụ trang Quên mật khẩu.
++
+ Production gửi SMS qua Twilio khi và chỉ khi cả ba biến sau có giá trị:
+ 
+ ```env
+diff --git a/frontend/.env.example b/frontend/.env.example
+index bfbaec5..6c561e8 100644
+--- a/frontend/.env.example
++++ b/frontend/.env.example
+@@ -10,3 +10,9 @@ VITE_CLOUDINARY_UPLOAD_PRESET=
+ # Hai biến Cloudinary là tùy chọn nhưng phải được điền cùng nhau để tải ảnh từ máy.
+ # Upload preset phải là unsigned. Nếu để trống, trang quản trị chỉ nhận URL ảnh HTTPS.
+ VITE_GA_MEASUREMENT_ID=
++# Firebase Phone Auth cho mã OTP đăng ký (tùy chọn). Chỉ dùng khi VITE_USE_MOCK=false và đủ 3 biến đầu;
++# để trống thì dùng OTP của backend (dev hiện mã trên màn hình, mock dùng 123456).
++VITE_FIREBASE_API_KEY=
++VITE_FIREBASE_AUTH_DOMAIN=
++VITE_FIREBASE_PROJECT_ID=
++VITE_FIREBASE_APP_ID=
+diff --git a/frontend/Dockerfile b/frontend/Dockerfile
+index de6516b..87e5010 100644
+--- a/frontend/Dockerfile
++++ b/frontend/Dockerfile
+@@ -14,6 +14,15 @@ ENV VITE_API_URL=$VITE_API_URL
+ ENV VITE_USE_MOCK=$VITE_USE_MOCK
+ ENV VITE_SITE_URL=$VITE_SITE_URL
+ ENV VITE_DEPLOYMENT_TARGET=$VITE_DEPLOYMENT_TARGET
++# Firebase Phone Auth web config (public values; empty = backend OTP)
++ARG VITE_FIREBASE_API_KEY=
++ARG VITE_FIREBASE_AUTH_DOMAIN=
++ARG VITE_FIREBASE_PROJECT_ID=
++ARG VITE_FIREBASE_APP_ID=
++ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY
++ENV VITE_FIREBASE_AUTH_DOMAIN=$VITE_FIREBASE_AUTH_DOMAIN
++ENV VITE_FIREBASE_PROJECT_ID=$VITE_FIREBASE_PROJECT_ID
++ENV VITE_FIREBASE_APP_ID=$VITE_FIREBASE_APP_ID
+ RUN npm run build
+ 
+ FROM nginx:1.29-alpine AS production
+diff --git a/frontend/package-lock.json b/frontend/package-lock.json
+index 9698fa1..cfaac43 100644
+--- a/frontend/package-lock.json
++++ b/frontend/package-lock.json
+@@ -15,6 +15,7 @@
+         "axios": "^1.17.0",
+         "bootstrap": "^5.3.8",
+         "chart.js": "^4.5.1",
++        "firebase": "^13.3.0",
+         "react": "^19.2.7",
+         "react-chartjs-2": "^5.3.1",
+         "react-dom": "^19.2.7",
+@@ -698,6 +699,702 @@
+         }
+       }
+     },
++    "node_modules/@firebase/ai": {
++      "version": "3.1.0",
++      "resolved": "https://registry.npmjs.org/@firebase/ai/-/ai-3.1.0.tgz",
++      "integrity": "sha512-bgdItvyUeuD9ww8Zj5s+6/v1SGtf+IqrvJqgf6gjhBckpnN0sCd73L/ns7jUcKboH44vU6J7o8unRHGaPofLFg==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/app-check-interop-types": "0.3.5",
++        "@firebase/component": "0.7.5",
++        "@firebase/logger": "0.5.2",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=24.12.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x",
++        "@firebase/app-types": "0.x"
++      }
++    },
++    "node_modules/@firebase/analytics": {
++      "version": "0.10.25",
++      "resolved": "https://registry.npmjs.org/@firebase/analytics/-/analytics-0.10.25.tgz",
++      "integrity": "sha512-oDagV3PHeNXBdxemksZCdj+GmUT19eCnTOcLdQePIIovFXlm3zWy3Gjeaokt9Nqx24kc4ljK8lU0XGcGmmKZ1A==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/installations": "0.6.24",
++        "@firebase/logger": "0.5.2",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x"
++      }
++    },
++    "node_modules/@firebase/analytics-compat": {
++      "version": "0.2.31",
++      "resolved": "https://registry.npmjs.org/@firebase/analytics-compat/-/analytics-compat-0.2.31.tgz",
++      "integrity": "sha512-msTlG9REujk5rjtOHNLngiuPmvaWGQte8ugL4/F6ZCMb+92Ue7SgjSEpNxINkM8ZtTrbGS83j5SZkt0r+M1Tjw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/analytics": "0.10.25",
++        "@firebase/analytics-types": "0.8.5",
++        "@firebase/component": "0.7.5",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x",
++        "@firebase/app-compat": "0.x"
++      }
++    },
++    "node_modules/@firebase/analytics-types": {
++      "version": "0.8.5",
++      "resolved": "https://registry.npmjs.org/@firebase/analytics-types/-/analytics-types-0.8.5.tgz",
++      "integrity": "sha512-kdnooE7Bis2jEnsqcerRwn/UQpH5D3uvHpku7OdUM9TJN3omlu6iYtbyAQ6XkAJRgJtO0aNf9OOkW8J6D59oCA==",
++      "license": "Apache-2.0"
++    },
++    "node_modules/@firebase/app": {
++      "version": "0.16.6",
++      "resolved": "https://registry.npmjs.org/@firebase/app/-/app-0.16.6.tgz",
++      "integrity": "sha512-WXCNElVCln7fjrVKSBWOOhyW7CD/Zjf8AGXoisSTNjRfcV5UGpIdXMsyqkneBnfPtZZbSyTZ50ThYEJg0bvSZQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/logger": "0.5.2",
++        "@firebase/util": "1.15.3",
++        "idb": "7.1.1",
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=24.12.0"
++      }
++    },
++    "node_modules/@firebase/app-check": {
++      "version": "0.13.1",
++      "resolved": "https://registry.npmjs.org/@firebase/app-check/-/app-check-0.13.1.tgz",
++      "integrity": "sha512-l8y3dmnhodXks/APAwx4tWqRl3tk8b9874KF1FJyKg1DIU+kMD0l52iz7S9/MW+eK8k6cjJg0G0iJ5KQAsQpow==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/logger": "0.5.2",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x"
++      }
++    },
++    "node_modules/@firebase/app-check-compat": {
++      "version": "0.4.7",
++      "resolved": "https://registry.npmjs.org/@firebase/app-check-compat/-/app-check-compat-0.4.7.tgz",
++      "integrity": "sha512-fBb/xSMyIKv1nDmccfzz3IAGBzx/cQOxmZai66rJzifb1hMMkztf824Xx7LhpTUe7HNUbXwY90IvJ66fi8q6yg==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/app-check": "0.13.1",
++        "@firebase/app-check-types": "0.5.5",
++        "@firebase/component": "0.7.5",
++        "@firebase/logger": "0.5.2",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x",
++        "@firebase/app-compat": "0.x"
++      }
++    },
++    "node_modules/@firebase/app-check-interop-types": {
++      "version": "0.3.5",
++      "resolved": "https://registry.npmjs.org/@firebase/app-check-interop-types/-/app-check-interop-types-0.3.5.tgz",
++      "integrity": "sha512-qId34pVZ2CXTmtu4ofW5leiI93DvnOvIcr/5GT7MZPw5WXAi6nZoU+g9cNRgl7K90UJSbK0cXxten4meYMPyZg==",
++      "license": "Apache-2.0"
++    },
++    "node_modules/@firebase/app-check-types": {
++      "version": "0.5.5",
++      "resolved": "https://registry.npmjs.org/@firebase/app-check-types/-/app-check-types-0.5.5.tgz",
++      "integrity": "sha512-+DF4gzFrlwGFyky38o4T/YN/r51l70yCtJ2HTkwmRj8FCMwPjm4hLH4fQbj6BUvzkiFqliBkitFsRpf1/YZkWA==",
++      "license": "Apache-2.0"
++    },
++    "node_modules/@firebase/app-compat": {
++      "version": "0.5.22",
++      "resolved": "https://registry.npmjs.org/@firebase/app-compat/-/app-compat-0.5.22.tgz",
++      "integrity": "sha512-NYF84+G98do88rkuC34w+y0RbyQb/kHaJaxv7DqwveARf/XN9zJS3yrQnw1BnP5ZJjvuVwhVYJ6sXMt6NFt1Bw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/app": "0.16.6",
++        "@firebase/component": "0.7.5",
++        "@firebase/logger": "0.5.2",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=24.12.0"
++      }
++    },
++    "node_modules/@firebase/app-types": {
++      "version": "0.9.6",
++      "resolved": "https://registry.npmjs.org/@firebase/app-types/-/app-types-0.9.6.tgz",
++      "integrity": "sha512-yPLahy7Esfu2w/yme3msVK4xTkDXQqq6szfQn8yVOQpCKiT5GVFjqNpLbuz6NkX0WuTwUidkmPewW3r4xkvpeg==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/logger": "0.5.2"
++      }
++    },
++    "node_modules/@firebase/auth": {
++      "version": "1.13.10",
++      "resolved": "https://registry.npmjs.org/@firebase/auth/-/auth-1.13.10.tgz",
++      "integrity": "sha512-Ss1REvrrfMu5hi5yduuSv6aMgppCeqBiI9tc5Lu6kTDDAirdO5bWPebT2Vz+zVIWKHciUxAN2PIrUHWniqNHTw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/logger": "0.5.2",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=24.12.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x",
++        "@react-native-async-storage/async-storage": "^2.2.0 || ^3.0.0"
++      },
++      "peerDependenciesMeta": {
++        "@react-native-async-storage/async-storage": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@firebase/auth-compat": {
++      "version": "0.6.15",
++      "resolved": "https://registry.npmjs.org/@firebase/auth-compat/-/auth-compat-0.6.15.tgz",
++      "integrity": "sha512-xdrE+S3zBtnFSSomwXZp3naofEbhGrwB9BK+RRLc7A3uq0gv1HCFf2/uLVXAIrt2QYl8BohL9Uc04wHsgrXe0Q==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/auth": "1.13.10",
++        "@firebase/auth-types": "0.13.2",
++        "@firebase/component": "0.7.5",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=24.12.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x",
++        "@firebase/app-compat": "0.x"
++      }
++    },
++    "node_modules/@firebase/auth-interop-types": {
++      "version": "0.2.6",
++      "resolved": "https://registry.npmjs.org/@firebase/auth-interop-types/-/auth-interop-types-0.2.6.tgz",
++      "integrity": "sha512-FgwZqDrBqgK0BHI70QTv1v/5wmuDF9f8fsJFvKSxoRlK2PPfSQtZAk2jhXu4pe9BZzFi/e4UYusU/bEQHdf6Qg==",
++      "license": "Apache-2.0"
++    },
++    "node_modules/@firebase/auth-types": {
++      "version": "0.13.2",
++      "resolved": "https://registry.npmjs.org/@firebase/auth-types/-/auth-types-0.13.2.tgz",
++      "integrity": "sha512-OU+miuoSxIWYN7GT291d2ylVJBL3k/OePo7/JDSoQtkFQoEiGBc4AHuMjj/seqFIsHrqnjrAfRCk4pfufoJolQ==",
++      "license": "Apache-2.0",
++      "peerDependencies": {
++        "@firebase/app-types": "0.x",
++        "@firebase/util": "1.x"
++      }
++    },
++    "node_modules/@firebase/component": {
++      "version": "0.7.5",
++      "resolved": "https://registry.npmjs.org/@firebase/component/-/component-0.7.5.tgz",
++      "integrity": "sha512-vuFDcL91Q+2ZuBJkyOh86T4q0B4ffNTDjc/A38tybO56odQABxRTFLTIowCWqAKeIcgo37GowWMVgFF73gD8Qw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@firebase/crashlytics": {
++      "version": "0.1.1",
++      "resolved": "https://registry.npmjs.org/@firebase/crashlytics/-/crashlytics-0.1.1.tgz",
++      "integrity": "sha512-hlMgtvEBsKB4NlIfuz9rfO+vKSfNp7yPdhkVTgFf2JlX1yezxzgMrs6MxxJ8l0CdXK9W+AOw/EtpdKxJah7PcQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/installations": "0.6.24",
++        "@firebase/util": "1.15.3",
++        "@opentelemetry/api": "1.9.1",
++        "@opentelemetry/api-logs": "0.220.0",
++        "@opentelemetry/browser-instrumentation": "0.6.0",
++        "@opentelemetry/core": "2.10.0",
++        "@opentelemetry/exporter-logs-otlp-http": "0.220.0",
++        "@opentelemetry/exporter-trace-otlp-proto": "0.220.0",
++        "@opentelemetry/instrumentation": "0.220.0",
++        "@opentelemetry/instrumentation-document-load": "0.65.0",
++        "@opentelemetry/instrumentation-fetch": "0.220.0",
++        "@opentelemetry/instrumentation-xml-http-request": "0.220.0",
++        "@opentelemetry/otlp-exporter-base": "0.220.0",
++        "@opentelemetry/otlp-transformer": "0.220.0",
++        "@opentelemetry/resources": "2.10.0",
++        "@opentelemetry/sdk-logs": "0.220.0",
++        "@opentelemetry/sdk-trace-base": "2.10.0",
++        "@opentelemetry/sdk-trace-web": "2.10.0",
++        "@opentelemetry/semantic-conventions": "1.43.0",
++        "tslib": "^2.1.0"
++      },
++      "bin": {
++        "crashlytics-setconstants": "setconstants.js"
++      },
++      "peerDependencies": {
++        "@angular/core": ">= 14.0.0",
++        "@angular/router": ">= 14.0.0",
++        "@firebase/app": "0.x",
++        "@firebase/app-types": "0.x",
++        "@types/react": ">= 16.8.0",
++        "next": ">= 13.0.0",
++        "react": ">= 16.8.0",
++        "react-router-dom": ">= 6.0.0"
++      },
++      "peerDependenciesMeta": {
++        "@angular/core": {
++          "optional": true
++        },
++        "@angular/router": {
++          "optional": true
++        },
++        "@types/react": {
++          "optional": true
++        },
++        "next": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        },
++        "react-router-dom": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@firebase/data-connect": {
++      "version": "0.7.4",
++      "resolved": "https://registry.npmjs.org/@firebase/data-connect/-/data-connect-0.7.4.tgz",
++      "integrity": "sha512-su1aGWlzhxb+xtggCUSsufJn1FDa06SBDK71y+fpQ+g2zMhMExik6FUv/odkKzOF/xfWVjabCbWBcjJY3MceDA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/auth-interop-types": "0.2.6",
++        "@firebase/component": "0.7.5",
++        "@firebase/logger": "0.5.2",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x"
++      }
++    },
++    "node_modules/@firebase/database": {
++      "version": "1.1.6",
++      "resolved": "https://registry.npmjs.org/@firebase/database/-/database-1.1.6.tgz",
++      "integrity": "sha512-nPktjjCWA9TSJUc0KtStBRugI6AF1b53qOlDvXkHtueIBt1sOhPzCT7S2gtxrs07S9jGA2o7J5faEa/PFAXomg==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/app-check-interop-types": "0.3.5",
++        "@firebase/auth-interop-types": "0.2.6",
++        "@firebase/component": "0.7.5",
++        "@firebase/logger": "0.5.2",
++        "@firebase/util": "1.15.3",
++        "faye-websocket": "0.11.4",
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=24.12.0"
++      }
++    },
++    "node_modules/@firebase/database-compat": {
++      "version": "2.1.8",
++      "resolved": "https://registry.npmjs.org/@firebase/database-compat/-/database-compat-2.1.8.tgz",
++      "integrity": "sha512-wCMI122co2+rbldcZALIgmFoVn0Pj+PAuCjo0zvppMaPm/ksmK9twpmGCrmbUVjqe6xRs0YkCrKlblNujG2cpQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/database": "1.1.6",
++        "@firebase/database-types": "1.0.22",
++        "@firebase/logger": "0.5.2",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=24.12.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x",
++        "@firebase/app-compat": "0.x"
++      },
++      "peerDependenciesMeta": {
++        "@firebase/app": {
++          "optional": true
++        },
++        "@firebase/app-compat": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@firebase/database-types": {
++      "version": "1.0.22",
++      "resolved": "https://registry.npmjs.org/@firebase/database-types/-/database-types-1.0.22.tgz",
++      "integrity": "sha512-YAZNXsjY9EQQ+pKw/3ax8n5FgolHC7Qew7EY5RceYdl0R2ZP+kCv1O0DkKlcceue8uQCOreHCNN7PWVFpY1Nug==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/app-types": "0.9.6",
++        "@firebase/util": "1.15.3"
++      }
++    },
++    "node_modules/@firebase/firestore": {
++      "version": "4.20.0",
++      "resolved": "https://registry.npmjs.org/@firebase/firestore/-/firestore-4.20.0.tgz",
++      "integrity": "sha512-reF9+TgS10kA4lqLrDdP/Za5IRxt5O1FXzowZ32MQn09DQwHQa0gndXgO/p6RmPL+pxwwl8XYdU4qLuFK4XeCg==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/logger": "0.5.2",
++        "@firebase/util": "1.15.3",
++        "@firebase/webchannel-wrapper": "1.0.7",
++        "@grpc/grpc-js": "~1.9.0",
++        "@grpc/proto-loader": "^0.7.8",
++        "re2js": "^2.8.3",
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=24.12.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x"
++      }
++    },
++    "node_modules/@firebase/firestore-compat": {
++      "version": "0.4.18",
++      "resolved": "https://registry.npmjs.org/@firebase/firestore-compat/-/firestore-compat-0.4.18.tgz",
++      "integrity": "sha512-kGtVBhgdDRKj+4SDOtXrWIiIj/EULCxMfJKiTn1mxDmxFx/OQqZP+1BfUXnybILXSTA5gcAEMSD+QZEtS8Y6sA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/firestore": "4.20.0",
++        "@firebase/firestore-types": "3.0.5",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=24.12.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x",
++        "@firebase/app-compat": "0.x"
++      }
++    },
++    "node_modules/@firebase/firestore-types": {
++      "version": "3.0.5",
++      "resolved": "https://registry.npmjs.org/@firebase/firestore-types/-/firestore-types-3.0.5.tgz",
++      "integrity": "sha512-dbdMAQkMd5dwWc48eupz/Y6/E9ruat3+gY5lhVKscvvT/HnDBEEMzJW38zdKhgdnglZHGk2vUsJMOHAphMHGMA==",
++      "license": "Apache-2.0",
++      "peerDependencies": {
++        "@firebase/app-types": "0.x",
++        "@firebase/util": "1.x"
++      }
++    },
++    "node_modules/@firebase/functions": {
++      "version": "0.14.0",
++      "resolved": "https://registry.npmjs.org/@firebase/functions/-/functions-0.14.0.tgz",
++      "integrity": "sha512-DhuYFr0eMhp+s/PNEk6SiMsYkc00+XVOUeKbrl8MOzQNZI3SKQpqoDR1d+keNDAutwmHRWTUAdXBoVPD+xxVUw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/app-check-interop-types": "0.3.5",
++        "@firebase/auth-interop-types": "0.2.6",
++        "@firebase/component": "0.7.5",
++        "@firebase/messaging-interop-types": "0.2.6",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x"
++      }
++    },
++    "node_modules/@firebase/functions-compat": {
++      "version": "0.5.0",
++      "resolved": "https://registry.npmjs.org/@firebase/functions-compat/-/functions-compat-0.5.0.tgz",
++      "integrity": "sha512-T3BDIToESZUHt7438wyKYMkRjKg3m1xAIux5fVpNvTRQlDOFLukWniQWBDhJ2znpU9kxMTR6+e31TVo8P15PZw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/functions": "0.14.0",
++        "@firebase/functions-types": "0.6.5",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x",
++        "@firebase/app-compat": "0.x"
++      }
++    },
++    "node_modules/@firebase/functions-types": {
++      "version": "0.6.5",
++      "resolved": "https://registry.npmjs.org/@firebase/functions-types/-/functions-types-0.6.5.tgz",
++      "integrity": "sha512-Zc0pURjthHXzSj54ZivCkzKDSV1r/wIpnmHdhq82q2yFFPVoncG/ZJjnVMiANvQfeww/QnElhzODpfwUucVwdA==",
++      "license": "Apache-2.0"
++    },
++    "node_modules/@firebase/installations": {
++      "version": "0.6.24",
++      "resolved": "https://registry.npmjs.org/@firebase/installations/-/installations-0.6.24.tgz",
++      "integrity": "sha512-Ui52ey8wHoWqkBbXRKJEKYWylI0JZogZmoLS+o8Anh1bxWtK27ZYjLla1UJAAdC5DCKLJ2qAp0VpJOjg8VOX1g==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/util": "1.15.3",
++        "idb": "7.1.1",
++        "tslib": "^2.1.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x"
++      }
++    },
++    "node_modules/@firebase/installations-compat": {
++      "version": "0.2.24",
++      "resolved": "https://registry.npmjs.org/@firebase/installations-compat/-/installations-compat-0.2.24.tgz",
++      "integrity": "sha512-8M5nlcWwYt881x83COP2odq5vgf+NgwJh+RMd4LRSv8JI1pxwDfgrDJOERrjTgfC9J5Z0vnQX4b1pdN914e0Zw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/installations": "0.6.24",
++        "@firebase/installations-types": "0.5.5",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x",
++        "@firebase/app-compat": "0.x"
++      }
++    },
++    "node_modules/@firebase/installations-types": {
++      "version": "0.5.5",
++      "resolved": "https://registry.npmjs.org/@firebase/installations-types/-/installations-types-0.5.5.tgz",
++      "integrity": "sha512-e9UYcju3puDl1vdrcKIi5dExzHLameOT/Tc61Q48PYwxtsM1NzZh/ikGbdBQTsbRgg0EMZqdPr0/m5ODUBobrg==",
++      "license": "Apache-2.0",
++      "peerDependencies": {
++        "@firebase/app-types": "0.x"
++      }
++    },
++    "node_modules/@firebase/logger": {
++      "version": "0.5.2",
++      "resolved": "https://registry.npmjs.org/@firebase/logger/-/logger-0.5.2.tgz",
++      "integrity": "sha512-J2VO4NFTc0xQFrxV1B/lm5balicm9cwuX2acR9Yn41fN8KgUeQFo+VJV222IqW2FPSXKDu9uo5WdQFWf9TPbYg==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@firebase/messaging": {
++      "version": "0.13.3",
++      "resolved": "https://registry.npmjs.org/@firebase/messaging/-/messaging-0.13.3.tgz",
++      "integrity": "sha512-nRXPAp+z0kA3KziJtRY9kktHECvRwaaONzHvislFgllhCwJMscW7icWNQA5IjyP8Uc2+GS/4px8Uz6rx6ftTag==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/installations": "0.6.24",
++        "@firebase/messaging-interop-types": "0.2.6",
++        "@firebase/util": "1.15.3",
++        "idb": "7.1.1",
++        "tslib": "^2.1.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x"
++      }
++    },
++    "node_modules/@firebase/messaging-compat": {
++      "version": "0.2.30",
++      "resolved": "https://registry.npmjs.org/@firebase/messaging-compat/-/messaging-compat-0.2.30.tgz",
++      "integrity": "sha512-m1DPT2ET5x0qYqXLoHwKMAyf1mgZZOhuoE6H6/H4OPsp8zSxMIDEFPaW7MaffPJsCA5J7kHzo+BHVNXK4ZoV+w==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/messaging": "0.13.3",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x",
++        "@firebase/app-compat": "0.x"
++      }
++    },
++    "node_modules/@firebase/messaging-interop-types": {
++      "version": "0.2.6",
++      "resolved": "https://registry.npmjs.org/@firebase/messaging-interop-types/-/messaging-interop-types-0.2.6.tgz",
++      "integrity": "sha512-MVzvkKe2V4H2dHu5oOxRfeKQcfTwWmCgnzsC4V1q3ixun5iiL8riCZ2qI35rDhCL4glPGiu0jHxDbpVNuTKfow==",
++      "license": "Apache-2.0"
++    },
++    "node_modules/@firebase/performance": {
++      "version": "0.7.14",
++      "resolved": "https://registry.npmjs.org/@firebase/performance/-/performance-0.7.14.tgz",
++      "integrity": "sha512-9PH1XEZVHErxGdbXluvGz4Uyjw4W955H8v7Mv9rHIybRrg5F2Ac2tvf5+mSf5EtnxWNmxrD2WLnvMFaZP4sMrQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/installations": "0.6.24",
++        "@firebase/logger": "0.5.2",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0",
++        "web-vitals": "^4.2.4"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x"
++      }
++    },
++    "node_modules/@firebase/performance-compat": {
++      "version": "0.2.27",
++      "resolved": "https://registry.npmjs.org/@firebase/performance-compat/-/performance-compat-0.2.27.tgz",
++      "integrity": "sha512-O/ozTf/EbChN94Pk7bd1eUC0PAC36726AwsaiJyC0bZzSBWfLGSWASGPH5pebUWXQPJtGxIJYRkkbX5l0Qa+Hw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/logger": "0.5.2",
++        "@firebase/performance": "0.7.14",
++        "@firebase/performance-types": "0.2.5",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x",
++        "@firebase/app-compat": "0.x"
++      }
++    },
++    "node_modules/@firebase/performance-types": {
++      "version": "0.2.5",
++      "resolved": "https://registry.npmjs.org/@firebase/performance-types/-/performance-types-0.2.5.tgz",
++      "integrity": "sha512-PRzOgB+/M+6AKlEkY8a9xy5Ff5SfZPIh4iShXhn2WAcL/euSbK7bdLqWysHduunNJhGFsXa22Ag3ixqL6rQtYg==",
++      "license": "Apache-2.0"
++    },
++    "node_modules/@firebase/remote-config": {
++      "version": "0.10.0",
++      "resolved": "https://registry.npmjs.org/@firebase/remote-config/-/remote-config-0.10.0.tgz",
++      "integrity": "sha512-lmVTu4jNvOmnrbPPDjhHpb2BdqiP/bwpQtpLSEaLKsYZ+srS6pS6Wfj5Ng1Dbon/HnpPA7Ph5gkI7l1ageGweQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/installations": "0.6.24",
++        "@firebase/logger": "0.5.2",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x"
++      }
++    },
++    "node_modules/@firebase/remote-config-compat": {
++      "version": "0.2.31",
++      "resolved": "https://registry.npmjs.org/@firebase/remote-config-compat/-/remote-config-compat-0.2.31.tgz",
++      "integrity": "sha512-dFLula2ecm74Zbed5bWMgnDNh3djFFqn9DjJYgMxoqrlJZjT0MNWnaQQXpkmw2WE9GzyIkaYS7HuxxLW4Fo8NQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/logger": "0.5.2",
++        "@firebase/remote-config": "0.10.0",
++        "@firebase/remote-config-types": "0.5.2",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x",
++        "@firebase/app-compat": "0.x"
++      }
++    },
++    "node_modules/@firebase/remote-config-types": {
++      "version": "0.5.2",
++      "resolved": "https://registry.npmjs.org/@firebase/remote-config-types/-/remote-config-types-0.5.2.tgz",
++      "integrity": "sha512-i8k1omVfoAnaT1ZPv2FFjxMZrATYsO/GnFgHEj5+7fAJLzi8wLnGGv1WK06oEAD6ltrWXSO1HzeNyajn/NjMWw==",
++      "license": "Apache-2.0"
++    },
++    "node_modules/@firebase/storage": {
++      "version": "0.14.6",
++      "resolved": "https://registry.npmjs.org/@firebase/storage/-/storage-0.14.6.tgz",
++      "integrity": "sha512-9WjohxpjbfcySjCp8kIbd1ZhtmCQFQLqPtDQ+wmZ5PVXimTDjDsSx/RZjwwK89MjCTXB9fCdmvZkJxplZn4W1A==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=24.12.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x"
++      }
++    },
++    "node_modules/@firebase/storage-compat": {
++      "version": "0.4.6",
++      "resolved": "https://registry.npmjs.org/@firebase/storage-compat/-/storage-compat-0.4.6.tgz",
++      "integrity": "sha512-te0IsqX1bM+OZCJF7jNSKXcMqCA2yYmpshRHjX4axy0lI/P9ZP9GLjEZMVL8wrjUWF4e3cZxMZTbck3Zd5E1hA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/component": "0.7.5",
++        "@firebase/storage": "0.14.6",
++        "@firebase/storage-types": "0.8.5",
++        "@firebase/util": "1.15.3",
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=24.12.0"
++      },
++      "peerDependencies": {
++        "@firebase/app": "0.x",
++        "@firebase/app-compat": "0.x"
++      }
++    },
++    "node_modules/@firebase/storage-types": {
++      "version": "0.8.5",
++      "resolved": "https://registry.npmjs.org/@firebase/storage-types/-/storage-types-0.8.5.tgz",
++      "integrity": "sha512-GEDs5P+rNUfNcS+wxIdOLAHficife2YXtvTJnyi3ssrX11AAtBg+nDUdbYh8vuBzWehVQZPmztGUUnud4L+4yg==",
++      "license": "Apache-2.0",
++      "peerDependencies": {
++        "@firebase/app-types": "0.x",
++        "@firebase/util": "1.x"
++      }
++    },
++    "node_modules/@firebase/util": {
++      "version": "1.15.3",
++      "resolved": "https://registry.npmjs.org/@firebase/util/-/util-1.15.3.tgz",
++      "integrity": "sha512-c/z/gaIlaaLZEuGbE6sLUuJ61tskg1JghvhcNQzW948ASBinbVBBRnZTC4b4yt4LaEtJQkYlyzqLHcutFwEIvA==",
++      "hasInstallScript": true,
++      "license": "Apache-2.0",
++      "dependencies": {
++        "tslib": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
++    "node_modules/@firebase/webchannel-wrapper": {
++      "version": "1.0.7",
++      "resolved": "https://registry.npmjs.org/@firebase/webchannel-wrapper/-/webchannel-wrapper-1.0.7.tgz",
++      "integrity": "sha512-phBFwieDLvkZGYN9CE9ZFNEIoBVksprzsnCzQejCmCHtgwCXReeuRpoEGN9C4EbhONztv8NRV1tau6Rb9pONwQ==",
++      "license": "Apache-2.0"
++    },
+     "node_modules/@fontsource/ibm-plex-sans": {
+       "version": "5.2.8",
+       "resolved": "https://registry.npmjs.org/@fontsource/ibm-plex-sans/-/ibm-plex-sans-5.2.8.tgz",
+@@ -707,140 +1404,822 @@
+         "url": "https://github.com/sponsors/ayuhito"
+       }
+     },
+-    "node_modules/@fontsource/jetbrains-mono": {
+-      "version": "5.2.8",
+-      "resolved": "https://registry.npmjs.org/@fontsource/jetbrains-mono/-/jetbrains-mono-5.2.8.tgz",
+-      "integrity": "sha512-6w8/SG4kqvIMu7xd7wt6x3idn1Qux3p9N62s6G3rfldOUYHpWcc2FKrqf+Vo44jRvqWj2oAtTHrZXEP23oSKwQ==",
+-      "license": "OFL-1.1",
+-      "funding": {
+-        "url": "https://github.com/sponsors/ayuhito"
++    "node_modules/@fontsource/jetbrains-mono": {
++      "version": "5.2.8",
++      "resolved": "https://registry.npmjs.org/@fontsource/jetbrains-mono/-/jetbrains-mono-5.2.8.tgz",
++      "integrity": "sha512-6w8/SG4kqvIMu7xd7wt6x3idn1Qux3p9N62s6G3rfldOUYHpWcc2FKrqf+Vo44jRvqWj2oAtTHrZXEP23oSKwQ==",
++      "license": "OFL-1.1",
++      "funding": {
++        "url": "https://github.com/sponsors/ayuhito"
++      }
++    },
++    "node_modules/@fontsource/space-grotesk": {
++      "version": "5.2.10",
++      "resolved": "https://registry.npmjs.org/@fontsource/space-grotesk/-/space-grotesk-5.2.10.tgz",
++      "integrity": "sha512-XNXEbT74OIITPqw2H6HXwPDp85fy43uxfBwFR5PU+9sLnjuLj12KlhVM9nZVN6q6dlKjkuN8JisW/OBxwxgUew==",
++      "license": "OFL-1.1",
++      "funding": {
++        "url": "https://github.com/sponsors/ayuhito"
++      }
++    },
++    "node_modules/@grpc/grpc-js": {
++      "version": "1.9.16",
++      "resolved": "https://registry.npmjs.org/@grpc/grpc-js/-/grpc-js-1.9.16.tgz",
++      "integrity": "sha512-wE4Ut/olIzfKqp631XrG+wbF0v1vWFN4YL9FyXC2LJiG33DsV7PLzURjrCvY/6je2ntdRkeLpPDluzSRGaVltQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@grpc/proto-loader": "^0.7.8",
++        "@types/node": ">=12.12.47"
++      },
++      "engines": {
++        "node": "^8.13.0 || >=10.10.0"
++      }
++    },
++    "node_modules/@grpc/proto-loader": {
++      "version": "0.7.15",
++      "resolved": "https://registry.npmjs.org/@grpc/proto-loader/-/proto-loader-0.7.15.tgz",
++      "integrity": "sha512-tMXdRCfYVixjuFK+Hk0Q1s38gV9zDiDJfWL3h1rv4Qc39oILCu1TRTDt7+fGUI8K4G1Fj125Hx/ru3azECWTyQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "lodash.camelcase": "^4.3.0",
++        "long": "^5.0.0",
++        "protobufjs": "^7.2.5",
++        "yargs": "^17.7.2"
++      },
++      "bin": {
++        "proto-loader-gen-types": "build/bin/proto-loader-gen-types.js"
++      },
++      "engines": {
++        "node": ">=6"
++      }
++    },
++    "node_modules/@humanfs/core": {
++      "version": "0.19.2",
++      "resolved": "https://registry.npmjs.org/@humanfs/core/-/core-0.19.2.tgz",
++      "integrity": "sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@humanfs/types": "^0.15.0"
++      },
++      "engines": {
++        "node": ">=18.18.0"
++      }
++    },
++    "node_modules/@humanfs/node": {
++      "version": "0.16.8",
++      "resolved": "https://registry.npmjs.org/@humanfs/node/-/node-0.16.8.tgz",
++      "integrity": "sha512-gE1eQNZ3R++kTzFUpdGlpmy8kDZD/MLyHqDwqjkVQI0JMdI1D51sy1H958PNXYkM2rAac7e5/CnIKZrHtPh3BQ==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@humanfs/core": "^0.19.2",
++        "@humanfs/types": "^0.15.0",
++        "@humanwhocodes/retry": "^0.4.0"
++      },
++      "engines": {
++        "node": ">=18.18.0"
++      }
++    },
++    "node_modules/@humanfs/types": {
++      "version": "0.15.0",
++      "resolved": "https://registry.npmjs.org/@humanfs/types/-/types-0.15.0.tgz",
++      "integrity": "sha512-ZZ1w0aoQkwuUuC7Yf+7sdeaNfqQiiLcSRbfI08oAxqLtpXQr9AIVX7Ay7HLDuiLYAaFPu8oBYNq/QIi9URHJ3Q==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=18.18.0"
++      }
++    },
++    "node_modules/@humanwhocodes/module-importer": {
++      "version": "1.0.1",
++      "resolved": "https://registry.npmjs.org/@humanwhocodes/module-importer/-/module-importer-1.0.1.tgz",
++      "integrity": "sha512-bxveV4V8v5Yb4ncFTT3rPSgZBOpCkjfK0y4oVVVJwIuDVBRMDXrPyXRL988i5ap9m9bnyEEjWfm5WkBmtffLfA==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=12.22"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/nzakas"
++      }
++    },
++    "node_modules/@humanwhocodes/retry": {
++      "version": "0.4.3",
++      "resolved": "https://registry.npmjs.org/@humanwhocodes/retry/-/retry-0.4.3.tgz",
++      "integrity": "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=18.18"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/nzakas"
++      }
++    },
++    "node_modules/@jridgewell/gen-mapping": {
++      "version": "0.3.13",
++      "resolved": "https://registry.npmjs.org/@jridgewell/gen-mapping/-/gen-mapping-0.3.13.tgz",
++      "integrity": "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==",
++      "license": "MIT",
++      "dependencies": {
++        "@jridgewell/sourcemap-codec": "^1.5.0",
++        "@jridgewell/trace-mapping": "^0.3.24"
++      }
++    },
++    "node_modules/@jridgewell/remapping": {
++      "version": "2.3.5",
++      "resolved": "https://registry.npmjs.org/@jridgewell/remapping/-/remapping-2.3.5.tgz",
++      "integrity": "sha512-LI9u/+laYG4Ds1TDKSJW2YPrIlcVYOwi2fUC6xB43lueCjgxV4lffOCZCtYFiH6TNOX+tQKXx97T4IKHbhyHEQ==",
++      "license": "MIT",
++      "dependencies": {
++        "@jridgewell/gen-mapping": "^0.3.5",
++        "@jridgewell/trace-mapping": "^0.3.24"
++      }
++    },
++    "node_modules/@jridgewell/resolve-uri": {
++      "version": "3.1.2",
++      "resolved": "https://registry.npmjs.org/@jridgewell/resolve-uri/-/resolve-uri-3.1.2.tgz",
++      "integrity": "sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=6.0.0"
++      }
++    },
++    "node_modules/@jridgewell/sourcemap-codec": {
++      "version": "1.5.5",
++      "resolved": "https://registry.npmjs.org/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.5.5.tgz",
++      "integrity": "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==",
++      "license": "MIT"
++    },
++    "node_modules/@jridgewell/trace-mapping": {
++      "version": "0.3.31",
++      "resolved": "https://registry.npmjs.org/@jridgewell/trace-mapping/-/trace-mapping-0.3.31.tgz",
++      "integrity": "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==",
++      "license": "MIT",
++      "dependencies": {
++        "@jridgewell/resolve-uri": "^3.1.0",
++        "@jridgewell/sourcemap-codec": "^1.4.14"
++      }
++    },
++    "node_modules/@kurkle/color": {
++      "version": "0.3.4",
++      "resolved": "https://registry.npmjs.org/@kurkle/color/-/color-0.3.4.tgz",
++      "integrity": "sha512-M5UknZPHRu3DEDWoipU6sE8PdkZ6Z/S+v4dD+Ke8IaNlpdSQah50lz1KtcFBa2vsdOnwbbnxJwVM4wty6udA5w==",
++      "license": "MIT"
++    },
++    "node_modules/@opentelemetry/api": {
++      "version": "1.9.1",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/api/-/api-1.9.1.tgz",
++      "integrity": "sha512-gLyJlPHPZYdAk1JENA9LeHejZe1Ti77/pTeFm/nMXmQH/HFZlcS/O2XJB+L8fkbrNSqhdtlvjBVjxwUYanNH5Q==",
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=8.0.0"
++      }
++    },
++    "node_modules/@opentelemetry/api-logs": {
++      "version": "0.220.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/api-logs/-/api-logs-0.220.0.tgz",
++      "integrity": "sha512-CmVa4ImJ+ynfrPMNaAXHET6Bhb44SwzmfyVJFq9ni2jgXJR/l7C6gfVFddNmHP+ZOkP9cf4f9DBe68qVLTHc9w==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/api": "^1.3.0"
++      },
++      "engines": {
++        "node": ">=8.0.0"
++      }
++    },
++    "node_modules/@opentelemetry/browser-instrumentation": {
++      "version": "0.6.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/browser-instrumentation/-/browser-instrumentation-0.6.0.tgz",
++      "integrity": "sha512-ZYi3WaiCix1D8K6SY5y+i9zvo0lWsnd/tKKnk5PaqWLLxUhVl0gud8G79RJZ3NApDZvQ57PAvNC7povMHIj7jw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/api-logs": "^0.220.0",
++        "@opentelemetry/core": "^2.9.0",
++        "@opentelemetry/instrumentation": "^0.220.0",
++        "@opentelemetry/semantic-conventions": "^1.43.0",
++        "web-vitals": "^5.3.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": "^1.9.1"
++      }
++    },
++    "node_modules/@opentelemetry/browser-instrumentation/node_modules/web-vitals": {
++      "version": "5.3.0",
++      "resolved": "https://registry.npmjs.org/web-vitals/-/web-vitals-5.3.0.tgz",
++      "integrity": "sha512-q6LWsLatGYZp5VGBIOvbTj6JBV2nOmC8KvWztXBmwJcfFAzhwKwbOxhUH306XY3CcaZDUlSmSuNPBsCn0bFu+g==",
++      "license": "Apache-2.0"
++    },
++    "node_modules/@opentelemetry/core": {
++      "version": "2.10.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/core/-/core-2.10.0.tgz",
++      "integrity": "sha512-/wNZ8twnEQQA4HoHu22+vcsdru6pWPWxW+7w+FlxT6Id7PE/WIbZmVKkte+PF72e0F2dnImFeHD2syyE1Mw6MQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.0.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/exporter-logs-otlp-http": {
++      "version": "0.220.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/exporter-logs-otlp-http/-/exporter-logs-otlp-http-0.220.0.tgz",
++      "integrity": "sha512-8186thl+pTw64iz/qEEen5oJZoZ/gO73XruChdaGlYdWOdBIQ42r+vHLf6a7vIDqTD4b8ZOoMlyxptanECaI9A==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/api-logs": "0.220.0",
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/otlp-exporter-base": "0.220.0",
++        "@opentelemetry/otlp-transformer": "0.220.0",
++        "@opentelemetry/sdk-logs": "0.220.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": "^1.3.0"
++      }
++    },
++    "node_modules/@opentelemetry/exporter-logs-otlp-http/node_modules/@opentelemetry/core": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/core/-/core-2.9.0.tgz",
++      "integrity": "sha512-m2nckMT80NnmjTYSPjJQObBJ+8dgkoajEOUbznL8AHZ3T3yHRk2P7gI1PhEBc1+lOnrYE9UWrWHqJDsmqjmNbw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.0.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/exporter-trace-otlp-proto": {
++      "version": "0.220.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/exporter-trace-otlp-proto/-/exporter-trace-otlp-proto-0.220.0.tgz",
++      "integrity": "sha512-voTAD8XgJxlK7zLkXh8EzMB09zrQr3tyY/BsnDTlDiQU/UdK58MZ63A3mUjdEDrxMjCVmBHU3WQJhRmQe+Dvzg==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/otlp-exporter-base": "0.220.0",
++        "@opentelemetry/otlp-transformer": "0.220.0",
++        "@opentelemetry/resources": "2.9.0",
++        "@opentelemetry/sdk-trace": "2.9.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": "^1.3.0"
++      }
++    },
++    "node_modules/@opentelemetry/exporter-trace-otlp-proto/node_modules/@opentelemetry/core": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/core/-/core-2.9.0.tgz",
++      "integrity": "sha512-m2nckMT80NnmjTYSPjJQObBJ+8dgkoajEOUbznL8AHZ3T3yHRk2P7gI1PhEBc1+lOnrYE9UWrWHqJDsmqjmNbw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.0.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/exporter-trace-otlp-proto/node_modules/@opentelemetry/resources": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/resources/-/resources-2.9.0.tgz",
++      "integrity": "sha512-jyA5MBLQ+Dkl3+JsZkUoUvL7yHvU64kLsvpXKarWm6347Sl1t1bXFTFykUePNpT5WH5pm9a2Qtt03iIYQhZ1Fg==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.3.0 <1.10.0"
+       }
+     },
+-    "node_modules/@fontsource/space-grotesk": {
+-      "version": "5.2.10",
+-      "resolved": "https://registry.npmjs.org/@fontsource/space-grotesk/-/space-grotesk-5.2.10.tgz",
+-      "integrity": "sha512-XNXEbT74OIITPqw2H6HXwPDp85fy43uxfBwFR5PU+9sLnjuLj12KlhVM9nZVN6q6dlKjkuN8JisW/OBxwxgUew==",
+-      "license": "OFL-1.1",
+-      "funding": {
+-        "url": "https://github.com/sponsors/ayuhito"
++    "node_modules/@opentelemetry/instrumentation": {
++      "version": "0.220.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/instrumentation/-/instrumentation-0.220.0.tgz",
++      "integrity": "sha512-xQx3E2WxP1mDvKzxLxX+CTCtNLa560YJZ3087qYHerl2YmiKpv7AH+dAy7vmx+eVrZ5BwhfWUAVoKOoxCNHcpw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/api-logs": "0.220.0",
++        "import-in-the-middle": "^3.0.0",
++        "require-in-the-middle": "^8.0.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": "^1.3.0"
+       }
+     },
+-    "node_modules/@humanfs/core": {
+-      "version": "0.19.2",
+-      "resolved": "https://registry.npmjs.org/@humanfs/core/-/core-0.19.2.tgz",
+-      "integrity": "sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==",
+-      "dev": true,
++    "node_modules/@opentelemetry/instrumentation-document-load": {
++      "version": "0.65.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/instrumentation-document-load/-/instrumentation-document-load-0.65.0.tgz",
++      "integrity": "sha512-xAhNXUIywjqmaSkpimsuUpRr0QYebMyTn0IJS9wFWYVLyH+2Q5IYWYys4IrT60foeyf2gyFmRBQyHupblNdaMA==",
+       "license": "Apache-2.0",
+       "dependencies": {
+-        "@humanfs/types": "^0.15.0"
++        "@opentelemetry/core": "^2.0.0",
++        "@opentelemetry/instrumentation": "^0.220.0",
++        "@opentelemetry/sdk-trace-web": "^2.0.0",
++        "@opentelemetry/semantic-conventions": "^1.23.0"
+       },
+       "engines": {
+-        "node": ">=18.18.0"
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": "^1.3.0"
+       }
+     },
+-    "node_modules/@humanfs/node": {
+-      "version": "0.16.8",
+-      "resolved": "https://registry.npmjs.org/@humanfs/node/-/node-0.16.8.tgz",
+-      "integrity": "sha512-gE1eQNZ3R++kTzFUpdGlpmy8kDZD/MLyHqDwqjkVQI0JMdI1D51sy1H958PNXYkM2rAac7e5/CnIKZrHtPh3BQ==",
+-      "dev": true,
++    "node_modules/@opentelemetry/instrumentation-fetch": {
++      "version": "0.220.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/instrumentation-fetch/-/instrumentation-fetch-0.220.0.tgz",
++      "integrity": "sha512-9LW+zgvKK6kqojB0GVqbOCRGBUWiatHPmRTusjSVdwYCImIgJRrJTKu6WhjHdejJSjRS/mGsw/w4ETZBqav3kQ==",
+       "license": "Apache-2.0",
+       "dependencies": {
+-        "@humanfs/core": "^0.19.2",
+-        "@humanfs/types": "^0.15.0",
+-        "@humanwhocodes/retry": "^0.4.0"
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/instrumentation": "0.220.0",
++        "@opentelemetry/sdk-trace-web": "2.9.0",
++        "@opentelemetry/semantic-conventions": "^1.29.0"
+       },
+       "engines": {
+-        "node": ">=18.18.0"
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": "^1.3.0"
+       }
+     },
+-    "node_modules/@humanfs/types": {
+-      "version": "0.15.0",
+-      "resolved": "https://registry.npmjs.org/@humanfs/types/-/types-0.15.0.tgz",
+-      "integrity": "sha512-ZZ1w0aoQkwuUuC7Yf+7sdeaNfqQiiLcSRbfI08oAxqLtpXQr9AIVX7Ay7HLDuiLYAaFPu8oBYNq/QIi9URHJ3Q==",
+-      "dev": true,
++    "node_modules/@opentelemetry/instrumentation-fetch/node_modules/@opentelemetry/core": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/core/-/core-2.9.0.tgz",
++      "integrity": "sha512-m2nckMT80NnmjTYSPjJQObBJ+8dgkoajEOUbznL8AHZ3T3yHRk2P7gI1PhEBc1+lOnrYE9UWrWHqJDsmqjmNbw==",
+       "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
+       "engines": {
+-        "node": ">=18.18.0"
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.0.0 <1.10.0"
+       }
+     },
+-    "node_modules/@humanwhocodes/module-importer": {
+-      "version": "1.0.1",
+-      "resolved": "https://registry.npmjs.org/@humanwhocodes/module-importer/-/module-importer-1.0.1.tgz",
+-      "integrity": "sha512-bxveV4V8v5Yb4ncFTT3rPSgZBOpCkjfK0y4oVVVJwIuDVBRMDXrPyXRL988i5ap9m9bnyEEjWfm5WkBmtffLfA==",
+-      "dev": true,
++    "node_modules/@opentelemetry/instrumentation-fetch/node_modules/@opentelemetry/resources": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/resources/-/resources-2.9.0.tgz",
++      "integrity": "sha512-jyA5MBLQ+Dkl3+JsZkUoUvL7yHvU64kLsvpXKarWm6347Sl1t1bXFTFykUePNpT5WH5pm9a2Qtt03iIYQhZ1Fg==",
+       "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
+       "engines": {
+-        "node": ">=12.22"
++        "node": "^18.19.0 || >=20.6.0"
+       },
+-      "funding": {
+-        "type": "github",
+-        "url": "https://github.com/sponsors/nzakas"
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.3.0 <1.10.0"
+       }
+     },
+-    "node_modules/@humanwhocodes/retry": {
+-      "version": "0.4.3",
+-      "resolved": "https://registry.npmjs.org/@humanwhocodes/retry/-/retry-0.4.3.tgz",
+-      "integrity": "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==",
+-      "dev": true,
++    "node_modules/@opentelemetry/instrumentation-fetch/node_modules/@opentelemetry/sdk-trace-base": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/sdk-trace-base/-/sdk-trace-base-2.9.0.tgz",
++      "integrity": "sha512-cp9zmTl62R8PJrpvFcmc8N2JQU/xfa0S+61q511Nji+QxCfZ8Ifvg7H27G8cANe4crg4RTrWsVvanHiXjSp6ag==",
++      "deprecated": "Use @opentelemetry/sdk-trace package",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/resources": "2.9.0",
++        "@opentelemetry/sdk-trace": "2.9.0",
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.3.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/instrumentation-fetch/node_modules/@opentelemetry/sdk-trace-web": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/sdk-trace-web/-/sdk-trace-web-2.9.0.tgz",
++      "integrity": "sha512-LS4XlzOK3e6YYdt84m15AmRR04121rKipmifi4XFZToH1h75f7F2bzHLbB1NMgIEYJ0jSKYm4VsK5mws/5kfTQ==",
++      "deprecated": "Use @opentelemetry/sdk-trace package",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/sdk-trace-base": "2.9.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.0.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/instrumentation-xml-http-request": {
++      "version": "0.220.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/instrumentation-xml-http-request/-/instrumentation-xml-http-request-0.220.0.tgz",
++      "integrity": "sha512-9FTY+kT3z5D8f7dC+Tubd4oJTu6tOGlQmws5J8e7DLMeIUwpWmLquRFV2BuUShiAPxTMGqqsZnuT3CVVbTu0JA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/instrumentation": "0.220.0",
++        "@opentelemetry/sdk-trace-web": "2.9.0",
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": "^1.3.0"
++      }
++    },
++    "node_modules/@opentelemetry/instrumentation-xml-http-request/node_modules/@opentelemetry/core": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/core/-/core-2.9.0.tgz",
++      "integrity": "sha512-m2nckMT80NnmjTYSPjJQObBJ+8dgkoajEOUbznL8AHZ3T3yHRk2P7gI1PhEBc1+lOnrYE9UWrWHqJDsmqjmNbw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.0.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/instrumentation-xml-http-request/node_modules/@opentelemetry/resources": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/resources/-/resources-2.9.0.tgz",
++      "integrity": "sha512-jyA5MBLQ+Dkl3+JsZkUoUvL7yHvU64kLsvpXKarWm6347Sl1t1bXFTFykUePNpT5WH5pm9a2Qtt03iIYQhZ1Fg==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.3.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/instrumentation-xml-http-request/node_modules/@opentelemetry/sdk-trace-base": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/sdk-trace-base/-/sdk-trace-base-2.9.0.tgz",
++      "integrity": "sha512-cp9zmTl62R8PJrpvFcmc8N2JQU/xfa0S+61q511Nji+QxCfZ8Ifvg7H27G8cANe4crg4RTrWsVvanHiXjSp6ag==",
++      "deprecated": "Use @opentelemetry/sdk-trace package",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/resources": "2.9.0",
++        "@opentelemetry/sdk-trace": "2.9.0",
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.3.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/instrumentation-xml-http-request/node_modules/@opentelemetry/sdk-trace-web": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/sdk-trace-web/-/sdk-trace-web-2.9.0.tgz",
++      "integrity": "sha512-LS4XlzOK3e6YYdt84m15AmRR04121rKipmifi4XFZToH1h75f7F2bzHLbB1NMgIEYJ0jSKYm4VsK5mws/5kfTQ==",
++      "deprecated": "Use @opentelemetry/sdk-trace package",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/sdk-trace-base": "2.9.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.0.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/otlp-exporter-base": {
++      "version": "0.220.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/otlp-exporter-base/-/otlp-exporter-base-0.220.0.tgz",
++      "integrity": "sha512-CXYo8UD5Mn9YbgebO2EL4wejtA+gxLmLiu6HCk2KH2BR7XhFN6/6p1UlCb23DYCjeYkndevLHuejCCN1yx4+OQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/otlp-transformer": "0.220.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": "^1.3.0"
++      }
++    },
++    "node_modules/@opentelemetry/otlp-exporter-base/node_modules/@opentelemetry/core": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/core/-/core-2.9.0.tgz",
++      "integrity": "sha512-m2nckMT80NnmjTYSPjJQObBJ+8dgkoajEOUbznL8AHZ3T3yHRk2P7gI1PhEBc1+lOnrYE9UWrWHqJDsmqjmNbw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.0.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/otlp-transformer": {
++      "version": "0.220.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/otlp-transformer/-/otlp-transformer-0.220.0.tgz",
++      "integrity": "sha512-lXGrv7KXZ0gNH9SVNUaa6vv6phVYGvJxfXAlMbzbakiXru75f5MZl8Z7oqiMMQD77riVHJCFlQvbZs/VVN2/4A==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/api-logs": "0.220.0",
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/resources": "2.9.0",
++        "@opentelemetry/sdk-logs": "0.220.0",
++        "@opentelemetry/sdk-metrics": "2.9.0",
++        "@opentelemetry/sdk-trace": "2.9.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": "^1.3.0"
++      }
++    },
++    "node_modules/@opentelemetry/otlp-transformer/node_modules/@opentelemetry/core": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/core/-/core-2.9.0.tgz",
++      "integrity": "sha512-m2nckMT80NnmjTYSPjJQObBJ+8dgkoajEOUbznL8AHZ3T3yHRk2P7gI1PhEBc1+lOnrYE9UWrWHqJDsmqjmNbw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.0.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/otlp-transformer/node_modules/@opentelemetry/resources": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/resources/-/resources-2.9.0.tgz",
++      "integrity": "sha512-jyA5MBLQ+Dkl3+JsZkUoUvL7yHvU64kLsvpXKarWm6347Sl1t1bXFTFykUePNpT5WH5pm9a2Qtt03iIYQhZ1Fg==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.3.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/resources": {
++      "version": "2.10.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/resources/-/resources-2.10.0.tgz",
++      "integrity": "sha512-q6MMm2zhggzsHVNbabYwut+a6nbuQQe3URUoxaojM/8K1IBfwwPzvxIjNi2/lI1TFe+fMHMW9MWhrtDLEXEnkA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.10.0",
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.3.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/sdk-logs": {
++      "version": "0.220.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/sdk-logs/-/sdk-logs-0.220.0.tgz",
++      "integrity": "sha512-WywcTkQtv2iNmt+6y5Kcd4rzvx9bLVsBa2Nwcmg01IUaBTkTow3W4d9KE5vNBpEDtb9tp21WcRBY/lANRrApYA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/api-logs": "0.220.0",
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/resources": "2.9.0",
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.4.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/sdk-logs/node_modules/@opentelemetry/core": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/core/-/core-2.9.0.tgz",
++      "integrity": "sha512-m2nckMT80NnmjTYSPjJQObBJ+8dgkoajEOUbznL8AHZ3T3yHRk2P7gI1PhEBc1+lOnrYE9UWrWHqJDsmqjmNbw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.0.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/sdk-logs/node_modules/@opentelemetry/resources": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/resources/-/resources-2.9.0.tgz",
++      "integrity": "sha512-jyA5MBLQ+Dkl3+JsZkUoUvL7yHvU64kLsvpXKarWm6347Sl1t1bXFTFykUePNpT5WH5pm9a2Qtt03iIYQhZ1Fg==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.3.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/sdk-metrics": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/sdk-metrics/-/sdk-metrics-2.9.0.tgz",
++      "integrity": "sha512-Xx8RGS4H5XEBl01WuCreMIpiah9cCXMbSkeuIePPdD2cUpq/vUzYmj8E/MK1OsbOc93FuAD4jfn2WOacKwLn7Q==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/resources": "2.9.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.9.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/sdk-metrics/node_modules/@opentelemetry/core": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/core/-/core-2.9.0.tgz",
++      "integrity": "sha512-m2nckMT80NnmjTYSPjJQObBJ+8dgkoajEOUbznL8AHZ3T3yHRk2P7gI1PhEBc1+lOnrYE9UWrWHqJDsmqjmNbw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.0.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/sdk-metrics/node_modules/@opentelemetry/resources": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/resources/-/resources-2.9.0.tgz",
++      "integrity": "sha512-jyA5MBLQ+Dkl3+JsZkUoUvL7yHvU64kLsvpXKarWm6347Sl1t1bXFTFykUePNpT5WH5pm9a2Qtt03iIYQhZ1Fg==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.3.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/sdk-trace": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/sdk-trace/-/sdk-trace-2.9.0.tgz",
++      "integrity": "sha512-sGA19HvtrrSKYsseHphluH6j3p6Xa3fqc7c7y8f/7mYWejc1lyDFcpSdD1kYa50HCLUeEo4zA5bW0pniaPszuw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/resources": "2.9.0",
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.3.0 <1.10.0"
++      }
++    },
++    "node_modules/@opentelemetry/sdk-trace-base": {
++      "version": "2.10.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/sdk-trace-base/-/sdk-trace-base-2.10.0.tgz",
++      "integrity": "sha512-GuYQQT7QD2EeO8lcZLRQzcbOyhqAzL+6WWTKTU9mSUBYBazkEDl+VrQcXQhbB08OWM9anD1aHleVadzulpOaUQ==",
++      "deprecated": "Use @opentelemetry/sdk-trace package",
+       "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/core": "2.10.0",
++        "@opentelemetry/resources": "2.10.0",
++        "@opentelemetry/sdk-trace": "2.10.0",
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
+       "engines": {
+-        "node": ">=18.18"
++        "node": "^18.19.0 || >=20.6.0"
+       },
+-      "funding": {
+-        "type": "github",
+-        "url": "https://github.com/sponsors/nzakas"
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.3.0 <1.10.0"
+       }
+     },
+-    "node_modules/@jridgewell/gen-mapping": {
+-      "version": "0.3.13",
+-      "resolved": "https://registry.npmjs.org/@jridgewell/gen-mapping/-/gen-mapping-0.3.13.tgz",
+-      "integrity": "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==",
+-      "license": "MIT",
++    "node_modules/@opentelemetry/sdk-trace-base/node_modules/@opentelemetry/sdk-trace": {
++      "version": "2.10.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/sdk-trace/-/sdk-trace-2.10.0.tgz",
++      "integrity": "sha512-MfQGq3GRmTh5fM/y+OjaO0vj6+luCB1XO2gfXCalKCfgKw0eHL++sm75DNweC6ohlp+aFvACqeE0fYayqdRaoQ==",
++      "license": "Apache-2.0",
+       "dependencies": {
+-        "@jridgewell/sourcemap-codec": "^1.5.0",
+-        "@jridgewell/trace-mapping": "^0.3.24"
++        "@opentelemetry/core": "2.10.0",
++        "@opentelemetry/resources": "2.10.0",
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.3.0 <1.10.0"
+       }
+     },
+-    "node_modules/@jridgewell/remapping": {
+-      "version": "2.3.5",
+-      "resolved": "https://registry.npmjs.org/@jridgewell/remapping/-/remapping-2.3.5.tgz",
+-      "integrity": "sha512-LI9u/+laYG4Ds1TDKSJW2YPrIlcVYOwi2fUC6xB43lueCjgxV4lffOCZCtYFiH6TNOX+tQKXx97T4IKHbhyHEQ==",
+-      "license": "MIT",
++    "node_modules/@opentelemetry/sdk-trace-web": {
++      "version": "2.10.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/sdk-trace-web/-/sdk-trace-web-2.10.0.tgz",
++      "integrity": "sha512-6WqXdWSlBH0GNjDhv1gg6SLVtMtIBVhLaWqd1hiKSXS8meXXP13sVPQoYFHz1uVo0feUTUCdP9vMS54KflisAw==",
++      "deprecated": "Use @opentelemetry/sdk-trace package",
++      "license": "Apache-2.0",
+       "dependencies": {
+-        "@jridgewell/gen-mapping": "^0.3.5",
+-        "@jridgewell/trace-mapping": "^0.3.24"
++        "@opentelemetry/core": "2.10.0",
++        "@opentelemetry/sdk-trace-base": "2.10.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.0.0 <1.10.0"
+       }
+     },
+-    "node_modules/@jridgewell/resolve-uri": {
+-      "version": "3.1.2",
+-      "resolved": "https://registry.npmjs.org/@jridgewell/resolve-uri/-/resolve-uri-3.1.2.tgz",
+-      "integrity": "sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==",
+-      "license": "MIT",
++    "node_modules/@opentelemetry/sdk-trace/node_modules/@opentelemetry/core": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/core/-/core-2.9.0.tgz",
++      "integrity": "sha512-m2nckMT80NnmjTYSPjJQObBJ+8dgkoajEOUbznL8AHZ3T3yHRk2P7gI1PhEBc1+lOnrYE9UWrWHqJDsmqjmNbw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
+       "engines": {
+-        "node": ">=6.0.0"
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.0.0 <1.10.0"
+       }
+     },
+-    "node_modules/@jridgewell/sourcemap-codec": {
+-      "version": "1.5.5",
+-      "resolved": "https://registry.npmjs.org/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.5.5.tgz",
+-      "integrity": "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==",
+-      "license": "MIT"
+-    },
+-    "node_modules/@jridgewell/trace-mapping": {
+-      "version": "0.3.31",
+-      "resolved": "https://registry.npmjs.org/@jridgewell/trace-mapping/-/trace-mapping-0.3.31.tgz",
+-      "integrity": "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==",
+-      "license": "MIT",
++    "node_modules/@opentelemetry/sdk-trace/node_modules/@opentelemetry/resources": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/resources/-/resources-2.9.0.tgz",
++      "integrity": "sha512-jyA5MBLQ+Dkl3+JsZkUoUvL7yHvU64kLsvpXKarWm6347Sl1t1bXFTFykUePNpT5WH5pm9a2Qtt03iIYQhZ1Fg==",
++      "license": "Apache-2.0",
+       "dependencies": {
+-        "@jridgewell/resolve-uri": "^3.1.0",
+-        "@jridgewell/sourcemap-codec": "^1.4.14"
++        "@opentelemetry/core": "2.9.0",
++        "@opentelemetry/semantic-conventions": "^1.29.0"
++      },
++      "engines": {
++        "node": "^18.19.0 || >=20.6.0"
++      },
++      "peerDependencies": {
++        "@opentelemetry/api": ">=1.3.0 <1.10.0"
+       }
+     },
+-    "node_modules/@kurkle/color": {
+-      "version": "0.3.4",
+-      "resolved": "https://registry.npmjs.org/@kurkle/color/-/color-0.3.4.tgz",
+-      "integrity": "sha512-M5UknZPHRu3DEDWoipU6sE8PdkZ6Z/S+v4dD+Ke8IaNlpdSQah50lz1KtcFBa2vsdOnwbbnxJwVM4wty6udA5w==",
+-      "license": "MIT"
++    "node_modules/@opentelemetry/semantic-conventions": {
++      "version": "1.43.0",
++      "resolved": "https://registry.npmjs.org/@opentelemetry/semantic-conventions/-/semantic-conventions-1.43.0.tgz",
++      "integrity": "sha512-eSYWTm620tTk45EKSedaUL8MFYI8hW164hIXsgIHyxu3VobUB3fFCu5t0hQby6OoWRPsG1KkKUG2M5UadiLiVg==",
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=14"
++      }
+     },
+     "node_modules/@oxc-project/types": {
+       "version": "0.155.0",
+@@ -862,6 +2241,63 @@
+         "url": "https://opencollective.com/popperjs"
+       }
+     },
++    "node_modules/@protobufjs/aspromise": {
++      "version": "1.1.2",
++      "resolved": "https://registry.npmjs.org/@protobufjs/aspromise/-/aspromise-1.1.2.tgz",
++      "integrity": "sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==",
++      "license": "BSD-3-Clause"
++    },
++    "node_modules/@protobufjs/base64": {
++      "version": "1.1.2",
++      "resolved": "https://registry.npmjs.org/@protobufjs/base64/-/base64-1.1.2.tgz",
++      "integrity": "sha512-AZkcAA5vnN/v4PDqKyMR5lx7hZttPDgClv83E//FMNhR2TMcLUhfRUBHCmSl0oi9zMgDDqRUJkSxO3wm85+XLg==",
++      "license": "BSD-3-Clause"
++    },
++    "node_modules/@protobufjs/codegen": {
++      "version": "2.0.5",
++      "resolved": "https://registry.npmjs.org/@protobufjs/codegen/-/codegen-2.0.5.tgz",
++      "integrity": "sha512-zgXFLzW3Ap33e6d0Wlj4MGIm6Ce8O89n/apUaGNB/jx+hw+ruWEp7EwGUshdLKVRCxZW12fp9r40E1mQrf/34g==",
++      "license": "BSD-3-Clause"
++    },
++    "node_modules/@protobufjs/eventemitter": {
++      "version": "1.1.1",
++      "resolved": "https://registry.npmjs.org/@protobufjs/eventemitter/-/eventemitter-1.1.1.tgz",
++      "integrity": "sha512-vW1GmwMZNnL+gMRaovlh9yZX74kc+TTU3FObkkurpMaRtBfLP3ldjS9KQWlwZgraRE0+dheEEoAxdzcJQ8eXZg==",
++      "license": "BSD-3-Clause"
++    },
++    "node_modules/@protobufjs/fetch": {
++      "version": "1.1.1",
++      "resolved": "https://registry.npmjs.org/@protobufjs/fetch/-/fetch-1.1.1.tgz",
++      "integrity": "sha512-GpptLrs57adMSuHi3VNj0mAF8dwh36LMaYF6XyJ6JMWlVsc+t42tm1HSEDmOs3A8fC9yyeisgLhsTVQokOZ0zw==",
++      "license": "BSD-3-Clause",
++      "dependencies": {
++        "@protobufjs/aspromise": "^1.1.1"
++      }
++    },
++    "node_modules/@protobufjs/float": {
++      "version": "1.0.2",
++      "resolved": "https://registry.npmjs.org/@protobufjs/float/-/float-1.0.2.tgz",
++      "integrity": "sha512-Ddb+kVXlXst9d+R9PfTIxh1EdNkgoRe5tOX6t01f1lYWOvJnSPDBlG241QLzcyPdoNTsblLUdujGSE4RzrTZGQ==",
++      "license": "BSD-3-Clause"
++    },
++    "node_modules/@protobufjs/path": {
++      "version": "1.1.2",
++      "resolved": "https://registry.npmjs.org/@protobufjs/path/-/path-1.1.2.tgz",
++      "integrity": "sha512-6JOcJ5Tm08dOHAbdR3GrvP+yUUfkjG5ePsHYczMFLq3ZmMkAD98cDgcT2iA1lJ9NVwFd4tH/iSSoe44YWkltEA==",
++      "license": "BSD-3-Clause"
++    },
++    "node_modules/@protobufjs/pool": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@protobufjs/pool/-/pool-1.1.0.tgz",
++      "integrity": "sha512-0kELaGSIDBKvcgS4zkjz1PeddatrjYcmMWOlAuAPwAeccUrPHdUqo/J6LiymHHEiJT5NrF1UVwxY14f+fy4WQw==",
++      "license": "BSD-3-Clause"
++    },
++    "node_modules/@protobufjs/utf8": {
++      "version": "1.1.2",
++      "resolved": "https://registry.npmjs.org/@protobufjs/utf8/-/utf8-1.1.2.tgz",
++      "integrity": "sha512-b1UQwcEZ4yCnMCD8DAL1VlbvBJE9/IX4FTIp7BG1xYpf29SLazLSrqUkj4w7Y5y7cCVP6E5tcqqcI0xemPkHug==",
++      "license": "BSD-3-Clause"
++    },
+     "node_modules/@rolldown/binding-android-arm-eabi": {
+       "version": "1.2.15",
+       "resolved": "https://registry.npmjs.org/@rolldown/binding-android-arm-eabi/-/binding-android-arm-eabi-1.2.15.tgz",
+@@ -965,9 +2401,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -984,9 +2417,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1003,9 +2433,6 @@
+       "cpu": [
+         "ppc64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1022,9 +2449,6 @@
+       "cpu": [
+         "s390x"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1041,9 +2465,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1060,9 +2481,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1304,6 +2722,15 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/@types/node": {
++      "version": "26.6.6",
++      "resolved": "https://registry.npmjs.org/@types/node/-/node-26.6.6.tgz",
++      "integrity": "sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==",
++      "license": "MIT",
++      "dependencies": {
++        "undici-types": "~8.9.0"
++      }
++    },
+     "node_modules/@vitejs/plugin-react": {
+       "version": "5.2.0",
+       "resolved": "https://registry.npmjs.org/@vitejs/plugin-react/-/plugin-react-5.2.0.tgz",
+@@ -1493,9 +2920,7 @@
+       "version": "5.0.1",
+       "resolved": "https://registry.npmjs.org/ansi-regex/-/ansi-regex-5.0.1.tgz",
+       "integrity": "sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==",
+-      "dev": true,
+       "license": "MIT",
+-      "peer": true,
+       "engines": {
+         "node": ">=8"
+       }
+@@ -1504,7 +2929,6 @@
+       "version": "4.3.0",
+       "resolved": "https://registry.npmjs.org/ansi-styles/-/ansi-styles-4.3.0.tgz",
+       "integrity": "sha512-zbB9rCJAT1rbjiVDb2hqKFHNYLxgtk8NURxZ3IZwD3F6NtxbXZQCnnSi1Lkx+IDohdPlFp222wVALIheZJQSEg==",
+-      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "color-convert": "^2.0.1"
+@@ -1735,6 +3159,26 @@
+         "pnpm": ">=8"
+       }
+     },
++    "node_modules/cjs-module-lexer": {
++      "version": "2.3.0",
++      "resolved": "https://registry.npmjs.org/cjs-module-lexer/-/cjs-module-lexer-2.3.0.tgz",
++      "integrity": "sha512-lmNyBzi6iYiqyrExTctfmjd8tInx+dHu9PBomTfH5RXS53c27JMFJgzNv5TyAnm3PgGf+MLy0+Ws41/HlVxdKQ==",
++      "license": "MIT"
++    },
++    "node_modules/cliui": {
++      "version": "8.0.1",
++      "resolved": "https://registry.npmjs.org/cliui/-/cliui-8.0.1.tgz",
++      "integrity": "sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ==",
++      "license": "ISC",
++      "dependencies": {
++        "string-width": "^4.2.0",
++        "strip-ansi": "^6.0.1",
++        "wrap-ansi": "^7.0.0"
++      },
++      "engines": {
++        "node": ">=12"
++      }
++    },
+     "node_modules/clsx": {
+       "version": "2.1.1",
+       "resolved": "https://registry.npmjs.org/clsx/-/clsx-2.1.1.tgz",
+@@ -1748,7 +3192,6 @@
+       "version": "2.0.1",
+       "resolved": "https://registry.npmjs.org/color-convert/-/color-convert-2.0.1.tgz",
+       "integrity": "sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==",
+-      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "color-name": "~1.1.4"
+@@ -1761,7 +3204,6 @@
+       "version": "1.1.4",
+       "resolved": "https://registry.npmjs.org/color-name/-/color-name-1.1.4.tgz",
+       "integrity": "sha512-dOy+3AuW3a2wNbZHIuMZpTcgjGuLU/uBL/ubcZF9OXbDo8ff4O8yVp5Bf0efS8uEoYo5q4Fx7dY9OgQGXgAsQA==",
+-      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/combined-stream": {
+@@ -1939,6 +3381,12 @@
+       "integrity": "sha512-nRa65aFge40viPAKxMKULIY8tcXKwKboJWNn4RoKwyWXJ6SP7BnrDGKUTzc64818jIciH0PK7LSF8QzZes19GA==",
+       "license": "ISC"
+     },
++    "node_modules/emoji-regex": {
++      "version": "8.0.0",
++      "resolved": "https://registry.npmjs.org/emoji-regex/-/emoji-regex-8.0.0.tgz",
++      "integrity": "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==",
++      "license": "MIT"
++    },
+     "node_modules/entities": {
+       "version": "8.0.0",
+       "resolved": "https://registry.npmjs.org/entities/-/entities-8.0.0.tgz",
+@@ -2251,6 +3699,18 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/faye-websocket": {
++      "version": "0.11.4",
++      "resolved": "https://registry.npmjs.org/faye-websocket/-/faye-websocket-0.11.4.tgz",
++      "integrity": "sha512-CzbClwlXAuiRQAlUyfqPgvPoNKTckTPGfwZV4ZdAhVcP2lh9KUxJg2b5GkE7XbjKQ3YJnQ9z6D9ntLAlB+tP8g==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "websocket-driver": ">=0.5.1"
++      },
++      "engines": {
++        "node": ">=0.8.0"
++      }
++    },
+     "node_modules/fdir": {
+       "version": "6.5.0",
+       "resolved": "https://registry.npmjs.org/fdir/-/fdir-6.5.0.tgz",
+@@ -2298,6 +3758,43 @@
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
++    "node_modules/firebase": {
++      "version": "13.3.0",
++      "resolved": "https://registry.npmjs.org/firebase/-/firebase-13.3.0.tgz",
++      "integrity": "sha512-hq5LkmCTAhjlma3WVa7k+e/g7afXQ+h/CBcUZ8vp6HO4FySsNHRQ4lnn4CcUbQd+pFaQyZof77I64e4pqc3yPw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "@firebase/ai": "3.1.0",
++        "@firebase/analytics": "0.10.25",
++        "@firebase/analytics-compat": "0.2.31",
++        "@firebase/app": "0.16.6",
++        "@firebase/app-check": "0.13.1",
++        "@firebase/app-check-compat": "0.4.7",
++        "@firebase/app-compat": "0.5.22",
++        "@firebase/app-types": "0.9.6",
++        "@firebase/auth": "1.13.10",
++        "@firebase/auth-compat": "0.6.15",
++        "@firebase/crashlytics": "0.1.1",
++        "@firebase/data-connect": "0.7.4",
++        "@firebase/database": "1.1.6",
++        "@firebase/database-compat": "2.1.8",
++        "@firebase/firestore": "4.20.0",
++        "@firebase/firestore-compat": "0.4.18",
++        "@firebase/functions": "0.14.0",
++        "@firebase/functions-compat": "0.5.0",
++        "@firebase/installations": "0.6.24",
++        "@firebase/installations-compat": "0.2.24",
++        "@firebase/messaging": "0.13.3",
++        "@firebase/messaging-compat": "0.2.30",
++        "@firebase/performance": "0.7.14",
++        "@firebase/performance-compat": "0.2.27",
++        "@firebase/remote-config": "0.10.0",
++        "@firebase/remote-config-compat": "0.2.31",
++        "@firebase/storage": "0.14.6",
++        "@firebase/storage-compat": "0.4.6",
++        "@firebase/util": "1.15.3"
++      }
++    },
+     "node_modules/flat-cache": {
+       "version": "4.0.1",
+       "resolved": "https://registry.npmjs.org/flat-cache/-/flat-cache-4.0.1.tgz",
+@@ -2387,6 +3884,15 @@
+         "node": ">=6.9.0"
+       }
+     },
++    "node_modules/get-caller-file": {
++      "version": "2.0.5",
++      "resolved": "https://registry.npmjs.org/get-caller-file/-/get-caller-file-2.0.5.tgz",
++      "integrity": "sha512-DyFP3BM/3YHTQOCUL/w0OZHR0lpKeGrxotcHWcqNEdnltqFwXVfhEBQ94eIo34AfQpo0rGki4cyIiftY06h2Fg==",
++      "license": "ISC",
++      "engines": {
++        "node": "6.* || 8.* || >= 10.*"
++      }
++    },
+     "node_modules/get-intrinsic": {
+       "version": "1.3.0",
+       "resolved": "https://registry.npmjs.org/get-intrinsic/-/get-intrinsic-1.3.0.tgz",
+@@ -2541,6 +4047,12 @@
+         "node": "^20.19.0 || ^22.12.0 || >=24.0.0"
+       }
+     },
++    "node_modules/http-parser-js": {
++      "version": "0.5.10",
++      "resolved": "https://registry.npmjs.org/http-parser-js/-/http-parser-js-0.5.10.tgz",
++      "integrity": "sha512-Pysuw9XpUq5dVc/2SMHpuTY01RFl8fttgcyunjL7eEMhGM3cI4eOmiCycJDVCo/7O7ClfQD3SaI6ftDzqOXYMA==",
++      "license": "MIT"
++    },
+     "node_modules/https-proxy-agent": {
+       "version": "5.0.1",
+       "resolved": "https://registry.npmjs.org/https-proxy-agent/-/https-proxy-agent-5.0.1.tgz",
+@@ -2554,6 +4066,12 @@
+         "node": ">= 6"
+       }
+     },
++    "node_modules/idb": {
++      "version": "7.1.1",
++      "resolved": "https://registry.npmjs.org/idb/-/idb-7.1.1.tgz",
++      "integrity": "sha512-gchesWBzyvGHRO9W8tzUWFDycow5gwjvFKfyV9FF32Y7F50yZMp7mP+T2mJIWFx49zicqyC4uefHM17o6xKIVQ==",
++      "license": "ISC"
++    },
+     "node_modules/ignore": {
+       "version": "5.3.2",
+       "resolved": "https://registry.npmjs.org/ignore/-/ignore-5.3.2.tgz",
+@@ -2581,6 +4099,26 @@
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
++    "node_modules/import-in-the-middle": {
++      "version": "3.6.0",
++      "resolved": "https://registry.npmjs.org/import-in-the-middle/-/import-in-the-middle-3.6.0.tgz",
++      "integrity": "sha512-xRU7hI24S2FhucXtuZXn8EpcOjfVP6iiEQyR0USayPeaOroEmSsNlqnl95866iRdRtkHrd6Q/Z4D14R60au0+A==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "cjs-module-lexer": "^2.2.0",
++        "es-module-lexer": "^3.0.4",
++        "module-details-from-path": "^1.0.4"
++      },
++      "engines": {
++        "node": ">=18"
++      }
++    },
++    "node_modules/import-in-the-middle/node_modules/es-module-lexer": {
++      "version": "3.0.4",
++      "resolved": "https://registry.npmjs.org/es-module-lexer/-/es-module-lexer-3.0.4.tgz",
++      "integrity": "sha512-BldNY5mwkVu+cQ5Ymn3e6hB9Sx8XHx4ZevWbiUyZbfKxJxYO27Hf0wfzkxIaD5CAJMaGl3YspKELj0ff/7nCMA==",
++      "license": "MIT"
++    },
+     "node_modules/imurmurhash": {
+       "version": "0.1.4",
+       "resolved": "https://registry.npmjs.org/imurmurhash/-/imurmurhash-0.1.4.tgz",
+@@ -2611,6 +4149,15 @@
+         "node": ">=0.10.0"
+       }
+     },
++    "node_modules/is-fullwidth-code-point": {
++      "version": "3.0.0",
++      "resolved": "https://registry.npmjs.org/is-fullwidth-code-point/-/is-fullwidth-code-point-3.0.0.tgz",
++      "integrity": "sha512-zymm5+u+sCsSWyD9qNaejV3DFvhCKclKdizYaJUuHA83RLjb7nSuGnddCHGv0hk+KY7BMAlsWeK4Ueg6EV6XQg==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=8"
++      }
++    },
+     "node_modules/is-glob": {
+       "version": "4.0.3",
+       "resolved": "https://registry.npmjs.org/is-glob/-/is-glob-4.0.3.tgz",
+@@ -2923,9 +4470,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -2946,9 +4490,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -2969,9 +4510,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -2992,9 +4530,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -3064,6 +4599,12 @@
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
++    "node_modules/lodash.camelcase": {
++      "version": "4.3.0",
++      "resolved": "https://registry.npmjs.org/lodash.camelcase/-/lodash.camelcase-4.3.0.tgz",
++      "integrity": "sha512-TwuEnCnxbc3rAvhf/LbG7tJUDzhqXyFnv3dtzLOPgCG/hODL7WFnsbwktkD7yUV0RrreP/l1PALq/YSg6VvjlA==",
++      "license": "MIT"
++    },
+     "node_modules/lodash.merge": {
+       "version": "4.6.2",
+       "resolved": "https://registry.npmjs.org/lodash.merge/-/lodash.merge-4.6.2.tgz",
+@@ -3071,6 +4612,12 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/long": {
++      "version": "5.3.2",
++      "resolved": "https://registry.npmjs.org/long/-/long-5.3.2.tgz",
++      "integrity": "sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==",
++      "license": "Apache-2.0"
++    },
+     "node_modules/lru-cache": {
+       "version": "5.1.1",
+       "resolved": "https://registry.npmjs.org/lru-cache/-/lru-cache-5.1.1.tgz",
+@@ -3161,6 +4708,12 @@
+         "node": "*"
+       }
+     },
++    "node_modules/module-details-from-path": {
++      "version": "1.0.4",
++      "resolved": "https://registry.npmjs.org/module-details-from-path/-/module-details-from-path-1.0.4.tgz",
++      "integrity": "sha512-EGWKgxALGMgzvxYF1UyGTy0HXX/2vHLkw6+NvDKW2jypWbHpjQuj4UMcqQWXHERJhVGKikolT06G3bcKe4fi7w==",
++      "license": "MIT"
++    },
+     "node_modules/ms": {
+       "version": "2.1.3",
+       "resolved": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz",
+@@ -3404,6 +4957,29 @@
+         "url": "https://github.com/chalk/ansi-styles?sponsor=1"
+       }
+     },
++    "node_modules/protobufjs": {
++      "version": "7.6.6",
++      "resolved": "https://registry.npmjs.org/protobufjs/-/protobufjs-7.6.6.tgz",
++      "integrity": "sha512-dYDWdjSl5RNb7SgPxGQcRU+GtvP7s2fpkrY0r432PcOIaZ0/rBcxEZnQN67iJhFuQiVw754JDoPruPCNdGsbjg==",
++      "hasInstallScript": true,
++      "license": "BSD-3-Clause",
++      "dependencies": {
++        "@protobufjs/aspromise": "^1.1.2",
++        "@protobufjs/base64": "^1.1.2",
++        "@protobufjs/codegen": "^2.0.5",
++        "@protobufjs/eventemitter": "^1.1.1",
++        "@protobufjs/fetch": "^1.1.1",
++        "@protobufjs/float": "^1.0.2",
++        "@protobufjs/path": "^1.1.2",
++        "@protobufjs/pool": "^1.1.0",
++        "@protobufjs/utf8": "^1.1.1",
++        "@types/node": ">=13.7.0",
++        "long": "^5.3.2"
++      },
++      "engines": {
++        "node": ">=12.0.0"
++      }
++    },
+     "node_modules/proxy-from-env": {
+       "version": "2.1.0",
+       "resolved": "https://registry.npmjs.org/proxy-from-env/-/proxy-from-env-2.1.0.tgz",
+@@ -3423,6 +4999,15 @@
+         "node": ">=6"
+       }
+     },
++    "node_modules/re2js": {
++      "version": "2.10.0",
++      "resolved": "https://registry.npmjs.org/re2js/-/re2js-2.10.0.tgz",
++      "integrity": "sha512-/P6FNnLbHjXJMRF1dPoZoVTyHvFcuVhbDpzml9DPMlbeErYlZ18GueAaG9GhYhAm/9AN7i7Y6crmDrLX0DeJ4Q==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
+     "node_modules/react": {
+       "version": "19.2.7",
+       "resolved": "https://registry.npmjs.org/react/-/react-19.2.7.tgz",
+@@ -3545,6 +5130,15 @@
+         "node": ">=8"
+       }
+     },
++    "node_modules/require-directory": {
++      "version": "2.1.1",
++      "resolved": "https://registry.npmjs.org/require-directory/-/require-directory-2.1.1.tgz",
++      "integrity": "sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
+     "node_modules/require-from-string": {
+       "version": "2.0.2",
+       "resolved": "https://registry.npmjs.org/require-from-string/-/require-from-string-2.0.2.tgz",
+@@ -3555,6 +5149,19 @@
+         "node": ">=0.10.0"
+       }
+     },
++    "node_modules/require-in-the-middle": {
++      "version": "8.0.1",
++      "resolved": "https://registry.npmjs.org/require-in-the-middle/-/require-in-the-middle-8.0.1.tgz",
++      "integrity": "sha512-QT7FVMXfWOYFbeRBF6nu+I6tr2Tf3u0q8RIEjNob/heKY/nh7drD/k7eeMFmSQgnTtCzLDcCu/XEnpW2wk4xCQ==",
++      "license": "MIT",
++      "dependencies": {
++        "debug": "^4.3.5",
++        "module-details-from-path": "^1.0.3"
++      },
++      "engines": {
++        "node": ">=9.3.0 || >=8.10.0 <9.0.0"
++      }
++    },
+     "node_modules/resolve-from": {
+       "version": "4.0.0",
+       "resolved": "https://registry.npmjs.org/resolve-from/-/resolve-from-4.0.0.tgz",
+@@ -3604,6 +5211,26 @@
+       "integrity": "sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==",
+       "license": "MIT"
+     },
++    "node_modules/safe-buffer": {
++      "version": "5.2.1",
++      "resolved": "https://registry.npmjs.org/safe-buffer/-/safe-buffer-5.2.1.tgz",
++      "integrity": "sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==",
++      "funding": [
++        {
++          "type": "github",
++          "url": "https://github.com/sponsors/feross"
++        },
++        {
++          "type": "patreon",
++          "url": "https://www.patreon.com/feross"
++        },
++        {
++          "type": "consulting",
++          "url": "https://feross.org/support"
++        }
++      ],
++      "license": "MIT"
++    },
+     "node_modules/saxes": {
+       "version": "6.0.0",
+       "resolved": "https://registry.npmjs.org/saxes/-/saxes-6.0.0.tgz",
+@@ -3691,6 +5318,32 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/string-width": {
++      "version": "4.2.3",
++      "resolved": "https://registry.npmjs.org/string-width/-/string-width-4.2.3.tgz",
++      "integrity": "sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==",
++      "license": "MIT",
++      "dependencies": {
++        "emoji-regex": "^8.0.0",
++        "is-fullwidth-code-point": "^3.0.0",
++        "strip-ansi": "^6.0.1"
++      },
++      "engines": {
++        "node": ">=8"
++      }
++    },
++    "node_modules/strip-ansi": {
++      "version": "6.0.1",
++      "resolved": "https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.1.tgz",
++      "integrity": "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==",
++      "license": "MIT",
++      "dependencies": {
++        "ansi-regex": "^5.0.1"
++      },
++      "engines": {
++        "node": ">=8"
++      }
++    },
+     "node_modules/strip-indent": {
+       "version": "3.0.0",
+       "resolved": "https://registry.npmjs.org/strip-indent/-/strip-indent-3.0.0.tgz",
+@@ -3826,6 +5479,12 @@
+         "node": ">=20"
+       }
+     },
++    "node_modules/tslib": {
++      "version": "2.9.1",
++      "resolved": "https://registry.npmjs.org/tslib/-/tslib-2.9.1.tgz",
++      "integrity": "sha512-a4Ux9VKuIMHsOS7ENbEq6hK2ZGYIT27Rtl0E4eD9KqwxhKiQeMZE/9xb3IdYwWaSOyIBQLExhQgXDTYoiCxnWA==",
++      "license": "0BSD"
++    },
+     "node_modules/type-check": {
+       "version": "0.4.0",
+       "resolved": "https://registry.npmjs.org/type-check/-/type-check-0.4.0.tgz",
+@@ -3849,6 +5508,12 @@
+         "node": ">=20.18.1"
+       }
+     },
++    "node_modules/undici-types": {
++      "version": "8.9.0",
++      "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-8.9.0.tgz",
++      "integrity": "sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==",
++      "license": "MIT"
++    },
+     "node_modules/update-browserslist-db": {
+       "version": "1.3.4",
+       "resolved": "https://registry.npmjs.org/update-browserslist-db/-/update-browserslist-db-1.3.4.tgz",
+@@ -4069,6 +5734,12 @@
+         "node": ">=18"
+       }
+     },
++    "node_modules/web-vitals": {
++      "version": "4.2.4",
++      "resolved": "https://registry.npmjs.org/web-vitals/-/web-vitals-4.2.4.tgz",
++      "integrity": "sha512-r4DIlprAGwJ7YM11VZp4R884m0Vmgr6EAKe3P+kO0PPj3Unqyvv59rczf6UiGcb9Z8QxZVcqKNwv/g0WNdWwsw==",
++      "license": "Apache-2.0"
++    },
+     "node_modules/webidl-conversions": {
+       "version": "8.0.1",
+       "resolved": "https://registry.npmjs.org/webidl-conversions/-/webidl-conversions-8.0.1.tgz",
+@@ -4079,6 +5750,29 @@
+         "node": ">=20"
+       }
+     },
++    "node_modules/websocket-driver": {
++      "version": "0.7.5",
++      "resolved": "https://registry.npmjs.org/websocket-driver/-/websocket-driver-0.7.5.tgz",
++      "integrity": "sha512-ZL2+3c7kMBdIRCMz6l8jQMHyGVxj+UL+xVk74Ombiciboca8rHa15L86B19E5oh1pL9Ii/uj54gtsIrZGMo6zA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "http-parser-js": ">=0.5.1",
++        "safe-buffer": ">=5.1.0",
++        "websocket-extensions": ">=0.1.1"
++      },
++      "engines": {
++        "node": ">=0.8.0"
++      }
++    },
++    "node_modules/websocket-extensions": {
++      "version": "0.1.4",
++      "resolved": "https://registry.npmjs.org/websocket-extensions/-/websocket-extensions-0.1.4.tgz",
++      "integrity": "sha512-OqedPIGOfsDlo31UNwYbCFMSaO9m9G/0faIHj5/dZFDMFqPTcx6UwqyOy3COEaEOg/9VsGIpdqn62W5KhoKSpg==",
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=0.8.0"
++      }
++    },
+     "node_modules/whatwg-mimetype": {
+       "version": "5.0.0",
+       "resolved": "https://registry.npmjs.org/whatwg-mimetype/-/whatwg-mimetype-5.0.0.tgz",
+@@ -4147,6 +5841,23 @@
+         "node": ">=0.10.0"
+       }
+     },
++    "node_modules/wrap-ansi": {
++      "version": "7.0.0",
++      "resolved": "https://registry.npmjs.org/wrap-ansi/-/wrap-ansi-7.0.0.tgz",
++      "integrity": "sha512-YVGIj2kamLSTxw6NsZjoBxfSwsn0ycdesmc4p+Q21c5zPuZ1pl+NfxVdxPtdHvmNVOQ6XSYG4AUtyt/Fi7D16Q==",
++      "license": "MIT",
++      "dependencies": {
++        "ansi-styles": "^4.0.0",
++        "string-width": "^4.1.0",
++        "strip-ansi": "^6.0.0"
++      },
++      "engines": {
++        "node": ">=10"
++      },
++      "funding": {
++        "url": "https://github.com/chalk/wrap-ansi?sponsor=1"
++      }
++    },
+     "node_modules/xml-name-validator": {
+       "version": "5.0.0",
+       "resolved": "https://registry.npmjs.org/xml-name-validator/-/xml-name-validator-5.0.0.tgz",
+@@ -4164,12 +5875,48 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/y18n": {
++      "version": "5.0.8",
++      "resolved": "https://registry.npmjs.org/y18n/-/y18n-5.0.8.tgz",
++      "integrity": "sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==",
++      "license": "ISC",
++      "engines": {
++        "node": ">=10"
++      }
++    },
+     "node_modules/yallist": {
+       "version": "3.1.1",
+       "resolved": "https://registry.npmjs.org/yallist/-/yallist-3.1.1.tgz",
+       "integrity": "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==",
+       "license": "ISC"
+     },
++    "node_modules/yargs": {
++      "version": "17.7.3",
++      "resolved": "https://registry.npmjs.org/yargs/-/yargs-17.7.3.tgz",
++      "integrity": "sha512-GZtjxm/J/4TSxuL3FNYjCmLktBTnIw/rVmKSIyKeYAZpmJB2ig9VauCC5xsa82GNKVKDAqpOn3KVzNt0zmrU0g==",
++      "license": "MIT",
++      "dependencies": {
++        "cliui": "^8.0.1",
++        "escalade": "^3.1.1",
++        "get-caller-file": "^2.0.5",
++        "require-directory": "^2.1.1",
++        "string-width": "^4.2.3",
++        "y18n": "^5.0.5",
++        "yargs-parser": "^21.1.1"
++      },
++      "engines": {
++        "node": ">=12"
++      }
++    },
++    "node_modules/yargs-parser": {
++      "version": "21.1.1",
++      "resolved": "https://registry.npmjs.org/yargs-parser/-/yargs-parser-21.1.1.tgz",
++      "integrity": "sha512-tVpsJW7DdjecAiFpbIB1e3qxIQsE6NoPc5/eTdrbbIC4h0LVsWhnoa3g+m2HclBIujHzsxZ4VJVA+GUuc2/LBw==",
++      "license": "ISC",
++      "engines": {
++        "node": ">=12"
++      }
++    },
+     "node_modules/yocto-queue": {
+       "version": "0.1.0",
+       "resolved": "https://registry.npmjs.org/yocto-queue/-/yocto-queue-0.1.0.tgz",
+diff --git a/frontend/package.json b/frontend/package.json
+index 2c2ca74..d8ca58e 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -22,6 +22,7 @@
+     "axios": "^1.17.0",
+     "bootstrap": "^5.3.8",
+     "chart.js": "^4.5.1",
++    "firebase": "^13.3.0",
+     "react": "^19.2.7",
+     "react-chartjs-2": "^5.3.1",
+     "react-dom": "^19.2.7",
+diff --git a/frontend/src/api/authApi.js b/frontend/src/api/authApi.js
+index 4aa6fa4..a4e6b15 100644
+--- a/frontend/src/api/authApi.js
++++ b/frontend/src/api/authApi.js
+@@ -21,6 +21,11 @@ export const authApi = {
+     USE_MOCK
+       ? mockDb.verifyRegistrationOtp(phone, otp)
+       : axiosClient.post('/auth/register/verify-otp', { phone, otp }, skipAuthRefresh),
++  // Firebase Phone Auth (real backend only): check the number first, then trade the Firebase ID token for an account.
++  checkRegistrationPhone: (phone) =>
++    axiosClient.post('/auth/register/check-phone', { phone }, skipAuthRefresh),
++  registerWithFirebase: ({ fullName, phone, password, idToken }) =>
++    axiosClient.post('/auth/register/firebase', { fullName, phone, password, idToken }, skipAuthRefresh),
+   requestPasswordReset: ({ identifier }) =>
+     USE_MOCK
+       ? mockDb.requestPasswordReset(identifier)
+diff --git a/frontend/src/assets/styles/luxe.css b/frontend/src/assets/styles/luxe.css
+index 8d61c06..a077a4d 100644
+--- a/frontend/src/assets/styles/luxe.css
++++ b/frontend/src/assets/styles/luxe.css
+@@ -2534,3 +2534,54 @@ p,
+   font-size: var(--text-sm);
+   pointer-events: none;
+ }
++
++/* ---------- Registration OTP: resend countdown ---------- */
++.otp-actions {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: center;
++  justify-content: space-between;
++  gap: var(--space-xs) var(--space-md);
++  margin: 0 0 var(--space-md);
++}
++
++.otp-actions .auth-text-button {
++  margin: 0;
++}
++
++.otp-actions .auth-text-button:disabled {
++  opacity: 0.6;
++  cursor: wait;
++}
++
++.otp-resend-wait {
++  color: var(--color-ink-muted);
++  font-size: var(--text-xs);
++  font-variant-numeric: tabular-nums;
++}
++
++.otp-resend-wait b {
++  color: var(--color-ink);
++}
++
++/* ---------- Registration with Firebase Phone Auth ---------- */
++.recaptcha-host:empty {
++  display: none;
++}
++
++/* Google allows hiding the floating badge when the notice below is visible in the flow. */
++.grecaptcha-badge {
++  visibility: hidden;
++}
++
++.recaptcha-note {
++  margin: var(--space-sm) 0 0;
++  color: var(--color-ink-muted);
++  font-size: var(--text-xs);
++  text-align: center;
++  text-wrap: pretty;
++}
++
++.recaptcha-note a {
++  color: var(--color-accent);
++}
+diff --git a/frontend/src/context/AuthContext.jsx b/frontend/src/context/AuthContext.jsx
+index 828c0b9..4251421 100644
+--- a/frontend/src/context/AuthContext.jsx
++++ b/frontend/src/context/AuthContext.jsx
+@@ -82,6 +82,13 @@ export function AuthProvider({ children }) {
+     },
+     [mergeLocalWishlist, persistSession],
+   );
++  const registerWithFirebase = useCallback(
++    async (payload) => {
++      const session = persistSession(await authApi.registerWithFirebase(payload));
++      return mergeLocalWishlist(session);
++    },
++    [mergeLocalWishlist, persistSession],
++  );
+ 
+   const updateProfile = useCallback(
+     async (payload) => {
+@@ -139,6 +146,7 @@ export function AuthProvider({ children }) {
+       login,
+       requestRegistrationOtp,
+       verifyRegistrationOtp,
++      registerWithFirebase,
+       logout,
+       updateProfile,
+       updateLocalUser,
+@@ -147,7 +155,7 @@ export function AuthProvider({ children }) {
+       setWishlist,
+       loadCurrentUser,
+     }),
+-    [changePassword, loadCurrentUser, loading, login, logout, requestRegistrationOtp, setWishlist, token, toggleWishlist, updateLocalUser, updateProfile, user, verifyRegistrationOtp],
++    [changePassword, loadCurrentUser, loading, login, logout, registerWithFirebase, requestRegistrationOtp, setWishlist, token, toggleWishlist, updateLocalUser, updateProfile, user, verifyRegistrationOtp],
+   );
+ 
+   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+diff --git a/frontend/src/mock/mockAuthOtp.test.js b/frontend/src/mock/mockAuthOtp.test.js
+index 2375fee..cbd6c77 100644
+--- a/frontend/src/mock/mockAuthOtp.test.js
++++ b/frontend/src/mock/mockAuthOtp.test.js
+@@ -1,4 +1,4 @@
+-import { afterEach, describe, expect, it } from 'vitest';
++import { afterEach, describe, expect, it, vi } from 'vitest';
+ import { mockDb } from './mockDb';
+ 
+ describe('mock OTP authentication', () => {
+@@ -19,6 +19,22 @@ describe('mock OTP authentication', () => {
+     expect(session.user.email).toBeUndefined();
+   });
+ 
++  it('makes the same phone wait 60 seconds before another registration code', async () => {
++    const payload = { fullName: 'Resend User', phone: '0955555555', password: '123456' };
++    const first = await mockDb.requestRegistrationOtp(payload);
++    expect(first.resendInSeconds).toBe(60);
++
++    await expect(mockDb.requestRegistrationOtp(payload)).rejects.toMatchObject({ response: { status: 429 } });
++
++    vi.useFakeTimers({ toFake: ['Date'] });
++    try {
++      vi.setSystemTime(Date.now() + 61 * 1000);
++      await expect(mockDb.requestRegistrationOtp(payload)).resolves.toMatchObject({ resendInSeconds: 60 });
++    } finally {
++      vi.useRealTimers();
++    }
++  });
++
+   it('resets a password through SMS using the phone number', async () => {
+     const requested = await mockDb.requestPasswordReset('0911111111');
+     await mockDb.resetPassword('0911111111', requested.debugOtp, 'new-password');
+diff --git a/frontend/src/mock/mockDb.js b/frontend/src/mock/mockDb.js
+index f1c3e33..daebcc3 100644
+--- a/frontend/src/mock/mockDb.js
++++ b/frontend/src/mock/mockDb.js
+@@ -57,6 +57,7 @@ const createId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(3
+ const readOtpRequests = () => storage.get(STORAGE_KEYS.mockOtpRequests, []);
+ const writeOtpRequests = (items) => storage.set(STORAGE_KEYS.mockOtpRequests, items);
+ const mockOtp = '123456';
++const OTP_RESEND_SECONDS = 60;
+ const vnpayCheckoutAuthorization = Symbol('mock-vnpay-checkout');
+ const currentMockUser = () => {
+   const currentUser = storage.get(STORAGE_KEYS.currentUser);
+@@ -163,19 +164,30 @@ export const mockDb = {
+     const phone = normalizeVietnamesePhone(payload.phone);
+     if (!phone) fail('Số điện thoại Việt Nam không hợp lệ');
+     if (users.some((user) => user.phone === phone)) fail('Số điện thoại đã được sử dụng');
++    const previous = readOtpRequests().find(
++      (item) => item.purpose === 'register' && item.target === phone && item.expiresAt > Date.now(),
++    );
++    const waitSeconds = previous?.createdAt ? Math.ceil(OTP_RESEND_SECONDS - (Date.now() - previous.createdAt) / 1000) : 0;
++    if (waitSeconds > 0) fail(`Vui lòng đợi ${waitSeconds} giây rồi gửi lại mã.`, 429);
+     const request = {
+       id: createId('otp'),
+       purpose: 'register',
+       target: phone,
+       otp: mockOtp,
+       payload: { ...payload, phone },
++      createdAt: Date.now(),
+       expiresAt: Date.now() + 10 * 60 * 1000,
+     };
+     writeOtpRequests([
+       request,
+       ...readOtpRequests().filter((item) => !(item.purpose === request.purpose && item.target === request.target)),
+     ]);
+-    return wait({ deliveryTarget: `${phone.slice(0, 3)}***${phone.slice(-3)}`, expiresInSeconds: 600, debugOtp: mockOtp });
++    return wait({
++      deliveryTarget: `${phone.slice(0, 3)}***${phone.slice(-3)}`,
++      expiresInSeconds: 600,
++      resendInSeconds: OTP_RESEND_SECONDS,
++      debugOtp: mockOtp,
++    });
+   },
+ 
+   async verifyRegistrationOtp(phone, otp) {
+diff --git a/frontend/src/pages/PhoneAuthPages.test.jsx b/frontend/src/pages/PhoneAuthPages.test.jsx
+index 843a832..cfe94d4 100644
+--- a/frontend/src/pages/PhoneAuthPages.test.jsx
++++ b/frontend/src/pages/PhoneAuthPages.test.jsx
+@@ -1,16 +1,16 @@
+-import { cleanup, render, screen } from '@testing-library/react';
++import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+ import { MemoryRouter } from 'react-router-dom';
+ import { afterEach, describe, expect, it, vi } from 'vitest';
+ import ForgotPassword from './ForgotPassword';
+ import Register from './Register';
+ 
+-vi.mock('../hooks/useAuth', () => ({
+-  useAuth: () => ({
+-    logout: vi.fn(),
+-    requestRegistrationOtp: vi.fn(),
+-    verifyRegistrationOtp: vi.fn(),
+-  }),
++const auth = vi.hoisted(() => ({
++  logout: vi.fn(),
++  requestRegistrationOtp: vi.fn(),
++  verifyRegistrationOtp: vi.fn(),
+ }));
++
++vi.mock('../hooks/useAuth', () => ({ useAuth: () => auth }));
+ vi.mock('../api/authApi', () => ({
+   authApi: {
+     requestPasswordReset: vi.fn(),
+@@ -20,7 +20,37 @@ vi.mock('../api/authApi', () => ({
+ vi.mock('react-toastify', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+ 
+ describe('phone-only authentication pages', () => {
+-  afterEach(cleanup);
++  afterEach(() => {
++    cleanup();
++    vi.useRealTimers();
++    vi.clearAllMocks();
++  });
++
++  it('locks "Gửi lại mã" for 60 seconds, then sends a new code', async () => {
++    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
++    auth.requestRegistrationOtp.mockResolvedValue({ deliveryTarget: '091***678', debugOtp: '123456', resendInSeconds: 60 });
++    render(<MemoryRouter><Register /></MemoryRouter>);
++
++    fireEvent.change(screen.getByLabelText('Họ và tên'), { target: { value: 'Trần Thu Hà' } });
++    fireEvent.change(screen.getByLabelText('Số điện thoại'), { target: { value: '0912345678' } });
++    fireEvent.change(screen.getByLabelText('Mật khẩu'), { target: { value: '123456' } });
++    fireEvent.change(screen.getByLabelText('Xác nhận mật khẩu'), { target: { value: '123456' } });
++    fireEvent.click(screen.getByRole('button', { name: 'Gửi mã xác minh' }));
++
++    expect(await screen.findByRole('heading', { name: 'Nhập mã OTP' })).toBeInTheDocument();
++    expect(screen.getByText(/Gửi lại mã sau/)).toHaveTextContent('Gửi lại mã sau 60 giây');
++    expect(screen.queryByRole('button', { name: 'Gửi lại mã' })).not.toBeInTheDocument();
++
++    act(() => { vi.advanceTimersByTime(30000); });
++    expect(screen.getByText(/Gửi lại mã sau/)).toHaveTextContent('30 giây');
++
++    act(() => { vi.advanceTimersByTime(30000); });
++    fireEvent.click(screen.getByRole('button', { name: 'Gửi lại mã' }));
++
++    expect(await screen.findByText(/Gửi lại mã sau/)).toHaveTextContent('60 giây');
++    expect(auth.requestRegistrationOtp).toHaveBeenCalledTimes(2);
++    expect(auth.requestRegistrationOtp).toHaveBeenLastCalledWith({ fullName: 'Trần Thu Hà', phone: '0912345678', password: '123456' });
++  });
+ 
+   it('registers with a phone and explains SMS verification without email', () => {
+     render(<MemoryRouter><Register /></MemoryRouter>);
+diff --git a/frontend/src/pages/Register.jsx b/frontend/src/pages/Register.jsx
+index 8372ca4..3cadaa0 100644
+--- a/frontend/src/pages/Register.jsx
++++ b/frontend/src/pages/Register.jsx
+@@ -1,14 +1,30 @@
+-import { useState } from 'react';
++import { useEffect, useRef, useState } from 'react';
+ import { FiKey, FiLock, FiPhone, FiUserPlus } from 'react-icons/fi';
+ import { Link, useNavigate } from 'react-router-dom';
+ import { toast } from 'react-toastify';
++import { authApi } from '../api/authApi';
++import { confirmPhoneCode, releasePhoneVerifier, sendPhoneCode } from '../api/firebasePhoneApi';
+ import { useAuth } from '../hooks/useAuth';
+-import { isStrongEnoughPassword, isValidVietnamesePhone, validateRequired } from '../utils/validators';
++import { runtimeConfig } from '../utils/runtimeConfig';
++import { isStrongEnoughPassword, isValidVietnamesePhone, normalizeVietnamesePhone, validateRequired } from '../utils/validators';
+ import StoreBrand from '../components/common/StoreBrand';
+ 
++const RESEND_SECONDS = 60;
++const maskPhone = (value) => {
++  const phone = normalizeVietnamesePhone(value) || String(value);
++  return `${phone.slice(0, 3)}***${phone.slice(-3)}`;
++};
++
+ export default function Register() {
+   const navigate = useNavigate();
+-  const { requestRegistrationOtp, verifyRegistrationOtp, logout } = useAuth();
++  const { requestRegistrationOtp, verifyRegistrationOtp, registerWithFirebase, logout } = useAuth();
++  // 'firebase': Firebase sends and checks the SMS code; 'server': our backend does (mock/dev shows the code).
++  const useFirebase = runtimeConfig.phoneOtpProvider === 'firebase';
++  const recaptchaHostRef = useRef(null);
++  const confirmationRef = useRef(null);
++  // Kept after a successful Firebase check so a failed account request can be retried without a new SMS.
++  const idTokenRef = useRef(null);
++  const sentPhoneRef = useRef('');
+   const [form, setForm] = useState({ fullName: '', phone: '', password: '', confirmPassword: '' });
+   const [errors, setErrors] = useState({});
+   const [loading, setLoading] = useState(false);
+@@ -16,12 +32,56 @@ export default function Register() {
+   const [otp, setOtp] = useState('');
+   const [deliveryTarget, setDeliveryTarget] = useState('');
+   const [isDebugOtp, setIsDebugOtp] = useState(false);
++  const [resending, setResending] = useState(false);
++  // The resend button unlocks when the clock passes resendAt; `now` ticks once a second meanwhile.
++  const [resendAt, setResendAt] = useState(0);
++  const [now, setNow] = useState(0);
++  const resendIn = Math.max(0, Math.ceil((resendAt - now) / 1000));
++
++  useEffect(() => {
++    if (!resendAt) return undefined;
++    const timer = setInterval(() => {
++      const current = Date.now();
++      setNow(current);
++      if (current >= resendAt) clearInterval(timer);
++    }, 1000);
++    return () => clearInterval(timer);
++  }, [resendAt]);
++
++  useEffect(() => (useFirebase ? releasePhoneVerifier : undefined), [useFirebase]);
+ 
+   const update = (key, value) => {
+     setForm({ ...form, [key]: value });
+     setErrors({ ...errors, [key]: '' });
+   };
+ 
++  const requestCode = async (payload) => {
++    if (!useFirebase) return requestRegistrationOtp(payload);
++    await authApi.checkRegistrationPhone(payload.phone);
++    idTokenRef.current = null;
++    confirmationRef.current = await sendPhoneCode(payload.phone, recaptchaHostRef.current);
++    return { deliveryTarget: maskPhone(payload.phone), resendInSeconds: RESEND_SECONDS };
++  };
++
++  const createAccount = async (payload) => {
++    if (!useFirebase) return verifyRegistrationOtp({ phone: payload.phone, otp });
++    if (!confirmationRef.current) throw new Error('Vui lòng bấm "Gửi lại mã" để nhận mã mới.');
++    idTokenRef.current ||= await confirmPhoneCode(confirmationRef.current, otp);
++    return registerWithFirebase({ ...payload, idToken: idTokenRef.current });
++  };
++
++  const sendCode = async () => {
++    const { confirmPassword: _confirmPassword, ...payload } = form;
++    const result = await requestCode(payload);
++    sentPhoneRef.current = normalizeVietnamesePhone(payload.phone);
++    const current = Date.now();
++    setDeliveryTarget(result.deliveryTarget || form.phone);
++    setIsDebugOtp(Boolean(result.debugOtp));
++    setNow(current);
++    setResendAt(current + (result.resendInSeconds || RESEND_SECONDS) * 1000);
++    return result;
++  };
++
+   const submitDetails = async (event) => {
+     event.preventDefault();
+     const nextErrors = validateRequired(form);
+@@ -30,12 +90,13 @@ export default function Register() {
+     if (form.password !== form.confirmPassword) nextErrors.confirmPassword = 'Mật khẩu xác nhận không khớp';
+     setErrors(nextErrors);
+     if (Object.keys(nextErrors).length) return toast.error('Vui lòng kiểm tra thông tin đăng ký');
++    // Going back and resubmitting the same number must respect the resend countdown too.
++    if (resendIn > 0 && normalizeVietnamesePhone(form.phone) === sentPhoneRef.current) {
++      return toast.error(`Vui lòng đợi ${resendIn} giây rồi gửi lại mã.`);
++    }
+     setLoading(true);
+     try {
+-      const { confirmPassword: _confirmPassword, ...payload } = form;
+-      const result = await requestRegistrationOtp(payload);
+-      setDeliveryTarget(result.deliveryTarget || form.phone);
+-      setIsDebugOtp(Boolean(result.debugOtp));
++      const result = await sendCode();
+       setStep('otp');
+       toast.success(result.debugOtp ? `Mã OTP SMS thử nghiệm: ${result.debugOtp}` : 'Đã gửi mã OTP qua SMS');
+     } catch (error) {
+@@ -45,12 +106,27 @@ export default function Register() {
+     }
+   };
+ 
++  const resendOtp = async () => {
++    if (resendIn > 0 || resending) return;
++    setResending(true);
++    try {
++      const result = await sendCode();
++      setOtp('');
++      toast.success(result.debugOtp ? `Mã OTP SMS thử nghiệm mới: ${result.debugOtp}` : 'Đã gửi lại mã OTP qua SMS');
++    } catch (error) {
++      toast.error(error.friendlyMessage || error.message);
++    } finally {
++      setResending(false);
++    }
++  };
++
+   const submitOtp = async (event) => {
+     event.preventDefault();
+     if (!/^\d{6}$/.test(otp)) return toast.error('Vui lòng nhập mã OTP gồm 6 chữ số');
+     setLoading(true);
+     try {
+-      await verifyRegistrationOtp({ phone: form.phone, otp });
++      const { confirmPassword: _confirmPassword, ...payload } = form;
++      await createAccount(payload);
+       logout();
+       toast.success('Xác minh số điện thoại và đăng ký thành công. Vui lòng đăng nhập!');
+       navigate('/login', { replace: true });
+@@ -86,11 +162,30 @@ export default function Register() {
+           ) : (
+             <>
+               <label className="input-with-icon otp-input"><span>Mã OTP</span><div><FiKey /><input inputMode="numeric" maxLength="6" value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, ''))} placeholder="••••••" /></div></label>
+-              <button type="button" className="auth-text-button" onClick={() => setStep('details')}>Quay lại sửa thông tin</button>
++              <div className="otp-actions">
++                <button type="button" className="auth-text-button" onClick={() => setStep('details')}>Quay lại sửa thông tin</button>
++                {resendIn > 0 ? (
++                  <span className="otp-resend-wait">Gửi lại mã sau <b>{resendIn}</b> giây</span>
++                ) : (
++                  <button type="button" className="auth-text-button" onClick={resendOtp} disabled={resending || loading}>
++                    {resending ? 'Đang gửi lại…' : 'Gửi lại mã'}
++                  </button>
++                )}
++              </div>
+             </>
+           )}
+           <button className="btn btn-primary auth-submit" disabled={loading}>{loading ? 'Đang xử lý...' : step === 'details' ? 'Gửi mã xác minh' : 'Xác minh và đăng ký'}</button>
+           <p className="auth-switch">Đã có tài khoản? <Link to="/login">Đăng nhập</Link></p>
++          {/* Firebase renders its invisible reCAPTCHA here; it must stay mounted across both steps. */}
++          {useFirebase && (
++            <>
++              <div ref={recaptchaHostRef} className="recaptcha-host" />
++              {/* The floating reCAPTCHA badge is hidden (it covered the chat button), so its notice is shown here instead. */}
++              <p className="recaptcha-note">
++                Trang được bảo vệ bởi reCAPTCHA; áp dụng <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">Chính sách quyền riêng tư</a> và <a href="https://policies.google.com/terms" target="_blank" rel="noreferrer">Điều khoản dịch vụ</a> của Google.
++              </p>
++            </>
++          )}
+         </form>
+       </div>
+     </main>
+diff --git a/frontend/src/utils/runtimeConfig.js b/frontend/src/utils/runtimeConfig.js
+index 9513659..ad7de9b 100644
+--- a/frontend/src/utils/runtimeConfig.js
++++ b/frontend/src/utils/runtimeConfig.js
+@@ -30,11 +30,24 @@ export const createRuntimeConfig = (env = {}) => {
+     throw new Error('VITE_SITE_URL is required in production');
+   }
+ 
++  const firebase = {
++    apiKey: String(env.VITE_FIREBASE_API_KEY || '').trim(),
++    authDomain: String(env.VITE_FIREBASE_AUTH_DOMAIN || '').trim(),
++    projectId: String(env.VITE_FIREBASE_PROJECT_ID || '').trim(),
++    appId: String(env.VITE_FIREBASE_APP_ID || '').trim(),
++  };
++  // Sign-up codes go through Firebase only against the real backend, which checks the Firebase token.
++  const phoneOtpProvider = !useMock && firebase.apiKey && firebase.authDomain && firebase.projectId
++    ? 'firebase'
++    : 'server';
++
+   return {
+     useMock,
+     deploymentTarget,
+     apiUrl,
+     siteUrl,
++    firebase,
++    phoneOtpProvider,
+     cloudinary: {
+       cloudName: env.VITE_CLOUDINARY_CLOUD_NAME || '',
+       uploadPreset: env.VITE_CLOUDINARY_UPLOAD_PRESET || '',
+diff --git a/frontend/src/utils/runtimeConfig.test.js b/frontend/src/utils/runtimeConfig.test.js
+index 408baf6..35acdc4 100644
+--- a/frontend/src/utils/runtimeConfig.test.js
++++ b/frontend/src/utils/runtimeConfig.test.js
+@@ -8,6 +8,20 @@ describe('createRuntimeConfig', () => {
+     expect(createRuntimeConfig({}).useMock).toBe(false);
+   });
+ 
++  it('sends sign-up codes through Firebase only with a full config and the real backend', () => {
++    const firebaseEnv = {
++      VITE_FIREBASE_API_KEY: 'test-api-key',
++      VITE_FIREBASE_AUTH_DOMAIN: 'demo.firebaseapp.com',
++      VITE_FIREBASE_PROJECT_ID: 'demo',
++      VITE_FIREBASE_APP_ID: '1:1:web:1',
++    };
++    expect(createRuntimeConfig(firebaseEnv).phoneOtpProvider).toBe('firebase');
++    expect(createRuntimeConfig(firebaseEnv).firebase.projectId).toBe('demo');
++    expect(createRuntimeConfig({ ...firebaseEnv, VITE_USE_MOCK: 'true' }).phoneOtpProvider).toBe('server');
++    expect(createRuntimeConfig({ ...firebaseEnv, VITE_FIREBASE_PROJECT_ID: '' }).phoneOtpProvider).toBe('server');
++    expect(createRuntimeConfig({}).phoneOtpProvider).toBe('server');
++  });
++
+   it('requires an API URL for a production API build', () => {
+     expect(() => createRuntimeConfig({ PROD: true, VITE_USE_MOCK: 'false' }))
+       .toThrow('VITE_API_URL');
+diff --git a/frontend/vite.config.js b/frontend/vite.config.js
+index 04316d7..ed9d5b8 100644
+--- a/frontend/vite.config.js
++++ b/frontend/vite.config.js
+@@ -41,6 +41,13 @@ export default defineConfig(({ command, mode }) => {
+     test: {
+       environment: 'jsdom',
+       setupFiles: './src/test/setup.js',
++      // Tests must not depend on a developer's local .env: Firebase sign-up is switched on per test.
++      env: {
++        VITE_FIREBASE_API_KEY: '',
++        VITE_FIREBASE_AUTH_DOMAIN: '',
++        VITE_FIREBASE_PROJECT_ID: '',
++        VITE_FIREBASE_APP_ID: '',
++      },
+     },
+     build: {
+       rolldownOptions: {
+diff --git a/backend/src/services/firebaseTokenVerifier.js b/backend/src/services/firebaseTokenVerifier.js
+new file mode 100644
+index 0000000..7f2bb8f
+--- /dev/null
++++ b/backend/src/services/firebaseTokenVerifier.js
+@@ -0,0 +1,79 @@
++const jwt = require('jsonwebtoken');
++const AppError = require('../utils/AppError');
++
++// Firebase signs ID tokens with rotating Google keys published here (X.509 PEM per key id).
++const CERTS_URL = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
++// A sign-in older than this cannot be used to create an account.
++const MAX_SIGN_IN_AGE_SECONDS = 15 * 60;
++const DEFAULT_CACHE_SECONDS = 60 * 60;
++
++const invalidToken = () => new AppError('Xác minh số điện thoại không hợp lệ hoặc đã hết hạn. Vui lòng nhận mã mới.', 401);
++
++class FirebaseTokenVerifier {
++  constructor({ fetchImpl } = {}) {
++    this.fetchImpl = fetchImpl || ((...args) => fetch(...args));
++    this.certs = null;
++    this.certsExpireAt = 0;
++  }
++
++  clearCache() {
++    this.certs = null;
++    this.certsExpireAt = 0;
++  }
++
++  async publicCerts({ refresh = false } = {}) {
++    if (!refresh && this.certs && Date.now() < this.certsExpireAt) return this.certs;
++    let response;
++    try {
++      response = await this.fetchImpl(CERTS_URL, { signal: AbortSignal.timeout(8000) });
++    } catch {
++      throw new AppError('Không thể kết nối dịch vụ xác minh số điện thoại. Vui lòng thử lại sau.', 503);
++    }
++    if (!response.ok) throw new AppError('Không thể kết nối dịch vụ xác minh số điện thoại. Vui lòng thử lại sau.', 503);
++    const maxAge = Number(/max-age=(\d+)/.exec(response.headers.get('cache-control') || '')?.[1]);
++    this.certs = await response.json();
++    this.certsExpireAt = Date.now() + (maxAge || DEFAULT_CACHE_SECONDS) * 1000;
++    return this.certs;
++  }
++
++  async certFor(keyId) {
++    const certs = await this.publicCerts();
++    if (certs[keyId]) return certs[keyId];
++    // Google rotated its keys since the last fetch.
++    const refreshed = await this.publicCerts({ refresh: true });
++    return refreshed[keyId] || null;
++  }
++
++  // Returns the verified claims of a Firebase ID token that signed in with a phone number.
++  async verifyPhoneToken(idToken, projectId) {
++    if (!projectId) throw new AppError('Xác minh số điện thoại bằng Firebase chưa được cấu hình.', 503);
++    const decoded = jwt.decode(idToken, { complete: true });
++    if (!decoded || decoded.header?.alg !== 'RS256' || !decoded.header?.kid) throw invalidToken();
++
++    const cert = await this.certFor(decoded.header.kid);
++    if (!cert) throw invalidToken();
++
++    let claims;
++    try {
++      claims = jwt.verify(idToken, cert, {
++        algorithms: ['RS256'],
++        audience: projectId,
++        issuer: `https://securetoken.google.com/${projectId}`,
++      });
++    } catch {
++      throw invalidToken();
++    }
++
++    const nowSeconds = Math.floor(Date.now() / 1000);
++    const authTime = Number(claims.auth_time);
++    if (!claims.sub || !authTime || authTime > nowSeconds + 60 || nowSeconds - authTime > MAX_SIGN_IN_AGE_SECONDS) {
++      throw invalidToken();
++    }
++    if (claims.firebase?.sign_in_provider !== 'phone' || !claims.phone_number) throw invalidToken();
++    return claims;
++  }
++}
++
++module.exports = new FirebaseTokenVerifier();
++module.exports.FirebaseTokenVerifier = FirebaseTokenVerifier;
++module.exports.CERTS_URL = CERTS_URL;
+diff --git a/backend/tests/firebase-registration.test.js b/backend/tests/firebase-registration.test.js
+new file mode 100644
+index 0000000..d891a37
+--- /dev/null
++++ b/backend/tests/firebase-registration.test.js
+@@ -0,0 +1,129 @@
++const crypto = require('crypto');
++const jwt = require('jsonwebtoken');
++const request = require('supertest');
++const env = require('../src/config/env');
++const User = require('../src/models/User');
++const firebaseTokenVerifier = require('../src/services/firebaseTokenVerifier');
++const { app, createUser } = require('./helpers');
++
++const PROJECT_ID = 'phoneshopai-test';
++const keyPair = () => crypto.generateKeyPairSync('rsa', {
++  modulusLength: 2048,
++  publicKeyEncoding: { type: 'spki', format: 'pem' },
++  privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
++});
++const googleKey = keyPair();
++const strangerKey = keyPair();
++const nowSeconds = () => Math.floor(Date.now() / 1000);
++
++const firebaseToken = ({
++  phone = '+84912345678',
++  provider = 'phone',
++  authTime = nowSeconds(),
++  audience = PROJECT_ID,
++  privateKey = googleKey.privateKey,
++  keyid = 'google-key-1',
++} = {}) => jwt.sign(
++  { phone_number: phone, auth_time: authTime, firebase: { sign_in_provider: provider, identities: { phone: [phone] } } },
++  privateKey,
++  { algorithm: 'RS256', keyid, audience, issuer: `https://securetoken.google.com/${audience}`, subject: 'firebase-uid-1', expiresIn: '1h' },
++);
++
++const details = { fullName: 'Phạm Quốc Huy', phone: '0912345678', password: 'mat-khau-1' };
++const register = (body) => request(app).post('/api/auth/register/firebase').send(body);
++
++describe('Registration with Firebase Phone Auth', () => {
++  let originalProjectId;
++  let originalFetch;
++
++  beforeEach(() => {
++    originalProjectId = env.firebase.projectId;
++    originalFetch = firebaseTokenVerifier.fetchImpl;
++    env.firebase.projectId = PROJECT_ID;
++    firebaseTokenVerifier.clearCache();
++    firebaseTokenVerifier.fetchImpl = jest.fn(async () => ({
++      ok: true,
++      headers: { get: () => 'public, max-age=3600' },
++      json: async () => ({ 'google-key-1': googleKey.publicKey }),
++    }));
++  });
++
++  afterEach(() => {
++    env.firebase.projectId = originalProjectId;
++    firebaseTokenVerifier.fetchImpl = originalFetch;
++    firebaseTokenVerifier.clearCache();
++  });
++
++  it('checks the number before any SMS is sent', async () => {
++    await createUser({ email: 'taken@test.com', phone: '0988888888' });
++
++    const free = await request(app).post('/api/auth/register/check-phone').send({ phone: '+84 912 345 678' });
++    expect(free.status).toBe(200);
++    expect(free.body.data).toEqual({ available: true });
++
++    const taken = await request(app).post('/api/auth/register/check-phone').send({ phone: '0988888888' });
++    expect(taken.status).toBe(409);
++
++    const invalid = await request(app).post('/api/auth/register/check-phone').send({ phone: '12345' });
++    expect(invalid.status).toBe(422);
++  });
++
++  it('creates a verified customer from a valid phone token and lets them log in', async () => {
++    const response = await register({ ...details, idToken: firebaseToken() });
++
++    expect(response.status).toBe(201);
++    expect(response.body.data.token).toBeTruthy();
++    expect(response.body.data.user).toMatchObject({ phone: '0912345678', role: 'customer', phoneVerified: true });
++    expect(response.body.data.user.password).toBeUndefined();
++
++    const stored = await User.findOne({ phone: '0912345678' }).select('+password');
++    expect(stored.password).not.toBe(details.password);
++
++    const loggedIn = await request(app).post('/api/auth/login').send({ identifier: '0912345678', password: details.password });
++    expect(loggedIn.status).toBe(200);
++  });
++
++  it('rejects a token for another phone, project, key or sign-in method', async () => {
++    const cases = [
++      [{ phone: '+84987654321' }, 400],
++      [{ audience: 'another-project' }, 401],
++      [{ privateKey: strangerKey.privateKey }, 401],
++      [{ provider: 'password' }, 401],
++      [{ authTime: nowSeconds() - 20 * 60 }, 401],
++    ];
++    for (const [tokenOptions, status] of cases) {
++      const response = await register({ ...details, idToken: firebaseToken(tokenOptions) });
++      expect({ tokenOptions, status: response.status }).toEqual({ tokenOptions, status });
++    }
++    expect(await User.countDocuments({ phone: '0912345678' })).toBe(0);
++  });
++
++  it('refuses a number that is already registered', async () => {
++    await createUser({ email: 'existing@test.com', phone: '0912345678' });
++    const response = await register({ ...details, idToken: firebaseToken() });
++    expect(response.status).toBe(409);
++  });
++
++  it('does not accept self-assigned roles or a missing token', async () => {
++    const withRole = await register({ ...details, idToken: firebaseToken(), role: 'admin' });
++    expect(withRole.status).toBe(422);
++
++    const withoutToken = await register(details);
++    expect(withoutToken.status).toBe(422);
++  });
++
++  it('refetches Google keys once when the key id is new', async () => {
++    firebaseTokenVerifier.fetchImpl
++      .mockResolvedValueOnce({ ok: true, headers: { get: () => 'max-age=3600' }, json: async () => ({ 'old-key': strangerKey.publicKey }) });
++
++    const response = await register({ ...details, idToken: firebaseToken() });
++    expect(response.status).toBe(201);
++    expect(firebaseTokenVerifier.fetchImpl).toHaveBeenCalledTimes(2);
++  });
++
++  it('answers 503 when Firebase is not configured on the server', async () => {
++    env.firebase.projectId = '';
++    const response = await register({ ...details, idToken: firebaseToken() });
++    expect(response.status).toBe(503);
++  });
++});
+diff --git a/frontend/src/api/firebasePhoneApi.js b/frontend/src/api/firebasePhoneApi.js
+new file mode 100644
+index 0000000..a766221
+--- /dev/null
++++ b/frontend/src/api/firebasePhoneApi.js
+@@ -0,0 +1,107 @@
++import { runtimeConfig } from '../utils/runtimeConfig';
++import { normalizeVietnamesePhone } from '../utils/validators';
++
++// Firebase only proves the phone number. The account itself is created by our backend from the ID token,
++// so the Firebase session lives in memory and is signed out right after the token is read.
++
++const FIREBASE_ERRORS = {
++  'auth/invalid-phone-number': 'Số điện thoại không hợp lệ.',
++  'auth/missing-phone-number': 'Vui lòng nhập số điện thoại.',
++  'auth/invalid-verification-code': 'Mã OTP không đúng. Vui lòng kiểm tra lại.',
++  'auth/missing-verification-code': 'Vui lòng nhập mã OTP gồm 6 chữ số.',
++  'auth/code-expired': 'Mã OTP đã hết hạn. Vui lòng bấm "Gửi lại mã".',
++  'auth/session-expired': 'Mã OTP đã hết hạn. Vui lòng bấm "Gửi lại mã".',
++  'auth/too-many-requests': 'Bạn đã yêu cầu quá nhiều lần. Vui lòng thử lại sau ít phút.',
++  'auth/quota-exceeded': 'Đã hết hạn mức gửi SMS. Vui lòng thử lại sau.',
++  'auth/captcha-check-failed': 'Kiểm tra chống spam (reCAPTCHA) thất bại. Vui lòng tải lại trang rồi thử lại.',
++  'auth/invalid-app-credential': 'Kiểm tra chống spam (reCAPTCHA) không hợp lệ. Vui lòng tải lại trang rồi thử lại.',
++  'auth/network-request-failed': 'Không kết nối được dịch vụ xác minh. Vui lòng kiểm tra mạng.',
++  'auth/operation-not-allowed': 'Firebase chưa cho phép gửi SMS: hãy bật Phone trong Sign-in method và cho phép Việt Nam trong SMS region policy.',
++  'auth/unauthorized-domain': 'Tên miền này chưa được thêm vào Authorized domains của Firebase.',
++  'auth/billing-not-enabled': 'Dự án Firebase chưa bật gói Blaze nên chưa gửi được SMS thật. Hãy dùng số điện thoại thử nghiệm.',
++};
++
++export const firebaseErrorMessage = (error) => {
++  if (FIREBASE_ERRORS[error?.code]) return FIREBASE_ERRORS[error.code];
++  if (error?.code) return `Không xác minh được số điện thoại (${error.code}).`;
++  return 'Không xác minh được số điện thoại. Vui lòng thử lại.';
++};
++
++const friendlyError = (error) => {
++  const wrapped = new Error(firebaseErrorMessage(error));
++  wrapped.friendlyMessage = wrapped.message;
++  wrapped.code = error?.code;
++  return wrapped;
++};
++
++export const toE164 = (phone) => {
++  const normalized = normalizeVietnamesePhone(phone);
++  return normalized ? `+84${normalized.slice(1)}` : '';
++};
++
++let firebasePromise = null;
++let verifier = null;
++let verifierHost = null;
++
++// The SDK is fetched on first use, so only the sign-up page downloads it.
++const loadFirebase = () => {
++  firebasePromise ||= Promise.all([import('firebase/app'), import('firebase/auth')])
++    .then(([appModule, authModule]) => {
++      const app = appModule.initializeApp(runtimeConfig.firebase);
++      const auth = authModule.initializeAuth(app, { persistence: authModule.inMemoryPersistence });
++      auth.languageCode = 'vi';
++      return { auth, authModule };
++    })
++    .catch((error) => {
++      firebasePromise = null;
++      throw error;
++    });
++  return firebasePromise;
++};
++
++export const releasePhoneVerifier = () => {
++  try {
++    verifier?.clear();
++  } catch {
++    // The widget was already removed with the page.
++  }
++  verifierHost?.replaceChildren();
++  verifier = null;
++  verifierHost = null;
++};
++
++// Sends the SMS code. `host` is an element that stays mounted; an invisible reCAPTCHA is rendered inside it.
++export const sendPhoneCode = async (phone, host) => {
++  let firebase;
++  try {
++    firebase = await loadFirebase();
++  } catch (error) {
++    throw friendlyError(error);
++  }
++  const { auth, authModule } = firebase;
++  // A fresh widget per send: an invisible reCAPTCHA token cannot be reused for "Gửi lại mã".
++  releasePhoneVerifier();
++  const mount = document.createElement('div');
++  host.replaceChildren(mount);
++  verifierHost = host;
++  verifier = new authModule.RecaptchaVerifier(auth, mount, { size: 'invisible' });
++  try {
++    return await authModule.signInWithPhoneNumber(auth, toE164(phone), verifier);
++  } catch (error) {
++    releasePhoneVerifier();
++    throw friendlyError(error);
++  }
++};
++
++// Checks the code with Firebase and returns the ID token our backend verifies.
++export const confirmPhoneCode = async (confirmation, code) => {
++  const { auth, authModule } = await loadFirebase();
++  try {
++    const credential = await confirmation.confirm(code);
++    return await credential.user.getIdToken();
++  } catch (error) {
++    throw friendlyError(error);
++  } finally {
++    await authModule.signOut(auth).catch(() => {});
++  }
++};
+diff --git a/frontend/src/api/firebasePhoneApi.test.js b/frontend/src/api/firebasePhoneApi.test.js
+new file mode 100644
+index 0000000..630764e
+--- /dev/null
++++ b/frontend/src/api/firebasePhoneApi.test.js
+@@ -0,0 +1,85 @@
++import { afterEach, describe, expect, it, vi } from 'vitest';
++
++const firebase = vi.hoisted(() => ({
++  auth: { languageCode: null },
++  verifiers: [],
++  initializeApp: vi.fn(() => ({ name: 'phoneshopai' })),
++  initializeAuth: vi.fn(),
++  signInWithPhoneNumber: vi.fn(),
++  signOut: vi.fn(async () => {}),
++}));
++
++vi.mock('firebase/app', () => ({ initializeApp: firebase.initializeApp }));
++vi.mock('firebase/auth', () => ({
++  initializeAuth: firebase.initializeAuth.mockImplementation(() => firebase.auth),
++  inMemoryPersistence: { type: 'NONE' },
++  RecaptchaVerifier: vi.fn(function RecaptchaVerifier(auth, element, options) {
++    this.element = element;
++    this.options = options;
++    this.clear = vi.fn();
++    firebase.verifiers.push(this);
++  }),
++  signInWithPhoneNumber: firebase.signInWithPhoneNumber,
++  signOut: firebase.signOut,
++}));
++vi.mock('../utils/runtimeConfig', () => ({
++  runtimeConfig: { firebase: { apiKey: 'key', authDomain: 'demo.firebaseapp.com', projectId: 'demo', appId: 'app' } },
++}));
++
++const { confirmPhoneCode, firebaseErrorMessage, releasePhoneVerifier, sendPhoneCode, toE164 } = await import('./firebasePhoneApi');
++
++describe('Firebase phone verification helpers', () => {
++  afterEach(() => {
++    releasePhoneVerifier();
++    firebase.verifiers.length = 0;
++    vi.clearAllMocks();
++  });
++
++  it('formats Vietnamese numbers for Firebase', () => {
++    expect(toE164('0912 345 678')).toBe('+84912345678');
++    expect(toE164('+84 912 345 678')).toBe('+84912345678');
++    expect(toE164('12345')).toBe('');
++  });
++
++  it('sends the code with a fresh invisible reCAPTCHA each time, in memory and in Vietnamese', async () => {
++    const host = document.createElement('div');
++    firebase.signInWithPhoneNumber.mockResolvedValue({ confirm: vi.fn() });
++
++    const confirmation = await sendPhoneCode('0912345678', host);
++
++    expect(confirmation).toHaveProperty('confirm');
++    expect(firebase.initializeAuth).toHaveBeenCalledWith({ name: 'phoneshopai' }, { persistence: { type: 'NONE' } });
++    expect(firebase.auth.languageCode).toBe('vi');
++    expect(firebase.signInWithPhoneNumber).toHaveBeenCalledWith(firebase.auth, '+84912345678', firebase.verifiers[0]);
++    expect(firebase.verifiers[0].options).toEqual({ size: 'invisible' });
++    expect(host.children).toHaveLength(1);
++
++    await sendPhoneCode('0912345678', host);
++    expect(firebase.verifiers[0].clear).toHaveBeenCalled();
++    expect(firebase.verifiers).toHaveLength(2);
++    expect(host.children).toHaveLength(1);
++  });
++
++  it('turns Firebase errors into Vietnamese messages and drops the used widget', async () => {
++    const host = document.createElement('div');
++    firebase.signInWithPhoneNumber.mockRejectedValue({ code: 'auth/too-many-requests' });
++
++    await expect(sendPhoneCode('0912345678', host)).rejects.toMatchObject({
++      friendlyMessage: 'Bạn đã yêu cầu quá nhiều lần. Vui lòng thử lại sau ít phút.',
++    });
++    expect(firebase.verifiers[0].clear).toHaveBeenCalled();
++    expect(host.children).toHaveLength(0);
++    expect(firebaseErrorMessage({ code: 'auth/something-new' })).toContain('auth/something-new');
++  });
++
++  it('returns the ID token and signs out of Firebase whatever the outcome', async () => {
++    const confirmation = { confirm: vi.fn().mockResolvedValue({ user: { getIdToken: async () => 'firebase-id-token' } }) };
++    await expect(confirmPhoneCode(confirmation, '246810')).resolves.toBe('firebase-id-token');
++    expect(confirmation.confirm).toHaveBeenCalledWith('246810');
++    expect(firebase.signOut).toHaveBeenCalledTimes(1);
++
++    const wrong = { confirm: vi.fn().mockRejectedValue({ code: 'auth/invalid-verification-code' }) };
++    await expect(confirmPhoneCode(wrong, '000000')).rejects.toMatchObject({ friendlyMessage: 'Mã OTP không đúng. Vui lòng kiểm tra lại.' });
++    expect(firebase.signOut).toHaveBeenCalledTimes(2);
++  });
++});
+diff --git a/frontend/src/pages/RegisterFirebase.test.jsx b/frontend/src/pages/RegisterFirebase.test.jsx
+new file mode 100644
+index 0000000..d5ea94d
+--- /dev/null
++++ b/frontend/src/pages/RegisterFirebase.test.jsx
+@@ -0,0 +1,116 @@
++import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
++import { MemoryRouter, Route, Routes } from 'react-router-dom';
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import Register from './Register';
++
++const auth = vi.hoisted(() => ({
++  logout: vi.fn(),
++  requestRegistrationOtp: vi.fn(),
++  verifyRegistrationOtp: vi.fn(),
++  registerWithFirebase: vi.fn(),
++}));
++const firebasePhone = vi.hoisted(() => ({
++  sendPhoneCode: vi.fn(),
++  confirmPhoneCode: vi.fn(),
++  releasePhoneVerifier: vi.fn(),
++}));
++const api = vi.hoisted(() => ({ checkRegistrationPhone: vi.fn() }));
++const toast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
++
++vi.mock('../hooks/useAuth', () => ({ useAuth: () => auth }));
++vi.mock('../api/firebasePhoneApi', () => firebasePhone);
++vi.mock('../api/authApi', () => ({ authApi: api }));
++vi.mock('react-toastify', () => ({ toast }));
++vi.mock('../utils/runtimeConfig', async (importOriginal) => {
++  const actual = await importOriginal();
++  return { ...actual, runtimeConfig: { ...actual.runtimeConfig, phoneOtpProvider: 'firebase' } };
++});
++
++const renderRegister = () => render(
++  <MemoryRouter initialEntries={['/register']}>
++    <Routes>
++      <Route path="/register" element={<Register />} />
++      <Route path="/login" element={<p>Trang đăng nhập</p>} />
++    </Routes>
++  </MemoryRouter>,
++);
++
++const fillDetails = () => {
++  fireEvent.change(screen.getByLabelText('Họ và tên'), { target: { value: 'Võ Minh Thư' } });
++  fireEvent.change(screen.getByLabelText('Số điện thoại'), { target: { value: '0900000111' } });
++  fireEvent.change(screen.getByLabelText('Mật khẩu'), { target: { value: 'mk-thu-2026' } });
++  fireEvent.change(screen.getByLabelText('Xác nhận mật khẩu'), { target: { value: 'mk-thu-2026' } });
++  fireEvent.click(screen.getByRole('button', { name: 'Gửi mã xác minh' }));
++};
++
++const enterCode = (code) => {
++  fireEvent.change(screen.getByLabelText('Mã OTP'), { target: { value: code } });
++  fireEvent.click(screen.getByRole('button', { name: 'Xác minh và đăng ký' }));
++};
++
++describe('Register with Firebase Phone Auth', () => {
++  afterEach(() => {
++    cleanup();
++    vi.clearAllMocks();
++  });
++
++  it('checks the number, lets Firebase send and check the code, then creates the account', async () => {
++    const confirmation = { confirm: vi.fn() };
++    api.checkRegistrationPhone.mockResolvedValue({ available: true });
++    firebasePhone.sendPhoneCode.mockResolvedValue(confirmation);
++    firebasePhone.confirmPhoneCode.mockResolvedValue('firebase-id-token');
++    auth.registerWithFirebase.mockResolvedValue({ user: { id: 'u1' } });
++    renderRegister();
++
++    expect(screen.getByText(/bảo vệ bởi reCAPTCHA/)).toBeInTheDocument();
++    fillDetails();
++
++    expect(await screen.findByRole('heading', { name: 'Nhập mã OTP' })).toBeInTheDocument();
++    expect(screen.getByText(/đã được gửi qua SMS đến 090\*\*\*111/)).toBeInTheDocument();
++    expect(api.checkRegistrationPhone).toHaveBeenCalledWith('0900000111');
++    expect(firebasePhone.sendPhoneCode).toHaveBeenCalledWith('0900000111', expect.any(HTMLDivElement));
++    expect(auth.requestRegistrationOtp).not.toHaveBeenCalled();
++
++    enterCode('246810');
++
++    expect(await screen.findByText('Trang đăng nhập')).toBeInTheDocument();
++    expect(firebasePhone.confirmPhoneCode).toHaveBeenCalledWith(confirmation, '246810');
++    expect(auth.registerWithFirebase).toHaveBeenCalledWith({
++      fullName: 'Võ Minh Thư',
++      phone: '0900000111',
++      password: 'mk-thu-2026',
++      idToken: 'firebase-id-token',
++    });
++    expect(auth.logout).toHaveBeenCalled();
++  });
++
++  it('does not spend an SMS on a number that is already registered', async () => {
++    api.checkRegistrationPhone.mockRejectedValue(Object.assign(new Error('409'), { friendlyMessage: 'Số điện thoại này đã được đăng ký' }));
++    renderRegister();
++    fillDetails();
++
++    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Số điện thoại này đã được đăng ký'));
++    expect(firebasePhone.sendPhoneCode).not.toHaveBeenCalled();
++    expect(screen.getByRole('heading', { name: 'Đăng ký thành viên' })).toBeInTheDocument();
++  });
++
++  it('retries the account request with the same verified token instead of a new SMS', async () => {
++    api.checkRegistrationPhone.mockResolvedValue({ available: true });
++    firebasePhone.sendPhoneCode.mockResolvedValue({ confirm: vi.fn() });
++    firebasePhone.confirmPhoneCode.mockResolvedValue('firebase-id-token');
++    auth.registerWithFirebase
++      .mockRejectedValueOnce(Object.assign(new Error('offline'), { friendlyMessage: 'Không thể kết nối máy chủ' }))
++      .mockResolvedValueOnce({ user: { id: 'u1' } });
++    renderRegister();
++    fillDetails();
++    await screen.findByRole('heading', { name: 'Nhập mã OTP' });
++
++    enterCode('246810');
++    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Không thể kết nối máy chủ'));
++    fireEvent.click(screen.getByRole('button', { name: 'Xác minh và đăng ký' }));
++
++    expect(await screen.findByText('Trang đăng nhập')).toBeInTheDocument();
++    expect(firebasePhone.confirmPhoneCode).toHaveBeenCalledTimes(1);
++    expect(auth.registerWithFirebase).toHaveBeenCalledTimes(2);
++  });
++});

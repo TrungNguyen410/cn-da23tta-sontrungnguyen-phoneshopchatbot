@@ -10,9 +10,9 @@ const activeUserIndexes = [
   {
     key: { phone: 1 },
     options: {
-      name: 'user_phone_active_unique',
+      name: 'user_phone_set_active_unique',
       unique: true,
-      partialFilterExpression: { isDeleted: false },
+      partialFilterExpression: { phone: { $type: 'string' }, isDeleted: false },
     },
   },
   {
@@ -118,7 +118,7 @@ describe('phone auth data migration', () => {
     const activeState = await userIndexState();
     expect(activeState.map((index) => index.name).sort()).toEqual([
       'user_email_active_unique',
-      'user_phone_active_unique',
+      'user_phone_set_active_unique',
     ]);
 
     await migratePhoneAuth({ write: true, log: () => {}, User });

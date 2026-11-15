@@ -223,12 +223,12 @@ describe('axiosClient session refresh', () => {
     };
 
     await authApi.login({ identifier: '0912345678', password: '123456' });
-    await authApi.requestRegistrationOtp({
+    await authApi.register({
       fullName: 'Test User',
       password: '123456',
       phone: '0912345678',
     });
-    await authApi.verifyRegistrationOtp({ phone: '0912345678', otp: '123456' });
+    await authApi.loginWithSocial('firebase-id-token');
     await authApi.requestPasswordReset({ identifier: '0912345678' });
     await authApi.resetPassword({
       identifier: '0912345678',
@@ -240,8 +240,8 @@ describe('axiosClient session refresh', () => {
 
     expect(requests).toEqual([
       { skipAuthRefresh: true, url: '/auth/login' },
-      { skipAuthRefresh: true, url: '/auth/register/request-otp' },
-      { skipAuthRefresh: true, url: '/auth/register/verify-otp' },
+      { skipAuthRefresh: true, url: '/auth/register' },
+      { skipAuthRefresh: true, url: '/auth/social' },
       { skipAuthRefresh: true, url: '/auth/forgot-password/request-otp' },
       { skipAuthRefresh: true, url: '/auth/forgot-password/reset' },
       { skipAuthRefresh: true, url: '/auth/refresh' },

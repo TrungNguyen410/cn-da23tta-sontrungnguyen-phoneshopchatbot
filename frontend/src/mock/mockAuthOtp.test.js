@@ -1,22 +1,21 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { mockDb } from './mockDb';
 
-describe('mock OTP authentication', () => {
+describe('mock phone authentication', () => {
   afterEach(() => mockDb.reset());
 
-  it('does not create a registration before OTP verification', async () => {
-    const payload = {
-      fullName: 'OTP User',
-      phone: '0966666666',
-      password: '123456',
-    };
-    const requested = await mockDb.requestRegistrationOtp(payload);
-    expect((await mockDb.list('users')).some((user) => user.phone === payload.phone)).toBe(false);
+  it('registers a phone account at once, without OTP, and lets it log in', async () => {
+    const payload = { fullName: 'Direct User', phone: '+84 966 666 666', password: '123456' };
 
-    const session = await mockDb.verifyRegistrationOtp(payload.phone, requested.debugOtp);
-    expect(session.user.phone).toBe(payload.phone);
-    expect(session.user.phoneVerified).toBe(true);
-    expect(session.user.email).toBeUndefined();
+    const registered = await mockDb.register(payload);
+
+    expect(registered.token).toBeUndefined();
+    expect(registered.user).toMatchObject({ phone: '0966666666', authProvider: 'phone', phoneVerified: false });
+    expect(registered.user.password).toBeUndefined();
+    expect(registered.user.email).toBeUndefined();
+    const session = await mockDb.login('0966666666', '123456');
+    expect(session.user.fullName).toBe('Direct User');
+    await expect(mockDb.register(payload)).rejects.toThrow();
   });
 
   it('resets a password through SMS using the phone number', async () => {

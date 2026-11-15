@@ -18,7 +18,7 @@ Website bán điện thoại và phụ kiện, tích hợp **Chatbot AI** (Googl
 ## Chức năng
 
 ### Kế thừa & hoàn thiện (hệ thống bán hàng)
-- Khách hàng: trang chủ, tìm kiếm/lọc/sắp xếp sản phẩm, chi tiết, so sánh, giỏ hàng, voucher, đặt hàng, tra cứu đơn, đánh giá, tài khoản (đăng ký/đăng nhập JWT, OTP).
+- Khách hàng: trang chủ, tìm kiếm/lọc/sắp xếp sản phẩm, chi tiết, so sánh, giỏ hàng, voucher, đặt hàng, tra cứu đơn, đánh giá, tài khoản (đăng ký số điện thoại + mật khẩu, đăng nhập JWT hoặc Google/Facebook qua Firebase, quên mật khẩu bằng OTP).
 - Thanh toán: COD, chuyển khoản VietQR, MoMo, VNPay (sandbox).
 - Quản trị: dashboard doanh thu, sản phẩm, phụ kiện, đơn hàng, khách hàng, đánh giá, banner, voucher, danh mục, thương hiệu, cài đặt.
 

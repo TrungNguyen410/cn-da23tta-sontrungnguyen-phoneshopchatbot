@@ -35,6 +35,11 @@ class UserRepository extends BaseRepository {
     return User.findOne({ phone: normalized, isDeleted: false });
   }
 
+  async findByFirebaseUid(firebaseUid) {
+    if (!firebaseUid) return null;
+    return User.findOne({ firebaseUid: String(firebaseUid), isDeleted: false });
+  }
+
   async findByIdWithPassword(id) {
     return User.findOne({ _id: id, isDeleted: false }).select('+password');
   }

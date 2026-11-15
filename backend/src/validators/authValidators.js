@@ -21,8 +21,23 @@ const register = [
   body('role').not().exists().withMessage('Không được chỉ định vai trò khi đăng ký'),
   body('email').not().exists().withMessage('Đăng ký tài khoản không sử dụng email'),
   body('status').not().exists().withMessage('Không được chỉ định trạng thái khi đăng ký'),
-  body('channel').not().exists().withMessage('Không được chỉ định kênh OTP khi đăng ký'),
   body('phoneVerified').not().exists().withMessage('Không được tự xác minh số điện thoại'),
+  body('authProvider').not().exists().withMessage('Không được chỉ định cách đăng nhập khi đăng ký'),
+  body('firebaseUid').not().exists().withMessage('Không được chỉ định tài khoản Firebase khi đăng ký'),
+];
+
+// Only the Firebase ID token is accepted; name, email and avatar come from its verified claims.
+const socialLogin = [
+  body('idToken')
+    .isString().withMessage('Thiếu mã đăng nhập Google/Facebook')
+    .bail()
+    .isLength({ min: 20, max: 4096 }).withMessage('Mã đăng nhập Google/Facebook không hợp lệ'),
+  body().custom((value) => {
+    if (Object.keys(value || {}).some((field) => field !== 'idToken')) {
+      throw new Error('Yêu cầu đăng nhập chứa trường không được phép');
+    }
+    return true;
+  }),
 ];
 
 const login = [
@@ -33,12 +48,6 @@ const login = [
     return true;
   }),
   body('password').notEmpty().withMessage('Mật khẩu là bắt buộc'),
-];
-
-const verifyRegistrationOtp = [
-  vietnamesePhone('phone'),
-  body('otp').trim().matches(/^\d{6}$/).withMessage('Mã OTP phải gồm 6 chữ số'),
-  body('email').not().exists().withMessage('Xác minh đăng ký không sử dụng email'),
 ];
 
 const requestPasswordReset = [
@@ -76,7 +85,7 @@ const shippingAddressDto = (value) => {
 
 const updateProfile = [
   body('fullName').optional().trim().notEmpty().withMessage('Họ và tên không được để trống'),
-  body('phone').not().exists().withMessage('Đổi số điện thoại cần một luồng xác minh OTP riêng'),
+  body('phone').not().exists().withMessage('Không thể đổi số điện thoại đăng nhập'),
   body('address').optional().trim(),
   body('avatar').optional().trim(),
   body('shippingAddress').optional().custom(shippingAddressDto),
@@ -92,7 +101,7 @@ const logout = [body('refreshToken').optional().isString()];
 
 module.exports = {
   register,
-  verifyRegistrationOtp,
+  socialLogin,
   requestPasswordReset,
   resetPassword,
   login,

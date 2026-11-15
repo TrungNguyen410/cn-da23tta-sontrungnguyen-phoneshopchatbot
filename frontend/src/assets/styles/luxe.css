@@ -2534,3 +2534,77 @@ p,
   font-size: var(--text-sm);
   pointer-events: none;
 }
+
+/* ---------- Google / Facebook sign-in ---------- */
+.social-login {
+  display: grid;
+  gap: var(--space-sm);
+  margin: var(--space-md) 0;
+}
+
+.social-login-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.social-login-divider::before,
+.social-login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-glass-edge);
+}
+
+.social-login-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.social-login-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: 46px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--color-glass-edge);
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+  background: var(--color-glass);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  transition: border-color var(--dur-short) var(--ease-out), box-shadow var(--dur-short) var(--ease-out), transform var(--dur-short) var(--ease-out);
+}
+
+.social-login-button svg {
+  flex: none;
+  font-size: 1.25rem;
+}
+
+.social-login-facebook svg {
+  color: var(--color-brand-facebook);
+}
+
+.social-login-button:hover:not(:disabled),
+.social-login-button:focus-visible {
+  border-color: var(--color-champagne);
+  box-shadow: 0 0 14px var(--color-glow-champagne-soft);
+  transform: translateY(-1px);
+}
+
+.social-login-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+@media (max-width: 420px) {
+  .social-login-buttons {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

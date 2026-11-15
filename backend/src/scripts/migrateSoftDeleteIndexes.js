@@ -73,14 +73,15 @@ const migrationPlan = [
   },
   {
     model: 'User',
-    drop: ['phone_1', 'email_optional_unique'],
+    // user_phone_active_unique indexed a missing phone as null, so a second Google/Facebook account clashed.
+    drop: ['phone_1', 'email_optional_unique', 'user_phone_active_unique'],
     create: [
       {
         key: { phone: 1 },
         options: {
-          name: 'user_phone_active_unique',
+          name: 'user_phone_set_active_unique',
           unique: true,
-          partialFilterExpression: { isDeleted: false },
+          partialFilterExpression: { phone: { $type: 'string' }, isDeleted: false },
         },
       },
       {
@@ -89,6 +90,14 @@ const migrationPlan = [
           name: 'user_email_active_unique',
           unique: true,
           partialFilterExpression: { email: { $type: 'string' }, isDeleted: false },
+        },
+      },
+      {
+        key: { firebaseUid: 1 },
+        options: {
+          name: 'user_firebase_uid_active_unique',
+          unique: true,
+          partialFilterExpression: { firebaseUid: { $type: 'string' }, isDeleted: false },
         },
       },
     ],

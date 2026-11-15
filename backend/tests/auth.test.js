@@ -1,29 +1,39 @@
 const request = require('supertest');
 const User = require('../src/models/User');
+const VerificationCode = require('../src/models/VerificationCode');
 const { app, createUser, login } = require('./helpers');
 
 describe('Auth API', () => {
-  it('creates a customer only after the SMS phone OTP is verified', async () => {
-    const requested = await request(app).post('/api/auth/register/request-otp').send({
+  it('creates a customer from phone and password without an SMS code', async () => {
+    const registered = await request(app).post('/api/auth/register').send({
       fullName: 'Nguyen Minh Anh',
-      phone: '0912345678',
+      phone: '+84 912 345 678',
       password: '123456',
     });
 
-    expect(requested.status).toBe(202);
-    expect(await User.findOne({ phone: '0912345678' })).toBeNull();
-
-    const verified = await request(app).post('/api/auth/register/verify-otp').send({
-      phone: '+84912345678',
-      otp: requested.body.data.debugOtp,
+    expect(registered.status).toBe(201);
+    expect(registered.body.data.token).toBeUndefined();
+    expect(registered.body.data.user).toMatchObject({
+      phone: '0912345678',
+      role: 'customer',
+      authProvider: 'phone',
+      phoneVerified: false,
     });
+    expect(registered.body.data.user.email).toBeUndefined();
+    expect(registered.body.data.user.password).toBeUndefined();
+    expect(await VerificationCode.countDocuments()).toBe(0);
 
-    expect(verified.status).toBe(201);
-    expect(verified.body.data.token).toBeTruthy();
-    expect(verified.body.data.user.phone).toBe('0912345678');
-    expect(verified.body.data.user.phoneVerified).toBe(true);
-    expect(verified.body.data.user.email).toBeUndefined();
-    expect(verified.body.data.user.password).toBeUndefined();
+    const loggedIn = await request(app).post('/api/auth/login').send({ identifier: '0912345678', password: '123456' });
+    expect(loggedIn.status).toBe(200);
+    expect(loggedIn.body.data.user.fullName).toBe('Nguyen Minh Anh');
+  });
+
+  it('no longer offers the registration OTP endpoints', async () => {
+    const details = { fullName: 'Le Gia Bao', phone: '0933333333', password: '123456' };
+
+    expect((await request(app).post('/api/auth/register/request-otp').send(details)).status).toBe(404);
+    expect((await request(app).post('/api/auth/register/verify-otp').send({ phone: details.phone, otp: '123456' })).status).toBe(404);
+    expect(await User.findOne({ phone: '0933333333' })).toBeNull();
   });
 
   it('resets a forgotten password with a one-time SMS code', async () => {
@@ -151,18 +161,22 @@ describe('Auth API', () => {
     expect(attempts.map((response) => response.status).sort()).toEqual([200, 400]);
   });
 
-  it('rejects the old email registration verification contract', async () => {
-    const response = await request(app).post('/api/auth/register/verify-otp').send({
-      email: 'legacy@example.com',
-      otp: '123456',
+  it('does not let registration pick its own sign-in provider or Firebase account', async () => {
+    const response = await request(app).post('/api/auth/register').send({
+      fullName: 'Provider Attempt',
+      phone: '0912345670',
+      password: '123456',
+      authProvider: 'google',
+      firebaseUid: 'someone-else',
     });
 
     expect(response.status).toBe(422);
+    expect(await User.findOne({ phone: '0912345670' })).toBeNull();
   });
 
   it('rejects duplicate phones after normalization', async () => {
     await createUser({ email: 'normalized@test.com', phone: '0912345678' });
-    const response = await request(app).post('/api/auth/register/request-otp').send({
+    const response = await request(app).post('/api/auth/register').send({
       fullName: 'Duplicate Phone',
       phone: '+84 912 345 678',
       password: '123456',

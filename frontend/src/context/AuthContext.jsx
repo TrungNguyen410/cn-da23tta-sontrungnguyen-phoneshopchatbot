@@ -74,10 +74,11 @@ export function AuthProvider({ children }) {
     const session = persistSession(await authApi.login(credentials));
     return mergeLocalWishlist(session);
   }, [mergeLocalWishlist, persistSession]);
-  const requestRegistrationOtp = useCallback((payload) => authApi.requestRegistrationOtp(payload), []);
-  const verifyRegistrationOtp = useCallback(
-    async (payload) => {
-      const session = persistSession(await authApi.verifyRegistrationOtp(payload));
+  // Creates the account only; the sign-up page then sends the customer to the login form.
+  const register = useCallback((payload) => authApi.register(payload), []);
+  const loginWithSocial = useCallback(
+    async (idToken) => {
+      const session = persistSession(await authApi.loginWithSocial(idToken));
       return mergeLocalWishlist(session);
     },
     [mergeLocalWishlist, persistSession],
@@ -137,8 +138,8 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(user && token),
       isAdmin: user?.role === 'admin',
       login,
-      requestRegistrationOtp,
-      verifyRegistrationOtp,
+      loginWithSocial,
+      register,
       logout,
       updateProfile,
       updateLocalUser,
@@ -147,7 +148,7 @@ export function AuthProvider({ children }) {
       setWishlist,
       loadCurrentUser,
     }),
-    [changePassword, loadCurrentUser, loading, login, logout, requestRegistrationOtp, setWishlist, token, toggleWishlist, updateLocalUser, updateProfile, user, verifyRegistrationOtp],
+    [changePassword, loadCurrentUser, loading, login, loginWithSocial, logout, register, setWishlist, token, toggleWishlist, updateLocalUser, updateProfile, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

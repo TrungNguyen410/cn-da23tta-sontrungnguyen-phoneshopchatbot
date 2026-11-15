@@ -11,6 +11,8 @@ const router = express.Router();
 const otpRequestLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 5 });
 const otpVerifyLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
 const loginLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 15 });
+const registerLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, namespace: 'register' });
+const socialLoginLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, namespace: 'social-login' });
 const otpPhoneLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
@@ -24,9 +26,8 @@ const otpPhoneDailyLimit = rateLimit({
   keyGenerator: (req) => normalizeVietnamesePhone(req.body.phone || req.body.identifier) || 'invalid',
 });
 
-router.post('/register', otpRequestLimit, otpPhoneLimit, otpPhoneDailyLimit, validators.register, validate, authController.register);
-router.post('/register/request-otp', otpRequestLimit, otpPhoneLimit, otpPhoneDailyLimit, validators.register, validate, authController.register);
-router.post('/register/verify-otp', otpVerifyLimit, validators.verifyRegistrationOtp, validate, authController.verifyRegistrationOtp);
+router.post('/register', registerLimit, validators.register, validate, authController.register);
+router.post('/social', socialLoginLimit, validators.socialLogin, validate, authController.socialLogin);
 router.post('/forgot-password/request-otp', otpRequestLimit, otpPhoneLimit, otpPhoneDailyLimit, validators.requestPasswordReset, validate, authController.requestPasswordReset);
 router.post('/forgot-password/reset', otpVerifyLimit, validators.resetPassword, validate, authController.resetPassword);
 router.post('/login', loginLimit, validators.login, validate, authController.login);

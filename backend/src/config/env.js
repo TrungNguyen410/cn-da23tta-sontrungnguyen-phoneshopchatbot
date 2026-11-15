@@ -176,6 +176,10 @@ const env = {
     phone: process.env.MOMO_PHONE || '',
     accountName: process.env.MOMO_ACCOUNT_NAME || '',
   },
+  // Firebase Authentication (Google/Facebook): POST /api/auth/social accepts ID tokens issued for this project only.
+  firebase: {
+    projectId: String(process.env.FIREBASE_PROJECT_ID || '').trim(),
+  },
   sms: {
     accountSid: process.env.TWILIO_ACCOUNT_SID || '',
     authToken: process.env.TWILIO_AUTH_TOKEN || '',
