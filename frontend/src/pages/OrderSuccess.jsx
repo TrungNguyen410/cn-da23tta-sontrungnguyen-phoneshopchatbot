@@ -7,6 +7,7 @@ import EmptyState from '../components/common/EmptyState';
 import Loading from '../components/common/Loading';
 import { formatCurrency, formatDate } from '../utils/formatCurrency';
 import { getOrderStatus } from '../utils/orderStatus';
+import { formatShippingAddress } from '../utils/shippingAddress';
 import { trackEvent } from '../utils/analytics';
 
 export default function OrderSuccess() {
@@ -75,7 +76,7 @@ export default function OrderSuccess() {
             <div><small>Trạng thái</small><span className={`status-badge ${status.className}`}>{status.label}</span></div>
           </div>
           <div className="success-details">
-            <div><h3>Thông tin người nhận</h3><p>{order.customer.fullName}</p><p>{order.customer.phone}</p><p>{order.customer.email}</p><p>{order.customer.address}</p></div>
+            <div><h3>Thông tin người nhận</h3><p>{order.customer.fullName}</p><p>{order.customer.phone}</p><p>{order.customer.email}</p><p>{formatShippingAddress(order.customer)}</p></div>
             <div><h3>Sản phẩm</h3>{order.items.map((item) => <p key={item.id}>{item.name} <strong>x{item.quantity}</strong></p>)}</div>
           </div>
           {order.trackingNumber && <div className="order-shipping-note"><strong>{order.shippingProvider || 'Đơn vị giao hàng'}</strong><span>Mã vận đơn: <b>{order.trackingNumber}</b></span>{order.estimatedDelivery && <span>Dự kiến giao: {formatDate(order.estimatedDelivery, true)}</span>}</div>}

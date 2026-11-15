@@ -14,7 +14,11 @@ class VoucherRepository extends BaseRepository {
     return voucher?.toJSON() || null;
   }
 
-  async reserve(code, subtotal, now = new Date(), session) {
+  async findAssignedTo(userId) {
+    return this.findAll({ assignedUserId: userId }, { sort: { createdAt: -1 } });
+  }
+
+  async reserve(code, subtotal, now = new Date(), session, userId = null) {
     const dayStart = new Date(now);
     dayStart.setHours(0, 0, 0, 0);
     const voucher = await Voucher.findOneAndUpdate(
@@ -25,6 +29,8 @@ class VoucherRepository extends BaseRepository {
         minOrder: { $lte: Number(subtotal) },
         startDate: { $lte: now },
         endDate: { $gte: dayStart },
+        // Public vouchers have no owner; a gift voucher is reserved only by its owner.
+        assignedUserId: { $in: userId ? [null, userId] : [null] },
         $or: [
           { quantity: 0 },
           { $expr: { $lt: ['$used', '$quantity'] } },

@@ -3,9 +3,11 @@ const AppError = require('../utils/AppError');
 const accessoryRepository = require('../repositories/accessoryRepository');
 const orderRepository = require('../repositories/orderRepository');
 const productRepository = require('../repositories/productRepository');
+const userRepository = require('../repositories/userRepository');
 const voucherService = require('./voucherService');
 const withTransaction = require('../utils/withTransaction');
 const { normalizeVietnamesePhone } = require('../utils/phone');
+const { isCompleteShippingAddress, toShippingAddress } = require('../utils/shippingAddress');
 
 const allowedStatuses = ['pending', 'confirmed', 'shipping', 'delivered', 'completed', 'cancelled'];
 const statusTransitions = {
@@ -215,6 +217,27 @@ class OrderService {
   }
 
   async create(payload, user, metadata = {}) {
+    const order = await this.placeOrder(payload, user, metadata);
+    await this.rememberShippingAddress(user, order.customer, payload.saveAddress === true);
+    return order;
+  }
+
+  // Keeps the receiver details on the account so the next checkout is prefilled.
+  // The first order always saves them; later orders only when the customer ticks "save as default".
+  async rememberShippingAddress(user, customer, requested) {
+    if (!user?.id) return;
+    if (!requested && isCompleteShippingAddress(user.shippingAddress)) return;
+    const shippingAddress = toShippingAddress(customer);
+    if (!isCompleteShippingAddress(shippingAddress)) return;
+    try {
+      await userRepository.update(user.id, { shippingAddress });
+    } catch (error) {
+      // The order is already committed; a failed convenience save must not fail checkout.
+      console.error('Could not save the shipping address', error.message);
+    }
+  }
+
+  async placeOrder(payload, user, metadata = {}) {
     const customer = this.canonicalCustomer(payload.customer);
     const paymentMethod = payload.paymentMethod || 'cod';
     const requestFingerprint = this.buildRequestFingerprint({
@@ -248,7 +271,7 @@ class OrderService {
         const shipping = this.shippingQuote(customer, subtotal);
         const shippingFee = shipping.fee;
         const voucher = payload.voucherCode
-          ? await voucherService.reserve(payload.voucherCode, subtotal, session)
+          ? await voucherService.reserve(payload.voucherCode, subtotal, session, user)
           : null;
         const discount = this.calculateDiscount(voucher, subtotal, shippingFee);
         const total = Math.max(0, subtotal + shippingFee - discount);
@@ -405,10 +428,18 @@ class OrderService {
     if (['shipping', 'delivered', 'completed'].includes(order.status)) {
       throw new AppError('Đơn hàng không còn có thể hủy', 400);
     }
+    // Customers may only cancel before the shop confirms; admins can still cancel confirmed orders.
+    const isCustomer = Boolean(user) && user.role !== 'admin';
+    if (isCustomer && order.status !== 'pending') {
+      throw new AppError(
+        'Đơn hàng đã được cửa hàng xác nhận nên bạn không thể tự hủy. Vui lòng liên hệ cửa hàng để được hỗ trợ.',
+        400,
+      );
+    }
 
     const previous = await orderRepository.transitionToCancelled(
       id,
-      ['pending', 'confirmed'],
+      isCustomer ? ['pending'] : ['pending', 'confirmed'],
       session,
     );
     if (!previous) {

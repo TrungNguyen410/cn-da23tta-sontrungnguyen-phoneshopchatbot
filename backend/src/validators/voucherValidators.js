@@ -29,4 +29,24 @@ const check = [
   body('subtotal').isFloat({ min: 0 }).withMessage('Tạm tính phải là số không âm'),
 ];
 
-module.exports = { create, update, check };
+const gift = [
+  body().custom((payload) => {
+    const allowed = ['type', 'value', 'minOrder', 'maxDiscount', 'endDate', 'note'];
+    if (!payload || typeof payload !== 'object' || Object.keys(payload).some((key) => !allowed.includes(key))) {
+      throw new Error('Dữ liệu voucher tặng khách chứa trường không được phép');
+    }
+    return true;
+  }),
+  body('type').isIn(['percent', 'fixed', 'shipping']).withMessage('Loại mã giảm giá không hợp lệ'),
+  body('value').isFloat({ gt: 0 }).withMessage('Giá trị giảm phải lớn hơn 0'),
+  body('value').custom((value, { req }) => {
+    if (req.body.type === 'percent' && Number(value) > 100) throw new Error('Giảm theo phần trăm tối đa 100%');
+    return true;
+  }),
+  body('minOrder').optional().isFloat({ min: 0 }).withMessage('Giá trị đơn hàng tối thiểu phải là số không âm'),
+  body('maxDiscount').optional().isFloat({ min: 0 }).withMessage('Mức giảm tối đa phải là số không âm'),
+  body('endDate').isISO8601().withMessage('Ngày hết hạn không hợp lệ'),
+  body('note').optional().isString().trim().isLength({ max: 120 }).withMessage('Lời nhắn tối đa 120 ký tự'),
+];
+
+module.exports = { create, update, check, gift };

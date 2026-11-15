@@ -1,17 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FiCheckCircle, FiCreditCard, FiMapPin, FiPackage, FiUser } from 'react-icons/fi';
+import { FiCheckCircle, FiCreditCard, FiEdit2, FiMapPin, FiPackage, FiUser } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { orderApi } from '../api/orderApi';
 import { paymentApi } from '../api/paymentApi';
 import EmptyState from '../components/common/EmptyState';
+import ShippingAddressFields from '../components/order/ShippingAddressFields';
 import { useAuth } from '../hooks/useAuth';
 import { useCart } from '../hooks/useCart';
+import { useWards } from '../hooks/useWards';
 import { PAYMENT_METHODS } from '../utils/constants';
 import { calculateVoucherDiscount } from '../utils/checkoutPricing';
 import { formatCurrency } from '../utils/formatCurrency';
-import { getShippingQuote, SHIPPING_PROVINCES } from '../utils/shipping';
-import { isValidEmail, isValidVietnamesePhone, validateRequired } from '../utils/validators';
+import { getShippingQuote } from '../utils/shipping';
+import {
+  emptyShippingAddress,
+  formatShippingAddress,
+  isUsableSavedAddress,
+  pickShippingAddress,
+  validateShippingAddress,
+} from '../utils/shippingAddress';
+import { matchWard } from '../utils/wards';
 import { trackEvent } from '../utils/analytics';
 
 const paymentHint = (method) => {
@@ -37,21 +46,22 @@ const readPendingCheckout = () => {
 
 export default function Checkout() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, updateLocalUser } = useAuth();
   const cart = useCart();
   const [pendingCheckout] = useState(readPendingCheckout);
   const retryingVnpay = Boolean(pendingCheckout);
-  const [form, setForm] = useState({
-    fullName: user?.fullName || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    address: user?.address || '',
-    province: '',
-    district: '',
-    ward: '',
+  // A complete saved address skips the form; "Giao đến địa chỉ khác" opens it again.
+  const [savedAddress] = useState(() => (
+    isUsableSavedAddress(user?.shippingAddress) ? pickShippingAddress(user.shippingAddress) : null
+  ));
+  const [useSavedAddress, setUseSavedAddress] = useState(Boolean(savedAddress));
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
+  const [form, setForm] = useState(() => ({
+    ...(savedAddress || emptyShippingAddress(user || {})),
     note: '',
     paymentMethod: retryingVnpay ? 'card' : 'cod',
-  });
+  }));
+  const { wards, ready: wardsReady, failed: wardsFailed } = useWards(form.province);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [paymentConfirmStep, setPaymentConfirmStep] = useState(false);
@@ -124,29 +134,32 @@ export default function Checkout() {
     setErrors((current) => ({ ...current, [key]: '' }));
     if (key === 'paymentMethod') setPaymentConfirmStep(false);
   };
-  const errorProps = (key) => ({
-    'aria-invalid': Boolean(errors[key]),
-    'aria-describedby': errors[key] ? `checkout-${key}-error` : undefined,
-  });
+  const showAddressForm = () => {
+    setUseSavedAddress(false);
+    setSaveAsDefault(false);
+    setErrors({});
+    setForm((current) => ({ ...current, address: '', province: '', ward: '' }));
+  };
+  const restoreSavedAddress = () => {
+    setUseSavedAddress(true);
+    setSaveAsDefault(false);
+    setErrors({});
+    setForm((current) => ({ ...current, ...savedAddress }));
+  };
 
   const validateCheckout = () => {
-    const nextErrors = validateRequired({
-      fullName: form.fullName,
-      email: form.email,
-      phone: form.phone,
-      address: form.address,
-      province: form.province,
-      ward: form.ward,
-    });
-    if (form.email && !isValidEmail(form.email)) nextErrors.email = 'Email không đúng định dạng';
-    if (form.phone && !isValidVietnamesePhone(form.phone)) nextErrors.phone = 'Số điện thoại Việt Nam phải có 10 số';
+    const nextErrors = validateShippingAddress(form, { wards, wardsReady });
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
+      // A saved address that no longer validates is reopened so the customer can fix it.
+      if (useSavedAddress) setUseSavedAddress(false);
       toast.error('Vui lòng kiểm tra lại thông tin nhận hàng');
       return false;
     }
     return true;
   };
+  // The first order saves the address; afterwards only a new address with "save as default" ticked does.
+  const shouldSaveAddress = !useSavedAddress && (!savedAddress || saveAsDefault);
 
   const checkoutItems = cart.cartItems.map((item) => {
     const type = item.type === 'accessory' || item.accessoryId ? 'accessory' : 'product';
@@ -161,17 +174,14 @@ export default function Checkout() {
     };
   });
 
+  const receiver = () => pickShippingAddress({
+    ...form,
+    ward: (wardsReady && matchWard(wards, form.ward)) || form.ward,
+  });
   const orderPayload = () => ({
     items: checkoutItems,
-    customer: {
-      fullName: form.fullName.trim(),
-      email: form.email.trim(),
-      phone: form.phone.trim(),
-      address: form.address.trim(),
-      province: form.province,
-      district: form.district.trim(),
-      ward: form.ward.trim(),
-    },
+    customer: receiver(),
+    saveAddress: shouldSaveAddress,
     note: [
       form.note.trim(),
       form.paymentMethod === 'momo' ? `Ma giao dich MoMo: ${transferContent}` : '',
@@ -187,7 +197,9 @@ export default function Checkout() {
     submissionInFlightRef.current = true;
     setSubmitting(true);
     try {
-      const order = await orderApi.create(orderPayload(), idempotencyKeyRef.current);
+      const payload = orderPayload();
+      const order = await orderApi.create(payload, idempotencyKeyRef.current);
+      if (payload.saveAddress) updateLocalUser?.({ shippingAddress: payload.customer });
       cart.clearCart();
       navigate(`/order-success/${order.id}`, { state: { order }, replace: true });
     } catch (error) {
@@ -203,10 +215,9 @@ export default function Checkout() {
     submissionInFlightRef.current = true;
     setSubmitting(true);
     try {
-      const result = await paymentApi.createVnpayCheckout(
-        { ...orderPayload(), paymentMethod: 'card' },
-        idempotencyKeyRef.current,
-      );
+      const payload = { ...orderPayload(), paymentMethod: 'card' };
+      const result = await paymentApi.createVnpayCheckout(payload, idempotencyKeyRef.current);
+      if (payload.saveAddress) updateLocalUser?.({ shippingAddress: payload.customer });
       try {
         sessionStorage.setItem('techphone_pending_payment', JSON.stringify({
           orderId: result.order.id,
@@ -260,44 +271,46 @@ export default function Checkout() {
           <div className="checkout-main">
             <section className="panel checkout-section">
               <h2><FiUser /> Thông tin người nhận</h2>
-              <div className="form-grid">
-                <label className="form-field">
-                  <span>Họ và tên *</span>
-                  <input {...errorProps('fullName')} value={form.fullName} onChange={(event) => update('fullName', event.target.value)} />
-                  {errors.fullName && <small id="checkout-fullName-error">{errors.fullName}</small>}
-                </label>
-                <label className="form-field">
-                  <span>Số điện thoại *</span>
-                  <input {...errorProps('phone')} value={form.phone} onChange={(event) => update('phone', event.target.value)} />
-                  {errors.phone && <small id="checkout-phone-error">{errors.phone}</small>}
-                </label>
-                <label className="form-field full">
-                  <span>Email *</span>
-                  <input {...errorProps('email')} type="email" value={form.email} onChange={(event) => update('email', event.target.value)} />
-                  {errors.email && <small id="checkout-email-error">{errors.email}</small>}
-                </label>
-                <label className="form-field full">
-                  <span>Địa chỉ nhận hàng *</span>
-                  <textarea {...errorProps('address')} rows="3" value={form.address} onChange={(event) => update('address', event.target.value)} />
-                  {errors.address && <small id="checkout-address-error">{errors.address}</small>}
-                </label>
-                <label className="form-field full">
-                  <span>Tỉnh/thành phố *</span>
-                  <select {...errorProps('province')} value={form.province} onChange={(event) => update('province', event.target.value)}>
-                    <option value="">Chọn tỉnh/thành phố</option>
-                    {SHIPPING_PROVINCES.map((province) => <option key={province} value={province}>{province}</option>)}
-                  </select>
-                  {errors.province && <small id="checkout-province-error">{errors.province}</small>}
-                </label>
-                <label className="form-field">
-                  <span>Quận/huyện cũ (nếu có)</span>
-                  <input value={form.district} onChange={(event) => update('district', event.target.value)} placeholder="Ví dụ: Quận 1 (địa chỉ cũ)" />
-                </label>
-                <label className="form-field">
-                  <span>Phường/xã/đặc khu *</span>
-                  <input {...errorProps('ward')} value={form.ward} onChange={(event) => update('ward', event.target.value)} placeholder="Ví dụ: Bến Nghé" />
-                  {errors.ward && <small id="checkout-ward-error">{errors.ward}</small>}
-                </label>
+              {useSavedAddress ? (
+                <div className="saved-address-card">
+                  <FiMapPin aria-hidden="true" />
+                  <div>
+                    <small>Giao đến địa chỉ đã lưu</small>
+                    <strong>{form.fullName} · {form.phone}</strong>
+                    <p>{formatShippingAddress(form)}</p>
+                    <span>{form.email}</span>
+                  </div>
+                  <button type="button" className="btn btn-outline" onClick={showAddressForm}>
+                    <FiEdit2 /> Giao đến địa chỉ khác
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {savedAddress && (
+                    <div className="address-switch">
+                      <span>Đơn này giao đến địa chỉ mới</span>
+                      <button type="button" onClick={restoreSavedAddress}>Dùng địa chỉ đã lưu</button>
+                    </div>
+                  )}
+                  <ShippingAddressFields
+                    idPrefix="checkout"
+                    value={form}
+                    errors={errors}
+                    onChange={update}
+                    wards={wards}
+                    wardsFailed={wardsFailed}
+                  />
+                  {savedAddress ? (
+                    <label className="save-address-option">
+                      <input type="checkbox" checked={saveAsDefault} onChange={(event) => setSaveAsDefault(event.target.checked)} />
+                      <span>Lưu làm địa chỉ mặc định cho lần mua sau</span>
+                    </label>
+                  ) : (
+                    <p className="checkout-address-note"><FiCheckCircle /> Địa chỉ này sẽ được lưu vào tài khoản để lần sau không phải nhập lại</p>
+                  )}
+                </>
+              )}
+              <div className="form-grid checkout-note-grid">
                 <label className="form-field full">
                   <span>Ghi chú đơn hàng</span>
                   <textarea

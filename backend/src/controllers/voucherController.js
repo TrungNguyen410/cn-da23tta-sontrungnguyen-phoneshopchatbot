@@ -28,8 +28,18 @@ const remove = asyncHandler(async (req, res) => {
 });
 
 const validateVoucher = asyncHandler(async (req, res) => {
-  const voucher = await voucherService.validate(req.body.code, req.body.subtotal);
+  const voucher = await voucherService.validate(req.body.code, req.body.subtotal, req.user);
   successResponse(res, voucher, 'Voucher is valid');
 });
 
-module.exports = { list, getById, create, update, remove, validateVoucher };
+const mine = asyncHandler(async (req, res) => {
+  const vouchers = await voucherService.listForUser(req.user.id);
+  successResponse(res, vouchers, 'Customer vouchers retrieved');
+});
+
+const giftToCustomer = asyncHandler(async (req, res) => {
+  const voucher = await voucherService.giftToCustomer(req.params.id, req.body);
+  successResponse(res, voucher, 'Gift voucher created', 201);
+});
+
+module.exports = { list, getById, create, update, remove, validateVoucher, mine, giftToCustomer };

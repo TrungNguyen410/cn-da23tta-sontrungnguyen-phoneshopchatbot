@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FiCpu, FiSend, FiShoppingCart, FiThumbsDown, FiThumbsUp, FiTrash2, FiX } from 'react-icons/fi';
+import { FiSend, FiShoppingCart, FiThumbsDown, FiThumbsUp, FiTrash2, FiX } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { chatApi, DEFAULT_CHAT_CONFIG } from '../../api/chatApi';
 import { useCart } from '../../hooks/useCart';
+import { APP_NAME } from '../../utils/constants';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { storage } from '../../utils/storage';
 import RichText from './RichText';
+import RobotMascot from './RobotMascot';
 
 export const CHAT_STORAGE_KEYS = {
   visitorId: 'chat_visitor_id',
@@ -196,7 +198,8 @@ export default function ChatWidget() {
     setMessages([WELCOME]);
   };
 
-  const showQuickQuestions = messages.length === 1 && !sending && config.quickQuestions.length > 0;
+  const freshChat = messages.length === 1;
+  const showQuickQuestions = freshChat && !sending && config.quickQuestions.length > 0;
   const streaming = messages.some((message) => message.id === STREAMING_ID);
 
   if (!config.enabled) return null;
@@ -206,7 +209,7 @@ export default function ChatWidget() {
       {open && (
         <section className="chat-panel panel" role="dialog" aria-label="Trợ lý AI tư vấn">
           <header className="chat-header">
-            <span className="chat-avatar"><FiCpu /></span>
+            <span className="chat-avatar"><RobotMascot thinking={sending} /></span>
             <div>
               <strong>Trợ lý AI tư vấn</strong>
               <small>Trả lời dựa trên dữ liệu cửa hàng</small>
@@ -216,30 +219,42 @@ export default function ChatWidget() {
           </header>
 
           <div className="chat-messages" ref={listRef} aria-live="polite">
-            {messages.map((message) => (
-              <div key={message.id} className={`chat-message ${message.role} ${message.error ? 'error' : ''}`}>
-                <div className="chat-bubble">
-                  {message.role === 'assistant'
-                    ? <RichText text={message.id === 'welcome' ? config.greeting : message.content} />
-                    : message.content}
-                </div>
-                {message.products?.length > 0 && (
-                  <div className="chat-products">
-                    {message.products.map((product) => (
-                      <ProductCard key={product.id} product={product} onAdd={addToCart} />
-                    ))}
-                  </div>
-                )}
-                {message.role === 'assistant' && !['welcome', STREAMING_ID].includes(message.id) && !message.error && (
-                  <div className="chat-feedback">
-                    <button type="button" aria-label="Câu trả lời hữu ích" aria-pressed={message.feedback === 'up'} onClick={() => rate(message, 'up')}><FiThumbsUp /></button>
-                    <button type="button" aria-label="Câu trả lời chưa tốt" aria-pressed={message.feedback === 'down'} onClick={() => rate(message, 'down')}><FiThumbsDown /></button>
-                  </div>
-                )}
+            {freshChat && (
+              <div className="chat-hero">
+                <span className="chat-hero-robot"><RobotMascot float /></span>
+                <strong>Trợ lý AI {APP_NAME}</strong>
+                <small>Đang trực tuyến · Trả lời theo dữ liệu cửa hàng</small>
               </div>
-            ))}
+            )}
+            {messages.map((message) => {
+              const withAvatar = message.role === 'assistant' && !(freshChat && message.id === 'welcome');
+              return (
+                <div key={message.id} className={`chat-message ${message.role} ${message.error ? 'error' : ''}${withAvatar ? ' with-avatar' : ''}`}>
+                  {withAvatar && <span className="chat-message-avatar"><RobotMascot /></span>}
+                  <div className="chat-bubble">
+                    {message.role === 'assistant'
+                      ? <RichText text={message.id === 'welcome' ? config.greeting : message.content} />
+                      : message.content}
+                  </div>
+                  {message.products?.length > 0 && (
+                    <div className="chat-products">
+                      {message.products.map((product) => (
+                        <ProductCard key={product.id} product={product} onAdd={addToCart} />
+                      ))}
+                    </div>
+                  )}
+                  {message.role === 'assistant' && !['welcome', STREAMING_ID].includes(message.id) && !message.error && (
+                    <div className="chat-feedback">
+                      <button type="button" aria-label="Câu trả lời hữu ích" aria-pressed={message.feedback === 'up'} onClick={() => rate(message, 'up')}><FiThumbsUp /></button>
+                      <button type="button" aria-label="Câu trả lời chưa tốt" aria-pressed={message.feedback === 'down'} onClick={() => rate(message, 'down')}><FiThumbsDown /></button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
             {sending && !streaming && (
-              <div className="chat-message assistant">
+              <div className="chat-message assistant with-avatar">
+                <span className="chat-message-avatar"><RobotMascot thinking /></span>
                 <div className="chat-bubble chat-typing" aria-label="Trợ lý đang trả lời"><span /><span /><span /></div>
               </div>
             )}
@@ -278,7 +293,7 @@ export default function ChatWidget() {
         aria-label={open ? 'Đóng trợ lý AI' : 'Mở trợ lý AI tư vấn'}
         onClick={() => setOpen((current) => !current)}
       >
-        {open ? <FiX /> : <FiCpu />}
+        {open ? <FiX /> : <RobotMascot className="chat-toggle-robot" />}
         <span>{open ? 'Đóng' : 'Tư vấn AI'}</span>
       </button>
     </div>

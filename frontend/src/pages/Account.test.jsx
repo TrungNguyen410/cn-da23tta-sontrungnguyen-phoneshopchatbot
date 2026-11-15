@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -55,14 +55,36 @@ describe('Account profile', () => {
     const user = userEvent.setup();
     render(<MemoryRouter><Account /></MemoryRouter>);
 
-    expect(screen.getByDisplayValue('0912345678')).toHaveAttribute('readonly');
-    expect(screen.queryByLabelText('Email *')).not.toBeInTheDocument();
+    const profileForm = screen.getByRole('button', { name: 'Lưu thay đổi' }).closest('form');
+    expect(within(profileForm).getByLabelText(/Số điện thoại đăng nhập/)).toHaveAttribute('readonly');
+    expect(within(profileForm).queryByLabelText('Email *')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
 
+    expect(authMock.updateProfile).toHaveBeenCalledWith({ fullName: 'Test User' });
+  });
+
+  it('saves the default shipping address with the new ward list', async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter><Account /></MemoryRouter>);
+
+    expect(screen.getByLabelText(/Số nhà, tên đường/)).toHaveValue('1 Main Street');
+    await user.selectOptions(screen.getByLabelText(/Tỉnh\/thành phố/), 'Hà Nội');
+    const ward = screen.getByLabelText(/Phường\/xã\/đặc khu/);
+    await waitFor(() => expect(ward).toHaveAttribute('list'));
+    await user.type(ward, 'Ba Đình');
+    await user.click(screen.getByRole('button', { name: 'Lưu địa chỉ' }));
+
     expect(authMock.updateProfile).toHaveBeenCalledWith({
-      address: '1 Main Street',
-      fullName: 'Test User',
+      shippingAddress: {
+        fullName: 'Test User',
+        email: 'user@test.com',
+        phone: '0912345678',
+        address: '1 Main Street',
+        province: 'Hà Nội',
+        ward: 'Phường Ba Đình',
+      },
     });
+    expect(toast.success).toHaveBeenCalledWith('Đã lưu địa chỉ nhận hàng mặc định');
   });
 
   it('reorders from current catalog data and reports unavailable historical lines once', async () => {
@@ -161,6 +183,24 @@ describe('Account profile', () => {
 
     expect(await screen.findByText('TPPAID')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Hủy đơn/i })).not.toBeInTheDocument();
+  });
+
+  it('hides self-cancel once the shop has confirmed an unpaid order', async () => {
+    orderApiMock.getMyOrders.mockResolvedValue([{
+      id: 'order-confirmed',
+      orderNumber: 'TPCONFIRMED',
+      createdAt: '2026-08-01T08:00:00.000Z',
+      paymentStatus: 'pending',
+      status: 'confirmed',
+      total: 12000000,
+      items: [{ id: 'phone-1', image: '/phone.png', name: 'Phone', price: 12000000, quantity: 1, type: 'product' }],
+    }]);
+
+    render(<MemoryRouter initialEntries={['/account?tab=orders']}><Account /></MemoryRouter>);
+
+    expect(await screen.findByText('TPCONFIRMED')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Hủy đơn/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/không thể tự hủy/)).toBeInTheDocument();
   });
 
   it('shows the friendly cancellation error from the server', async () => {

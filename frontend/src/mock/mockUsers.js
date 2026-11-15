@@ -21,6 +21,14 @@ export const mockUsers = [
     status: 'active',
     phoneVerified: true,
     address: '45 Lê Lợi, Quận 1, TP. Hồ Chí Minh',
+    shippingAddress: {
+      fullName: 'Nguyễn Minh Anh',
+      email: 'user@gmail.com',
+      phone: '0911111111',
+      address: '45 Lê Lợi',
+      province: 'TP. Hồ Chí Minh',
+      ward: 'Phường Sài Gòn',
+    },
     createdAt: '2025-03-18T08:00:00.000Z',
   },
   {

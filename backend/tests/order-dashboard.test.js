@@ -1265,7 +1265,7 @@ describe('Orders and dashboard APIs', () => {
         revenue: 0,
       }),
     );
-    expect(response.body.data.monthlyRevenue).toHaveLength(12);
+    expect(response.body.data.revenue.monthly).toHaveLength(12);
   });
 
   it('does not merge the same month from different years', async () => {
@@ -1331,7 +1331,7 @@ describe('Orders and dashboard APIs', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data.stats.revenue).toBe(2000000);
-    expect(response.body.data.monthlyRevenue[0]).toBe(2);
+    expect(response.body.data.revenue.monthly[0]).toBe(2000000);
   });
 
   it('returns zero revenue for an empty year and rejects unsafe years', async () => {
@@ -1349,7 +1349,7 @@ describe('Orders and dashboard APIs', () => {
       .set('Authorization', `Bearer ${token}`);
     expect(empty.status).toBe(200);
     expect(empty.body.data.stats.revenue).toBe(0);
-    expect(empty.body.data.monthlyRevenue).toEqual(Array(12).fill(0));
+    expect(empty.body.data.revenue.monthly).toEqual(Array(12).fill(0));
 
     await request(app)
       .get('/api/admin/dashboard?year=1899')
@@ -1544,7 +1544,7 @@ describe('Orders and dashboard APIs', () => {
       .expect(422);
   });
 
-  it('accepts dashboard year 9999 and defaults omitted year to the current UTC year', async () => {
+  it('accepts dashboard year 9999 and defaults omitted year to the current Vietnam year', async () => {
     const admin = await createUser({
       email: 'dashboard-boundary-admin@test.com',
       phone: '0900000007',
@@ -1553,7 +1553,7 @@ describe('Orders and dashboard APIs', () => {
     const token = jwt.sign({ sub: admin.id, role: 'admin' }, env.jwtAccessSecret, {
       expiresIn: '15m',
     });
-    const currentYear = new Date().getUTCFullYear();
+    const currentYear = new Date(Date.now() + 7 * 60 * 60 * 1000).getUTCFullYear();
     await Order.create({
       orderNumber: 'TPCURRENTYEAR1',
       status: 'completed',
@@ -1580,6 +1580,6 @@ describe('Orders and dashboard APIs', () => {
     expect(boundary.body.data.stats.revenue).toBe(0);
     expect(omitted.status).toBe(200);
     expect(omitted.body.data.stats.revenue).toBe(7000000);
-    expect(omitted.body.data.monthlyRevenue[5]).toBe(7);
+    expect(omitted.body.data.revenue.monthly[5]).toBe(7000000);
   });
 });

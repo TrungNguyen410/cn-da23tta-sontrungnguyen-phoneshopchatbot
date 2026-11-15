@@ -7,8 +7,13 @@ const AppError = require('../utils/AppError');
 const pick = require('../utils/pick');
 
 const dashboard = asyncHandler(async (req, res) => {
-  const data = await dashboardService.statistics({ year: req.query.year });
+  const data = await dashboardService.statistics({ year: req.query.year, month: req.query.month });
   successResponse(res, data, 'Dashboard statistics retrieved');
+});
+
+const revenue = asyncHandler(async (req, res) => {
+  const data = await dashboardService.revenue({ year: req.query.year, month: req.query.month });
+  successResponse(res, data, 'Revenue retrieved');
 });
 
 const customers = asyncHandler(async (req, res) => {
@@ -23,4 +28,4 @@ const updateCustomer = asyncHandler(async (req, res) => {
   successResponse(res, data, 'Customer updated');
 });
 
-module.exports = { dashboard, customers, updateCustomer };
+module.exports = { dashboard, revenue, customers, updateCustomer };

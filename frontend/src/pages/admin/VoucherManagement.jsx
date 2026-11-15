@@ -14,7 +14,7 @@ export default function VoucherManagement() {
     { key: 'endDate', label: 'Ngày kết thúc', type: 'date', required: true },
     { key: 'active', label: 'Đang hoạt động', type: 'checkbox' },
   ]} columns={[
-    { key: 'code', label: 'Mã', render: (item) => <strong className="voucher-code">{item.code}</strong> },
+    { key: 'code', label: 'Mã', render: (item) => <span><strong className="voucher-code">{item.code}</strong><small className="table-subtext">{item.assignedUserId ? `Riêng 1 khách · ${item.note || 'voucher tặng'}` : 'Mọi khách hàng'}</small></span> },
     { key: 'type', label: 'Loại', render: (item) => item.type === 'percent' ? 'Phần trăm' : item.type === 'fixed' ? 'Cố định' : 'Phí vận chuyển' },
     { key: 'value', label: 'Giá trị', render: (item) => item.type === 'percent' ? `${item.value}%` : formatCurrency(item.value) },
     { key: 'minOrder', label: 'Đơn tối thiểu', render: (item) => formatCurrency(item.minOrder) },

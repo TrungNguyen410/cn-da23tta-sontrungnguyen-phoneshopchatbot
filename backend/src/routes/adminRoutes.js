@@ -36,12 +36,17 @@ const adminPagination = [
   query('limit').optional().isInt({ min: 1, max: 100 }),
 ];
 const adminSearch = [query('search').optional().trim().isLength({ max: 100 })];
-const dashboardYear = [query('year').optional().isInt({ min: 1970, max: 9999 })];
+const dashboardPeriod = [
+  query('year').optional().isInt({ min: 1970, max: 9999 }),
+  query('month').optional().isInt({ min: 1, max: 12 }),
+];
 
-router.get('/dashboard', dashboardYear, validate, adminController.dashboard);
+router.get('/dashboard', dashboardPeriod, validate, adminController.dashboard);
+router.get('/dashboard/revenue', dashboardPeriod, validate, adminController.revenue);
 
 router.get('/customers', [...adminPagination, ...adminSearch], validate, adminController.customers);
 router.put('/customers/:id', idParam, customerValidators.update, validate, adminController.updateCustomer);
+router.post('/customers/:id/vouchers', idParam, voucherValidators.gift, validate, voucherController.giftToCustomer);
 
 router.get('/products', catalogValidators.list, validate, productController.list);
 router.post('/products', catalogValidators.create, validate, productController.create);

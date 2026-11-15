@@ -15,6 +15,9 @@ const voucherSchema = new mongoose.Schema(
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
     active: { type: Boolean, default: true, index: true },
+    // Set for a gift voucher: only this customer can see and redeem it.
+    assignedUserId: { type: String, ref: 'User', default: null, index: true },
+    note: { type: String, trim: true, default: '' },
   },
   baseSchemaOptions,
 );

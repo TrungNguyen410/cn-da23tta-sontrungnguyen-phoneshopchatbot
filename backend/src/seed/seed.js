@@ -152,6 +152,14 @@ const run = async () => {
       phoneVerified: true,
       phoneVerifiedAt: new Date(),
       address: '45 Le Loi, District 1, Ho Chi Minh City',
+      shippingAddress: {
+        fullName: 'Nguyen Minh Anh',
+        email: 'user@gmail.com',
+        phone: '0911111111',
+        address: '45 Lê Lợi',
+        province: 'TP. Hồ Chí Minh',
+        ward: 'Phường Sài Gòn',
+      },
       avatar: imageFor('Minh Anh', '0f766e'),
     },
     {

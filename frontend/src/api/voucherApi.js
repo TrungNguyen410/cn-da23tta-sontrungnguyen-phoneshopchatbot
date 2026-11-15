@@ -5,6 +5,7 @@ import axiosClient from './axiosClient';
 export const voucherApi = {
   check: (code, subtotal) =>
     USE_MOCK ? mockDb.checkVoucher(code, subtotal) : axiosClient.post('/vouchers/check', { code, subtotal }),
+  mine: () => (USE_MOCK ? mockDb.myVouchers() : axiosClient.get('/vouchers/mine')),
   getAll: () => (USE_MOCK ? mockDb.list('vouchers') : axiosClient.get('/admin/vouchers')),
   create: (payload) => (USE_MOCK ? mockDb.save('vouchers', payload) : axiosClient.post('/admin/vouchers', payload)),
   update: (id, payload) =>

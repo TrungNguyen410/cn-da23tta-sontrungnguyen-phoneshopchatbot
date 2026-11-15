@@ -1,4 +1,10 @@
 const { body } = require('express-validator');
+const {
+  FIELD_LIMITS,
+  SHIPPING_ADDRESS_FIELDS,
+  isCompleteShippingAddress,
+  toShippingAddress,
+} = require('../utils/shippingAddress');
 const { normalizeVietnamesePhone } = require('../utils/phone');
 
 const vietnamesePhone = (field, message = 'Số điện thoại Việt Nam không hợp lệ') =>
@@ -46,11 +52,34 @@ const resetPassword = [
   body('newPassword').isLength({ min: 6 }).withMessage('Mật khẩu mới phải có ít nhất 6 ký tự'),
 ];
 
+const shippingAddressDto = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Địa chỉ nhận hàng không hợp lệ');
+  }
+  if (Object.keys(value).some((field) => !SHIPPING_ADDRESS_FIELDS.includes(field))) {
+    throw new Error('Địa chỉ nhận hàng chứa trường không được phép');
+  }
+  if (SHIPPING_ADDRESS_FIELDS.some((field) => (
+    value[field] !== undefined && (typeof value[field] !== 'string' || value[field].length > FIELD_LIMITS[field])
+  ))) {
+    throw new Error('Địa chỉ nhận hàng có trường không hợp lệ');
+  }
+  const address = toShippingAddress(value);
+  if (!isCompleteShippingAddress(address)) {
+    throw new Error('Vui lòng nhập đủ họ tên, số điện thoại, địa chỉ, tỉnh/thành và phường/xã');
+  }
+  if (address.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address.email)) {
+    throw new Error('Email nhận hàng không hợp lệ');
+  }
+  return true;
+};
+
 const updateProfile = [
   body('fullName').optional().trim().notEmpty().withMessage('Họ và tên không được để trống'),
   body('phone').not().exists().withMessage('Đổi số điện thoại cần một luồng xác minh OTP riêng'),
   body('address').optional().trim(),
   body('avatar').optional().trim(),
+  body('shippingAddress').optional().custom(shippingAddressDto),
 ];
 
 const changePassword = [

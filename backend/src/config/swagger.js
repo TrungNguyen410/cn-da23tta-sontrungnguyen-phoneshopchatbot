@@ -271,7 +271,7 @@ const swaggerDocument = {
       put: {
         tags: ['Orders'],
         security: [{ bearerAuth: [] }],
-        summary: 'Cancel an order before shipping',
+        summary: 'Cancel an order (customers: only while pending; admins: pending or confirmed)',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { 200: { description: 'Order cancelled' }, 400: { description: 'Order cannot be cancelled' } },
       },
@@ -294,7 +294,8 @@ const swaggerDocument = {
         parameters: [{ name: 'accessoryId', in: 'path', required: true, schema: { type: 'string' } }],
       },
     },
-    '/vouchers/check': { post: { tags: ['Vouchers'], summary: 'Validate voucher for cart subtotal' } },
+    '/vouchers/check': { post: { tags: ['Vouchers'], summary: 'Validate voucher for cart subtotal (a bearer token also unlocks gift vouchers assigned to that customer)' } },
+    '/vouchers/mine': { get: { tags: ['Vouchers'], security: [{ bearerAuth: [] }], summary: 'Gift vouchers assigned to the signed-in customer' } },
     '/vouchers': {
       get: { tags: ['Vouchers'], security: [{ bearerAuth: [] }], summary: 'List vouchers' },
       post: { tags: ['Vouchers'], security: [{ bearerAuth: [] }], summary: 'Create voucher', requestBody: { content: { 'application/json': { schema: { $ref: '#/components/schemas/VoucherRequest' } } } } },
@@ -311,8 +312,38 @@ const swaggerDocument = {
       get: { tags: ['Settings'], summary: 'List settings' },
       post: { tags: ['Settings'], security: [{ bearerAuth: [] }], summary: 'Create setting' },
     },
-    '/admin/dashboard': { get: { tags: ['Admin'], security: [{ bearerAuth: [] }], summary: 'Dashboard statistics' } },
+    '/admin/dashboard': {
+      get: {
+        tags: ['Admin'],
+        security: [{ bearerAuth: [] }],
+        summary: 'Dashboard statistics: revenue by year/month/day (Vietnam time), top products, top customers, low stock (<= 10)',
+        parameters: [
+          { name: 'year', in: 'query', schema: { type: 'integer', minimum: 1970, maximum: 9999 } },
+          { name: 'month', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 12 } },
+        ],
+      },
+    },
+    '/admin/dashboard/revenue': {
+      get: {
+        tags: ['Admin'],
+        security: [{ bearerAuth: [] }],
+        summary: 'Revenue for the 5 years up to `year`, the 12 months of `year` and the days of `month`',
+        parameters: [
+          { name: 'year', in: 'query', schema: { type: 'integer', minimum: 1970, maximum: 9999 } },
+          { name: 'month', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 12 } },
+        ],
+      },
+    },
     '/admin/customers': { get: { tags: ['Admin'], security: [{ bearerAuth: [] }], summary: 'List customer analytics' } },
+    '/admin/customers/{id}/vouchers': {
+      post: {
+        tags: ['Admin'],
+        security: [{ bearerAuth: [] }],
+        summary: 'Gift a one-use voucher that only this customer can redeem',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 201: { description: 'Gift voucher created' }, 404: { description: 'Customer not found' } },
+      },
+    },
     '/admin/orders/{id}/status': { put: { tags: ['Admin'], security: [{ bearerAuth: [] }], summary: 'Update order status' } },
     '/admin/reviews/{id}/approve': { put: { tags: ['Admin'], security: [{ bearerAuth: [] }], summary: 'Approve review' } },
     '/admin/reviews/{id}/reject': { put: { tags: ['Admin'], security: [{ bearerAuth: [] }], summary: 'Reject review' } },

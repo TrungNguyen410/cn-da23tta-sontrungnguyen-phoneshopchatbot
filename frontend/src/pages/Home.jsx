@@ -2,15 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   FiArrowRight,
   FiAward,
-  FiHeadphones,
   FiPause,
   FiPlay,
   FiRefreshCcw,
   FiShield,
-  FiSmartphone,
   FiTruck,
-  FiWatch,
-  FiZap,
 } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 import { accessoryApi } from '../api/accessoryApi';
@@ -21,15 +17,8 @@ import EmptyState from '../components/common/EmptyState';
 import CategoryCarousel from '../components/home/CategoryCarousel';
 import ProductGrid from '../components/product/ProductGrid';
 import PersonalizedRecommendations from '../components/product/PersonalizedRecommendations';
+import { brandShowcase } from '../utils/brandShowcase';
 import { bestDeals, bestSellers, featuredAccessories } from '../utils/merchandising';
-
-const categories = [
-  { name: 'iPhone', icon: FiSmartphone, query: 'Apple', color: 'blue' },
-  { name: 'Samsung', icon: FiSmartphone, query: 'Samsung', color: 'violet' },
-  { name: 'Xiaomi', icon: FiZap, query: 'Xiaomi', color: 'orange' },
-  { name: 'Tai nghe', icon: FiHeadphones, path: '/accessories?category=Tai%20nghe', color: 'cyan' },
-  { name: 'Đồng hồ', icon: FiWatch, path: '/accessories?category=Dong%20ho', color: 'green' },
-];
 
 export default function Home() {
   const [products, setProducts] = useState([]);
@@ -95,6 +84,7 @@ export default function Home() {
   const hotProducts = bestSellers(products);
   const saleProducts = bestDeals(products);
   const highlightedAccessories = featuredAccessories(accessories);
+  const brands = brandShowcase(products, accessories);
 
   return (
     <>
@@ -153,12 +143,14 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="container category-section">
-        <div className="section-heading compact">
-          <div><span>Mua sắm dễ dàng</span><h2>Danh mục nổi bật</h2></div>
-        </div>
-        <CategoryCarousel categories={categories} />
-      </section>
+      {brands.length > 0 && (
+        <section className="container category-section">
+          <div className="section-heading compact">
+            <div><span>Mua sắm dễ dàng</span><h2>Danh mục nổi bật</h2></div>
+          </div>
+          <CategoryCarousel categories={brands} />
+        </section>
+      )}
 
       <section className="container product-section">
         <div className="section-heading">

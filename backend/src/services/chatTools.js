@@ -379,7 +379,12 @@ const handlers = {
     }
     const now = new Date();
     const vouchers = await voucherRepository.findAll(
-      { active: true, startDate: { $lte: now }, endDate: { $gte: new Date(now.getTime() - 86400000) } },
+      {
+        active: true,
+        assignedUserId: null,
+        startDate: { $lte: now },
+        endDate: { $gte: new Date(now.getTime() - 86400000) },
+      },
       { sort: { createdAt: -1 }, limit: 10 },
     );
     return {

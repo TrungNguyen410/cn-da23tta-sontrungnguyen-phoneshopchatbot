@@ -9,6 +9,7 @@ const verificationCodeRepository = require('../repositories/verificationCodeRepo
 const userRepository = require('../repositories/userRepository');
 const otpDeliveryService = require('./otpDeliveryService');
 const { normalizeVietnamesePhone } = require('../utils/phone');
+const { toShippingAddress } = require('../utils/shippingAddress');
 
 const publicUser = (user) => (typeof user.toJSON === 'function' ? user.toJSON() : user);
 
@@ -170,8 +171,9 @@ class AuthService {
   }
 
   async updateProfile(userId, payload) {
-    const allowed = ['fullName', 'address', 'avatar'];
+    const allowed = ['fullName', 'address', 'avatar', 'shippingAddress'];
     const updates = Object.fromEntries(Object.entries(payload).filter(([key]) => allowed.includes(key)));
+    if (updates.shippingAddress) updates.shippingAddress = toShippingAddress(updates.shippingAddress);
     return userRepository.update(userId, updates);
   }
 

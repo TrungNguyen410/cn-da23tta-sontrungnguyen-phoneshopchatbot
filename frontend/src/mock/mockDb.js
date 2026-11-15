@@ -12,7 +12,9 @@ import { mockReviews } from './mockReviews';
 import { mockUsers } from './mockUsers';
 import { mockVouchers } from './mockVouchers';
 import { mockBrands, mockCategories } from './mockTaxonomy';
+import { buildDashboard, buildRevenue } from './mockDashboard';
 import { normalizeVietnamesePhone } from '../utils/validators';
+import { pickShippingAddress } from '../utils/shippingAddress';
 
 const wait = (value, delay = 180) => new Promise((resolve) => setTimeout(() => resolve(value), delay));
 const fail = (message, status = 400) => {
@@ -66,6 +68,35 @@ const requireActiveCheckoutUser = () => {
   const user = read('users').find((item) => item.id === session.id);
   if (!user || user.status !== 'active') fail('Tài khoản không thể đặt hàng', 403);
   return user;
+};
+const REQUIRED_ADDRESS_FIELDS = ['fullName', 'phone', 'address', 'province', 'ward'];
+const hasCompleteAddress = (address) => (
+  Boolean(address) && REQUIRED_ADDRESS_FIELDS.every((field) => String(address[field] || '').trim())
+);
+// Same rule as orderService.rememberShippingAddress: the first order saves the address,
+// later orders only when the customer asks for it.
+const rememberShippingAddress = (userId, customer, requested) => {
+  const users = read('users');
+  const user = users.find((item) => item.id === userId);
+  if (!user || (!requested && hasCompleteAddress(user.shippingAddress))) return;
+  const shippingAddress = pickShippingAddress(customer);
+  if (!hasCompleteAddress(shippingAddress)) return;
+  user.shippingAddress = { ...shippingAddress, phone: normalizeVietnamesePhone(shippingAddress.phone) || shippingAddress.phone };
+  write('users', users);
+};
+const GIFT_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const giftCode = () => `TRIAN${Array.from({ length: 6 }, () => (
+  GIFT_CODE_ALPHABET[Math.floor(Math.random() * GIFT_CODE_ALPHABET.length)]
+)).join('')}`;
+const voucherEnd = (voucher) => new Date(`${String(voucher.endDate).slice(0, 10)}T23:59:59`);
+// A gift voucher belongs to one customer; to anyone else it looks like an unknown code.
+const voucherVisibleTo = (voucher, userId) => !voucher.assignedUserId || voucher.assignedUserId === userId;
+const voucherStatus = (voucher, now = new Date()) => {
+  if (Number(voucher.quantity) && Number(voucher.used || 0) >= Number(voucher.quantity)) return 'used';
+  if (now > voucherEnd(voucher)) return 'expired';
+  if (!voucher.active) return 'inactive';
+  if (now < new Date(voucher.startDate)) return 'upcoming';
+  return 'available';
 };
 const scopedCheckoutKey = (userId, idempotencyKey) => {
   const key = String(idempotencyKey || '').trim().slice(0, 120);
@@ -206,10 +237,17 @@ export const mockDb = {
   },
 
   async updateProfile(userId, updates) {
-    const allowed = ['fullName', 'address', 'avatar'];
+    const allowed = ['fullName', 'address', 'avatar', 'shippingAddress'];
     const safeUpdates = Object.fromEntries(
       Object.entries(updates || {}).filter(([key]) => allowed.includes(key)),
     );
+    if (safeUpdates.shippingAddress) {
+      const address = pickShippingAddress(safeUpdates.shippingAddress);
+      if (!hasCompleteAddress(address)) fail('Vui lòng nhập đủ họ tên, số điện thoại, địa chỉ, tỉnh/thành và phường/xã', 422);
+      const phone = normalizeVietnamesePhone(address.phone);
+      if (!phone) fail('Số điện thoại Việt Nam không hợp lệ', 422);
+      safeUpdates.shippingAddress = { ...address, phone };
+    }
     return this.updateUser(userId, safeUpdates);
   },
 
@@ -334,6 +372,7 @@ export const mockDb = {
     if (payload.voucherCode) {
       const now = new Date();
       const usable = voucher
+        && voucherVisibleTo(voucher, user.id)
         && voucher.active
         && subtotal >= Number(voucher.minOrder || 0)
         && now >= new Date(voucher.startDate)
@@ -344,8 +383,9 @@ export const mockDb = {
     if (voucher) voucher.used = Number(voucher.used || 0) + 1;
     const discount = calculateVoucherDiscount(voucher, subtotal, shipping.fee);
     const now = new Date();
+    const { saveAddress, ...orderFields } = payload;
     const order = {
-      ...payload,
+      ...orderFields,
       userId: user.id,
       items,
       subtotal,
@@ -369,6 +409,7 @@ export const mockDb = {
       ));
     }
     write('orders', [order, ...orders]);
+    rememberShippingAddress(user.id, order.customer, saveAddress === true);
     return wait(clone(order));
   },
 
@@ -453,6 +494,22 @@ export const mockDb = {
     return wait(clone(order));
   },
 
+  // Customer self-service cancel: same rule as the backend, only before the shop confirms.
+  async cancelMyOrder(id) {
+    const session = currentMockUser();
+    if (!session) fail('Vui lòng đăng nhập để tiếp tục', 401);
+    const order = read('orders').find((item) => item.id === id);
+    if (!order) fail('Không tìm thấy đơn hàng', 404);
+    if (session.role !== 'admin' && order.userId !== session.id) {
+      fail('Bạn không có quyền truy cập đơn hàng này', 403);
+    }
+    if (order.status === 'cancelled') return wait(clone(order));
+    if (session.role !== 'admin' && order.status !== 'pending') {
+      fail('Đơn hàng đã được cửa hàng xác nhận nên bạn không thể tự hủy. Vui lòng liên hệ cửa hàng để được hỗ trợ.', 400);
+    }
+    return this.updateOrderStatus(id, 'cancelled');
+  },
+
   async updateOrderShipping(id, payload) {
     const orders = read('orders');
     const order = orders.find((item) => item.id === id);
@@ -514,7 +571,10 @@ export const mockDb = {
     const voucher = read('vouchers').find(
       (item) => item.code.toLowerCase() === code.trim().toLowerCase() && item.active,
     );
-    if (!voucher) fail('Mã giảm giá không hợp lệ');
+    if (!voucher || !voucherVisibleTo(voucher, currentMockUser()?.id)) fail('Mã giảm giá không hợp lệ');
+    if (Number(voucher.quantity) && Number(voucher.used || 0) >= Number(voucher.quantity)) {
+      fail('Mã giảm giá đã hết lượt sử dụng');
+    }
     if (subtotal < voucher.minOrder) fail(`Đơn hàng chưa đạt giá trị tối thiểu ${voucher.minOrder}`);
     const today = new Date();
     if (today < new Date(voucher.startDate) || today > new Date(`${voucher.endDate}T23:59:59`)) {
@@ -523,23 +583,58 @@ export const mockDb = {
     return wait(clone(voucher));
   },
 
-  async dashboard() {
-    const products = read('products');
-    const orders = read('orders');
-    const users = read('users').filter((user) => user.role === 'customer');
-    const revenue = orders
-      .filter((order) => order.status === 'completed')
-      .reduce((sum, order) => sum + order.total, 0);
-    return wait({
-      stats: { products: products.length, orders: orders.length, customers: users.length, revenue },
-      recentOrders: orders.slice(0, 5),
-      topProducts: [...products].sort((a, b) => b.sold - a.sold).slice(0, 5),
-      monthlyRevenue: [320, 415, 380, 520, 610, 740, 680, 820, 910, 1020, 1160, 1280],
-      orderStatus: ['pending', 'confirmed', 'shipping', 'completed', 'cancelled'].map((status) => ({
-        status,
-        count: orders.filter((order) => order.status === status).length,
-      })),
-    });
+  async dashboard(period = {}) {
+    return wait(buildDashboard({
+      products: read('products'),
+      accessories: read('accessories'),
+      orders: read('orders'),
+      users: read('users'),
+      ...period,
+    }));
+  },
+
+  async revenue(period = {}) {
+    return wait(buildRevenue(read('orders'), period));
+  },
+
+  async myVouchers() {
+    const session = currentMockUser();
+    if (!session) fail('Vui lòng đăng nhập để tiếp tục', 401);
+    return wait(read('vouchers')
+      .filter((voucher) => voucher.assignedUserId === session.id)
+      .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0))
+      .map((voucher) => ({ ...clone(voucher), status: voucherStatus(voucher) })));
+  },
+
+  async giftVoucher(customerId, payload = {}) {
+    const actor = currentMockUser();
+    if (!actor || actor.role !== 'admin') fail('Bạn không có đủ quyền để thực hiện thao tác này', 403);
+    const customer = read('users').find((user) => user.id === customerId && user.role === 'customer');
+    if (!customer) fail('Không tìm thấy khách hàng', 404);
+    const value = Number(payload.value);
+    if (!['percent', 'fixed', 'shipping'].includes(payload.type)) fail('Loại mã giảm giá không hợp lệ', 422);
+    if (!(value > 0) || (payload.type === 'percent' && value > 100)) fail('Giá trị giảm không hợp lệ', 422);
+    if (!payload.endDate || voucherEnd(payload) < new Date()) fail('Ngày hết hạn phải từ hôm nay trở đi', 422);
+    const now = new Date().toISOString();
+    const voucher = {
+      id: createId('voucher'),
+      code: giftCode(),
+      type: payload.type,
+      value,
+      minOrder: Number(payload.minOrder || 0),
+      maxDiscount: payload.type === 'percent' ? Number(payload.maxDiscount || 0) : 0,
+      quantity: 1,
+      used: 0,
+      startDate: now.slice(0, 10),
+      endDate: String(payload.endDate).slice(0, 10),
+      active: true,
+      assignedUserId: customer.id,
+      note: String(payload.note || '').trim() || `Tri ân khách hàng ${customer.fullName}`,
+      createdAt: now,
+      updatedAt: now,
+    };
+    write('vouchers', [voucher, ...read('vouchers')]);
+    return wait(clone(voucher));
   },
 
   reset() {

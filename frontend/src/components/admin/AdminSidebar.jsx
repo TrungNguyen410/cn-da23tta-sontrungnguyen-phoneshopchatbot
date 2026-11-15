@@ -16,6 +16,7 @@ import {
   FiX,
 } from 'react-icons/fi';
 import { NavLink } from 'react-router-dom';
+import LogoMark from '../common/LogoMark';
 
 const links = [
   { to: '/admin/dashboard', label: 'Tổng quan', icon: FiGrid },
@@ -38,7 +39,7 @@ export default function AdminSidebar({ open, onClose }) {
   return (
     <aside className={`admin-sidebar ${open ? 'open' : ''}`}>
       <div className="admin-brand">
-        <span className="brand-mark">P</span>
+        <LogoMark className="brand-logo-mark" />
         <span>PhoneShopAI<small>ADMIN CENTER</small></span>
         <button onClick={onClose}><FiX /></button>
       </div>

@@ -41,16 +41,18 @@ export default function CategoryCarousel({ categories }) {
   useEffect(() => () => clearTimeout(resumeRef.current), []);
 
   const renderCards = (clone = false) => categories.map((category) => {
-    const { name, icon: Icon, query, path, color } = category;
+    const { name, icon: Icon, logo, query, path, color } = category;
     return (
       <Link
         key={name}
         to={path || `/products?brand=${query}`}
-        className="category-card"
+        className={`category-card${logo ? ' has-logo' : ''}`}
         aria-hidden={clone || undefined}
         tabIndex={clone ? -1 : undefined}
       >
-        <div className={`category-icon ${color}`}><Icon /></div>
+        {logo
+          ? <div className="category-logo"><img src={logo} alt="" loading="lazy" decoding="async" /></div>
+          : <div className={`category-icon ${color}`}><Icon /></div>}
         <strong>{name}</strong>
         <span>Khám phá <FiArrowRight /></span>
       </Link>
@@ -72,6 +74,7 @@ export default function CategoryCarousel({ categories }) {
     >
       <div
         className={`category-marquee-track${looping ? ' is-looping' : ''}${isPaused ? ' is-paused' : ''}`}
+        style={{ '--marquee-count': categories.length }}
       >
         <div className="category-marquee-set">{renderCards()}</div>
         {looping && (

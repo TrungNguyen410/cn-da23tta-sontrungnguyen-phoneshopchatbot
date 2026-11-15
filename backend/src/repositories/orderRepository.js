@@ -4,6 +4,15 @@ const OrderCounter = require('../models/OrderCounter');
 const { normalizeVietnamesePhone } = require('../utils/phone');
 const { buildRegex } = require('../utils/query');
 
+// Revenue is reported in Vietnam time (UTC+7, no daylight saving) so an order placed
+// at 06:00 on the 1st belongs to that day, not to the previous UTC day.
+const REPORT_TIMEZONE = 'Asia/Ho_Chi_Minh';
+const REPORT_OFFSET_MS = 7 * 60 * 60 * 1000;
+const REVENUE_STATUSES = ['delivered', 'completed'];
+const localStart = (year, monthIndex = 0, day = 1) => (
+  new Date(Date.UTC(year, monthIndex, day) - REPORT_OFFSET_MS)
+);
+
 class OrderRepository extends BaseRepository {
   constructor() {
     super(Order);
@@ -134,19 +143,51 @@ class OrderRepository extends BaseRepository {
     return this.findPage(filter, { page, limit });
   }
 
-  async revenueByMonth(year) {
-    const start = new Date(Date.UTC(year, 0, 1));
-    const end = new Date(Date.UTC(year + 1, 0, 1));
+  async revenueBetween(start, end, unit) {
     return Order.aggregate([
       {
         $match: {
           isDeleted: false,
-          status: { $in: ['delivered', 'completed'] },
+          status: { $in: REVENUE_STATUSES },
           createdAt: { $gte: start, $lt: end },
         },
       },
-      { $group: { _id: { $month: '$createdAt' }, total: { $sum: '$total' } } },
+      {
+        $group: {
+          _id: { [`$${unit}`]: { date: '$createdAt', timezone: REPORT_TIMEZONE } },
+          total: { $sum: '$total' },
+        },
+      },
       { $sort: { _id: 1 } },
+    ]);
+  }
+
+  async revenueByYear(fromYear, toYear) {
+    return this.revenueBetween(localStart(fromYear), localStart(toYear + 1), 'year');
+  }
+
+  async revenueByMonth(year) {
+    return this.revenueBetween(localStart(year), localStart(year + 1), 'month');
+  }
+
+  async revenueByDay(year, month) {
+    return this.revenueBetween(localStart(year, month - 1), localStart(year, month), 'dayOfMonth');
+  }
+
+  // Customers ranked by money spent on delivered/completed orders.
+  async topCustomerTotals(limit) {
+    return Order.aggregate([
+      { $match: { isDeleted: false, userId: { $ne: null }, status: { $in: REVENUE_STATUSES } } },
+      {
+        $group: {
+          _id: '$userId',
+          orderCount: { $sum: 1 },
+          totalSpent: { $sum: '$total' },
+          lastOrderAt: { $max: '$createdAt' },
+        },
+      },
+      { $sort: { totalSpent: -1, orderCount: -1, _id: 1 } },
+      { $limit: limit },
     ]);
   }
 

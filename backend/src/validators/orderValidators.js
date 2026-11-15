@@ -4,7 +4,7 @@ const { normalizeVietnamesePhone } = require('../utils/phone');
 const statuses = ['pending', 'confirmed', 'shipping', 'delivered', 'completed', 'cancelled'];
 const MAX_ORDER_ITEMS = 50;
 const MAX_ITEM_ID_LENGTH = 100;
-const checkoutFields = ['items', 'customer', 'note', 'paymentMethod', 'voucherCode'];
+const checkoutFields = ['items', 'customer', 'note', 'paymentMethod', 'voucherCode', 'saveAddress'];
 const customerFields = ['fullName', 'email', 'phone', 'address', 'province', 'district', 'ward'];
 const itemFields = ['id', 'productId', 'accessoryId', 'type', 'quantity'];
 
@@ -53,6 +53,8 @@ const commonCreate = [
   body('customer.ward').trim().notEmpty().isLength({ max: 100 }),
   body('voucherCode').optional({ checkFalsy: true }).trim().isLength({ max: 50 }),
   body('note').optional({ checkFalsy: true }).trim().isLength({ max: 1000 }),
+  body('saveAddress').optional().isBoolean({ strict: true })
+    .withMessage('Lựa chọn lưu địa chỉ không hợp lệ'),
 ];
 
 const createDirect = [

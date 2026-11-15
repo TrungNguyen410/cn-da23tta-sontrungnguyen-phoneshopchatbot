@@ -6,6 +6,7 @@ import Loading from '../common/Loading';
 import DataTable from './DataTable';
 import ProductFormModal from './ProductFormModal';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { stockLevel } from '../../utils/stock';
 
 export default function CatalogManagement({ api, kind = 'product' }) {
   const [items, setItems] = useState([]);
@@ -70,7 +71,19 @@ export default function CatalogManagement({ api, kind = 'product' }) {
     },
     { key: 'brand', label: 'Thương hiệu' },
     { key: 'price', label: 'Giá bán', render: (item) => <strong>{formatCurrency(item.price)}</strong> },
-    { key: 'stock', label: 'Tồn kho', render: (item) => <span className={item.stock < 10 ? 'stock-low' : ''}>{item.stock}</span> },
+    {
+      key: 'stock',
+      label: 'Tồn kho',
+      render: (item) => {
+        const level = stockLevel(item.stock);
+        return (
+          <span className={level === 'ok' ? '' : `stock-low stock-${level}`}>
+            {item.stock}
+            {level !== 'ok' && <small>{level === 'out' ? 'Hết hàng' : 'Sắp hết'}</small>}
+          </span>
+        );
+      },
+    },
     { key: 'sold', label: 'Đã bán' },
     { key: 'status', label: 'Trạng thái', render: (item) => <span className={`status-badge ${item.status === 'active' ? 'status-completed' : 'status-cancelled'}`}>{item.status === 'active' ? 'Đang bán' : 'Ngừng bán'}</span> },
     {

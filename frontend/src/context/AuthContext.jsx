@@ -93,6 +93,16 @@ export function AuthProvider({ children }) {
     [user],
   );
 
+  // Mirrors a change the server already applied (e.g. the address saved with an order).
+  const updateLocalUser = useCallback((changes) => {
+    setUser((current) => {
+      if (!current) return current;
+      const nextUser = { ...current, ...changes };
+      storage.set(STORAGE_KEYS.currentUser, nextUser);
+      return nextUser;
+    });
+  }, []);
+
   const changePassword = useCallback(
     (payload) => authApi.changePassword(user.id, payload),
     [user],
@@ -131,12 +141,13 @@ export function AuthProvider({ children }) {
       verifyRegistrationOtp,
       logout,
       updateProfile,
+      updateLocalUser,
       changePassword,
       toggleWishlist,
       setWishlist,
       loadCurrentUser,
     }),
-    [changePassword, loadCurrentUser, loading, login, logout, requestRegistrationOtp, setWishlist, token, toggleWishlist, updateProfile, user, verifyRegistrationOtp],
+    [changePassword, loadCurrentUser, loading, login, logout, requestRegistrationOtp, setWishlist, token, toggleWishlist, updateLocalUser, updateProfile, user, verifyRegistrationOtp],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

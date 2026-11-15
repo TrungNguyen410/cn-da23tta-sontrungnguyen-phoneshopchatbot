@@ -1752,3 +1752,785 @@ p,
     transform: translateZ(30px);
   }
 }
+
+/* ---------- Brand identity (14/11): PhoneShopAI logo mark, official brand logos, AI robot ---------- */
+
+/* PhoneShopAI mark: champagne "P" with an AI spark, used in header, footer and admin sidebar. */
+.logo-mark {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.brand-logo-mark {
+  width: 2.5rem;
+  height: 2.5rem;
+  filter: drop-shadow(0 8px 18px var(--color-glow-gold-soft));
+  transition: transform var(--dur-long) var(--ease-spring), filter var(--dur-short) var(--ease-out);
+}
+
+.brand:hover .brand-logo-mark {
+  transform: rotate(-6deg) scale(1.06);
+  filter: drop-shadow(0 10px 22px var(--color-glow-gold));
+}
+
+.logo-mark-spark {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes logo-spark-twinkle {
+  0%, 72%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  82% { transform: scale(0.5) rotate(45deg); opacity: 0.55; }
+  91% { transform: scale(1.18) rotate(90deg); opacity: 1; }
+}
+
+/* Featured brands: official logos keep their own colors on an ivory plate inside the glass card. */
+.category-marquee-track.is-looping {
+  animation-duration: calc(var(--marquee-count, 5) * 4.4s);
+}
+
+.category-card.has-logo {
+  align-items: stretch;
+}
+
+/* Most brand cards start outside the clipped marquee, so the per-card scroll reveal made each one pop in late at the edge. */
+.category-marquee .nb-reveal.category-card {
+  opacity: 1;
+  translate: 0 0;
+}
+
+.category-logo {
+  display: flex;
+  height: 4.75rem;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-sm);
+  padding: 0.85rem 1.1rem;
+  border: 1px solid var(--color-logo-plate-edge);
+  border-radius: var(--radius-control);
+  background: linear-gradient(160deg, var(--color-logo-plate), var(--color-logo-plate-shade));
+  box-shadow: 0 12px 24px -16px var(--color-shadow-deep), 0 1px 0 var(--color-static-white) inset;
+  transform: translateZ(30px);
+  transition: transform var(--dur-long) var(--ease-spring), box-shadow var(--dur-short) var(--ease-out);
+}
+
+.category-logo img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+}
+
+.category-card:hover .category-logo {
+  transform: translateZ(46px) scale(1.04);
+  box-shadow: 0 18px 30px -16px var(--color-shadow-deep), 0 0 0 1px var(--color-glass-edge-strong);
+}
+
+/* AI assistant robot. */
+.robot-mascot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.robot-eye,
+.robot-antenna {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes robot-blink {
+  0%, 44%, 50%, 100% { transform: scaleY(1); }
+  47% { transform: scaleY(0.12); }
+}
+
+@keyframes robot-antenna-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.8); }
+}
+
+@keyframes robot-look {
+  0%, 100% { transform: translateX(-2.5px); }
+  50% { transform: translateX(2.5px); }
+}
+
+@keyframes robot-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .logo-mark-spark {
+    animation: logo-spark-twinkle 3.6s var(--ease-in-out) infinite;
+  }
+
+  .robot-eye {
+    animation: robot-blink 5.2s var(--ease-in-out) infinite;
+  }
+
+  .robot-antenna {
+    animation: robot-antenna-pulse 2.4s var(--ease-in-out) infinite;
+  }
+
+  .robot-mascot.is-thinking .robot-eyes {
+    animation: robot-look 1.4s var(--ease-in-out) infinite;
+  }
+
+  .robot-mascot.is-thinking .robot-antenna {
+    animation-duration: 0.8s;
+  }
+
+  .robot-mascot.is-floating {
+    animation: robot-float 4s var(--ease-in-out) infinite;
+  }
+}
+
+/* The gold toggle needs a dark badge so the gold robot stays visible on it. */
+.chat-toggle-robot {
+  width: 2rem;
+  height: 2rem;
+  margin-inline-start: calc(-1 * var(--space-2xs));
+  padding: 0.2rem;
+  border-radius: 50%;
+  background: var(--color-graphite-deep);
+  box-shadow: 0 0 0 1px var(--color-glass-edge-strong);
+}
+
+.chat-avatar {
+  width: 2.6rem !important;
+  height: 2.6rem !important;
+  padding: 0.22rem;
+  border: 1px solid var(--color-glass-edge-strong);
+  background: radial-gradient(circle at 50% 35%, var(--color-graphite-soft), var(--color-graphite-deep)) !important;
+}
+
+.chat-hero {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3xs);
+  padding: var(--space-sm) 0 var(--space-xs);
+  text-align: center;
+}
+
+.chat-hero-robot {
+  position: relative;
+  width: 5.75rem;
+  height: 5.75rem;
+  margin-bottom: var(--space-2xs);
+  padding: 0.75rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, var(--color-glow-gold-soft), var(--color-transparent) 70%);
+}
+
+.chat-hero-robot::after {
+  content: '';
+  position: absolute;
+  inset-inline: 1.5rem;
+  inset-block-end: 0.2rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--color-shadow-soft);
+  filter: blur(3px);
+}
+
+.chat-hero strong {
+  color: var(--color-ink);
+  font-size: var(--text-base);
+}
+
+.chat-hero small {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  color: var(--color-on-dark-soft);
+  font-size: var(--text-xs);
+}
+
+.chat-hero small::before {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--color-success-bright);
+  box-shadow: 0 0 8px var(--color-success-bright);
+}
+
+.chat-message.with-avatar {
+  position: relative;
+  padding-inline-start: 2.2rem;
+}
+
+.chat-message-avatar {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-start: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0.15rem;
+  border: 1px solid var(--color-glass-edge);
+  border-radius: 50%;
+  background: var(--color-graphite-deep);
+}
+
+@media (max-width: 560px) {
+  .brand-logo-mark {
+    width: 2.15rem;
+    height: 2.15rem;
+  }
+
+  .category-marquee-track.is-looping {
+    animation-duration: calc(var(--marquee-count, 5) * 3.2s);
+  }
+
+  .category-logo {
+    height: 4rem;
+    padding: 0.7rem 0.8rem;
+  }
+}
+
+@media (hover: none) {
+  .brand:hover .brand-logo-mark {
+    transform: none;
+  }
+
+  .category-card:hover .category-logo {
+    transform: translateZ(30px);
+    box-shadow: 0 12px 24px -16px var(--color-shadow-deep), 0 1px 0 var(--color-static-white) inset;
+  }
+}
+
+/* ---------- Saved address, order cancel rule, gift vouchers, dashboard insights (14/11) ---------- */
+.order-cancel-note {
+  margin: 0;
+  padding: 0 16px 14px;
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.saved-address-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--color-glass-edge-strong);
+  border-radius: var(--radius-surface);
+  background: var(--color-accent-soft);
+}
+
+.saved-address-card > svg {
+  width: 1.6rem;
+  height: 1.6rem;
+  color: var(--color-gold-bright);
+}
+
+.saved-address-card small {
+  display: block;
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+.saved-address-card strong {
+  display: block;
+  margin-top: var(--space-3xs);
+  color: var(--color-ink);
+}
+
+.saved-address-card p {
+  margin: var(--space-3xs) 0;
+  color: var(--color-ink);
+  text-wrap: pretty;
+}
+
+.saved-address-card span {
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.address-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px dashed var(--color-glass-edge-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.address-switch button {
+  padding: 0;
+  border: 0;
+  color: var(--color-accent);
+  background: none;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.save-address-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.save-address-option input {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--color-accent);
+}
+
+.checkout-note-grid {
+  margin-top: var(--space-md);
+}
+
+.form-field .field-hint {
+  color: var(--color-ink-muted);
+}
+
+.account-address-form {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-xl);
+  border-top: 1px solid var(--color-glass-edge);
+}
+
+.my-vouchers {
+  display: grid;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.my-vouchers li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--color-glass-edge-strong);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-control);
+  background: var(--color-glass-light);
+}
+
+.my-vouchers li.is-muted {
+  border-left-color: var(--color-rule-strong);
+  opacity: 0.68;
+}
+
+.my-vouchers li > svg {
+  width: 1.4rem;
+  height: 1.4rem;
+  color: var(--color-gold-bright);
+}
+
+.my-vouchers .voucher-code {
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  letter-spacing: 0.08em;
+}
+
+.my-vouchers p {
+  margin: var(--space-3xs) 0;
+  color: var(--color-ink);
+}
+
+.my-vouchers small {
+  color: var(--color-ink-muted);
+}
+
+.stock-low small {
+  display: block;
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.stock-low.stock-low {
+  color: var(--color-warning);
+}
+
+.stock-low.stock-out {
+  color: var(--color-danger);
+}
+
+.low-stock-alert {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: 18px;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+  background: var(--color-warning-soft);
+  text-decoration: none;
+}
+
+.low-stock-alert svg {
+  flex: none;
+  color: var(--color-warning);
+}
+
+.low-stock-alert span {
+  flex: 1;
+}
+
+.low-stock-alert b {
+  color: var(--color-warning);
+  white-space: nowrap;
+}
+
+.revenue-section {
+  margin-bottom: 18px;
+  transition: opacity var(--dur-short) var(--ease-out);
+}
+
+.revenue-section.is-refreshing {
+  opacity: 0.55;
+}
+
+.revenue-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.revenue-filters h2 {
+  margin: 0 var(--space-sm) 0 0;
+  color: var(--color-ink);
+  font-size: var(--text-lg);
+}
+
+.revenue-filters label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.revenue-filters select {
+  min-height: 2.25rem;
+  padding: 0 var(--space-lg) 0 var(--space-sm);
+  border: 1px solid var(--color-glass-edge-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+  background-color: var(--color-paper-sunken);
+}
+
+.revenue-filters small {
+  margin-left: auto;
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.revenue-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.6fr);
+  gap: 18px;
+}
+
+.revenue-grid > :last-child {
+  grid-column: 1 / -1;
+}
+
+.revenue-chart.chart-card {
+  display: flex;
+  height: auto;
+  min-height: 21rem;
+  flex-direction: column;
+}
+
+.revenue-canvas {
+  position: relative;
+  height: 15rem;
+}
+
+.revenue-canvas canvas {
+  max-height: none;
+}
+
+.revenue-total {
+  text-align: right;
+}
+
+.revenue-total small {
+  display: block;
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.revenue-total strong {
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.revenue-table {
+  margin-top: var(--space-sm);
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.revenue-table summary {
+  cursor: pointer;
+}
+
+.revenue-table table {
+  width: 100%;
+  margin-top: var(--space-xs);
+  border-collapse: collapse;
+}
+
+.revenue-table th,
+.revenue-table td {
+  padding: var(--space-3xs) 0;
+  border-bottom: 1px solid var(--color-glass-edge);
+  text-align: left;
+}
+
+.revenue-table td:last-child,
+.revenue-table th:last-child {
+  color: var(--color-ink);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.top-customers .data-table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-badge {
+  display: inline-grid;
+  width: 1.6rem;
+  height: 1.6rem;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  color: var(--color-on-gold);
+  background: var(--gradient-gold);
+  font-size: var(--text-xs);
+}
+
+.gift-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-2xs) var(--space-sm);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  color: var(--color-accent);
+  background: var(--color-transparent);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background-color var(--dur-short) var(--ease-out), color var(--dur-short) var(--ease-out);
+}
+
+.gift-button:hover,
+.gift-button:focus-visible {
+  color: var(--color-on-gold);
+  background: var(--color-accent);
+}
+
+.dashboard-side-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.dashboard-empty {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.low-stock-card {
+  padding: 20px;
+}
+
+.low-stock-count {
+  display: inline-grid;
+  min-width: 22px;
+  height: 22px;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+  font-size: 9px;
+}
+
+.low-stock-card ul {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.low-stock-card li {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--color-rule-soft);
+}
+
+.low-stock-card li:last-child {
+  border-bottom: 0;
+}
+
+.low-stock-card img {
+  width: 40px;
+  height: 40px;
+  border-radius: 7px;
+  object-fit: cover;
+}
+
+.low-stock-card li > a {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  text-decoration: none;
+}
+
+.low-stock-card li > a strong {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.low-stock-card li > a small {
+  color: var(--color-ink-subtle);
+  font-size: 7px;
+}
+
+.low-stock-card li > a:hover strong,
+.low-stock-card li > a:focus-visible strong {
+  color: var(--color-accent);
+}
+
+.stock-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stock-pill.is-low {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
+.stock-pill.is-out {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.low-stock-more {
+  display: block;
+  margin-top: var(--space-sm);
+  color: var(--color-ink-muted);
+}
+
+.gift-voucher-modal > h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.gift-voucher-customer {
+  margin: 0 0 var(--space-lg);
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.gift-voucher-customer strong {
+  color: var(--color-ink);
+}
+
+.gift-voucher-modal .modal-actions {
+  margin-top: var(--space-lg);
+}
+
+.gift-voucher-done {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-sm);
+}
+
+.gift-voucher-done > svg {
+  width: 2rem;
+  height: 2rem;
+  color: var(--color-success);
+}
+
+.gift-voucher-code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px dashed var(--color-accent);
+  border-radius: var(--radius-control);
+}
+
+.gift-voucher-code strong {
+  color: var(--color-gold-bright);
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  letter-spacing: 0.1em;
+}
+
+@media (max-width: 1100px) {
+  .revenue-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .saved-address-card,
+  .my-vouchers li {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .saved-address-card .btn,
+  .my-vouchers li .btn,
+  .my-vouchers li .status-badge {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .revenue-filters small {
+    margin-left: 0;
+  }
+
+}
+
+.revenue-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  margin: 0;
+  place-items: center;
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+  pointer-events: none;
+}

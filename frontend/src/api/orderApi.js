@@ -14,7 +14,7 @@ export const orderApi = {
     USE_MOCK ? mockDb.ordersForUser(userId) : axiosClient.get('/orders/my-orders'),
   getById: (id) => (USE_MOCK ? mockDb.get('orders', id) : axiosClient.get(`/orders/${id}`)),
   cancel: (id) =>
-    USE_MOCK ? mockDb.updateOrderStatus(id, 'cancelled') : axiosClient.put(`/orders/${id}/cancel`),
+    USE_MOCK ? mockDb.cancelMyOrder(id) : axiosClient.put(`/orders/${id}/cancel`),
   lookup: (orderNumber, phone) =>
     USE_MOCK
       ? mockDb.findOrder(orderNumber, phone)

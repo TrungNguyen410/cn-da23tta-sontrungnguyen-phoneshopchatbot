@@ -25,8 +25,8 @@ describe('Checkout payment confirmations', () => {
     fireEvent.change(screen.getByRole('combobox', { name: /Tỉnh\/thành phố/i }), {
       target: { value: 'TP. Hồ Chí Minh' },
     });
-    fireEvent.change(screen.getByRole('textbox', { name: /Phường\/xã\/đặc khu/i }), {
-      target: { value: 'Bến Nghé' },
+    fireEvent.change(screen.getByLabelText(/Phường\/xã\/đặc khu/i), {
+      target: { value: 'Phường Sài Gòn' },
     });
   };
 
@@ -233,10 +233,107 @@ describe('Checkout payment confirmations', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Xác nhận đặt hàng' }));
 
     const province = screen.getByRole('combobox', { name: /Tỉnh\/thành phố/i });
-    const ward = screen.getByRole('textbox', { name: /Phường\/xã\/đặc khu/i });
+    const ward = screen.getByLabelText(/Phường\/xã\/đặc khu/i);
     expect(province).toHaveAttribute('aria-invalid', 'true');
     expect(province).toHaveAttribute('aria-describedby');
     expect(ward).toHaveAttribute('aria-invalid', 'true');
     expect(ward).toHaveAttribute('aria-describedby');
+  });
+
+  describe('saved shipping address', () => {
+    const savedAddress = {
+      fullName: 'Nguyễn Minh Anh',
+      email: 'user@gmail.com',
+      phone: '0911111111',
+      address: '45 Lê Lợi',
+      province: 'TP. Hồ Chí Minh',
+      ward: 'Phường Sài Gòn',
+    };
+    let updateLocalUser;
+
+    beforeEach(() => {
+      updateLocalUser = vi.fn();
+      useAuth.mockReturnValue({
+        user: { id: 'user-1', fullName: 'Nguyễn Minh Anh', email: 'user@gmail.com', phone: '0911111111', shippingAddress: savedAddress },
+        updateLocalUser,
+      });
+    });
+
+    it('ships to the saved address without showing the form', async () => {
+      render(<MemoryRouter><Checkout /></MemoryRouter>);
+
+      expect(screen.getByText('45 Lê Lợi, Phường Sài Gòn, TP. Hồ Chí Minh')).toBeInTheDocument();
+      expect(screen.queryByLabelText(/Phường\/xã\/đặc khu/i)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Xác nhận đặt hàng' }));
+
+      await waitFor(() => expect(orderApi.create).toHaveBeenCalledTimes(1));
+      const payload = orderApi.create.mock.calls[0][0];
+      expect(payload.customer).toEqual(savedAddress);
+      expect(payload.saveAddress).toBe(false);
+      expect(payload.customer).not.toHaveProperty('district');
+      expect(updateLocalUser).not.toHaveBeenCalled();
+    });
+
+    it('opens the form for another address and saves it only when ticked', async () => {
+      render(<MemoryRouter><Checkout /></MemoryRouter>);
+      fireEvent.click(screen.getByRole('button', { name: /Giao đến địa chỉ khác/i }));
+
+      expect(screen.getByLabelText(/Tỉnh\/thành phố/i)).toHaveValue('');
+      fireEvent.change(screen.getByLabelText(/Tỉnh\/thành phố/i), { target: { value: 'Hà Nội' } });
+      fireEvent.change(screen.getByLabelText(/Phường\/xã\/đặc khu/i), { target: { value: 'Phường Ba Đình' } });
+      fireEvent.change(screen.getByLabelText(/Số nhà, tên đường/i), { target: { value: '8 Phan Đình Phùng' } });
+      fireEvent.click(screen.getByRole('checkbox', { name: /Lưu làm địa chỉ mặc định/i }));
+      fireEvent.click(screen.getByRole('button', { name: 'Xác nhận đặt hàng' }));
+
+      await waitFor(() => expect(orderApi.create).toHaveBeenCalledTimes(1));
+      const payload = orderApi.create.mock.calls[0][0];
+      expect(payload.customer).toMatchObject({ address: '8 Phan Đình Phùng', province: 'Hà Nội', ward: 'Phường Ba Đình' });
+      expect(payload.saveAddress).toBe(true);
+      expect(updateLocalUser).toHaveBeenCalledWith({ shippingAddress: payload.customer });
+    });
+
+    it('can switch back to the saved address', () => {
+      render(<MemoryRouter><Checkout /></MemoryRouter>);
+      fireEvent.click(screen.getByRole('button', { name: /Giao đến địa chỉ khác/i }));
+      fireEvent.click(screen.getByRole('button', { name: 'Dùng địa chỉ đã lưu' }));
+
+      expect(screen.getByText('45 Lê Lợi, Phường Sài Gòn, TP. Hồ Chí Minh')).toBeInTheDocument();
+    });
+
+    it('saves the address of a first order and resolves a loosely typed ward', async () => {
+      useAuth.mockReturnValue({
+        user: { id: 'user-2', fullName: 'Khách mới', email: 'new@example.com', phone: '0922222222' },
+        updateLocalUser,
+      });
+      render(<MemoryRouter><Checkout /></MemoryRouter>);
+      expect(screen.getByText(/sẽ được lưu vào tài khoản/)).toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText(/Tỉnh\/thành phố/i), { target: { value: 'TP. Hồ Chí Minh' } });
+      const ward = screen.getByLabelText(/Phường\/xã\/đặc khu/i);
+      await waitFor(() => expect(ward).toHaveAttribute('list'));
+      fireEvent.change(ward, { target: { value: 'sai gon' } });
+      fireEvent.change(screen.getByLabelText(/Số nhà, tên đường/i), { target: { value: '1 Nguyễn Huệ' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Xác nhận đặt hàng' }));
+
+      await waitFor(() => expect(orderApi.create).toHaveBeenCalledTimes(1));
+      const payload = orderApi.create.mock.calls[0][0];
+      expect(payload.customer.ward).toBe('Phường Sài Gòn');
+      expect(payload.saveAddress).toBe(true);
+    });
+
+    it('rejects a ward that does not belong to the chosen province', async () => {
+      useAuth.mockReturnValue({
+        user: { id: 'user-2', fullName: 'Khách mới', email: 'new@example.com', phone: '0922222222', address: '1 Nguyễn Huệ' },
+        updateLocalUser,
+      });
+      render(<MemoryRouter><Checkout /></MemoryRouter>);
+      fireEvent.change(screen.getByLabelText(/Tỉnh\/thành phố/i), { target: { value: 'TP. Hồ Chí Minh' } });
+      const ward = screen.getByLabelText(/Phường\/xã\/đặc khu/i);
+      await waitFor(() => expect(ward).toHaveAttribute('list'));
+      fireEvent.change(ward, { target: { value: 'Phường Ba Đình' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Xác nhận đặt hàng' }));
+
+      expect(await screen.findByText(/có trong danh sách của tỉnh\/thành đã chọn/)).toBeInTheDocument();
+      expect(orderApi.create).not.toHaveBeenCalled();
+    });
   });
 });

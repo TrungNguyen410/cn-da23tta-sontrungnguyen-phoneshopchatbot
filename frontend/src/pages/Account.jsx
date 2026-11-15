@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FiEye, FiLock, FiLogOut, FiPackage, FiRefreshCcw, FiUser, FiXCircle } from 'react-icons/fi';
+import { FiEye, FiGift, FiLock, FiLogOut, FiPackage, FiRefreshCcw, FiUser, FiXCircle } from 'react-icons/fi';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { accessoryApi } from '../api/accessoryApi';
@@ -10,15 +10,21 @@ import EmptyState from '../components/common/EmptyState';
 import Loading from '../components/common/Loading';
 import LoadError from '../components/common/LoadError';
 import AccessibleDialog from '../components/common/AccessibleDialog';
+import MyVouchers from '../components/order/MyVouchers';
 import OrderLookupPanel from '../components/order/OrderLookupPanel';
+import ShippingAddressFields from '../components/order/ShippingAddressFields';
 import { useAuth } from '../hooks/useAuth';
 import { useCart } from '../hooks/useCart';
+import { useWards } from '../hooks/useWards';
 import { formatCurrency, formatDate } from '../utils/formatCurrency';
 import { getOrderStatus } from '../utils/orderStatus';
+import { emptyShippingAddress, pickShippingAddress, validateShippingAddress } from '../utils/shippingAddress';
+import { matchWard } from '../utils/wards';
 import { isStrongEnoughPassword, validateRequired } from '../utils/validators';
 
+// Customers may cancel only before the shop confirms the order (same rule as the backend).
 const canSelfCancel = (order) =>
-  ['pending', 'confirmed'].includes(order.status)
+  order.status === 'pending'
   && !['paid', 'refund_required', 'refunded'].includes(order.paymentStatus);
 
 export default function Account() {
@@ -26,8 +32,14 @@ export default function Account() {
   const { user, updateProfile, changePassword, logout } = useAuth();
   const { addToCart } = useCart();
   const [tab, setTab] = useState(searchParams.get('tab') || 'profile');
-  const [profile, setProfile] = useState({ fullName: user.fullName, phone: user.phone, address: user.address || '' });
+  const [profile, setProfile] = useState({ fullName: user.fullName, phone: user.phone });
   const [profileErrors, setProfileErrors] = useState({});
+  const [shippingAddress, setShippingAddress] = useState(() => (
+    user.shippingAddress ? pickShippingAddress(user.shippingAddress) : emptyShippingAddress(user)
+  ));
+  const [addressErrors, setAddressErrors] = useState({});
+  const [savingAddress, setSavingAddress] = useState(false);
+  const { wards, ready: wardsReady, failed: wardsFailed } = useWards(shippingAddress.province);
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
@@ -38,7 +50,7 @@ export default function Account() {
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
-    if (['profile', 'orders', 'password'].includes(requestedTab)) setTab(requestedTab);
+    if (['profile', 'orders', 'vouchers', 'password'].includes(requestedTab)) setTab(requestedTab);
   }, [searchParams]);
 
   const loadOrders = useCallback(
@@ -62,10 +74,7 @@ export default function Account() {
     setProfileErrors(nextErrors);
     if (Object.keys(nextErrors).length) return toast.error('Vui lòng kiểm tra lại thông tin cá nhân');
     try {
-      await updateProfile({
-        fullName: profile.fullName.trim(),
-        address: profile.address.trim(),
-      });
+      await updateProfile({ fullName: profile.fullName.trim() });
       toast.success('Đã cập nhật thông tin cá nhân');
     } catch (error) {
       toast.error(error.friendlyMessage || error.message);
@@ -74,6 +83,30 @@ export default function Account() {
   const updateProfileField = (key, value) => {
     setProfile((current) => ({ ...current, [key]: value }));
     setProfileErrors((current) => ({ ...current, [key]: '' }));
+  };
+  const updateAddressField = (key, value) => {
+    setShippingAddress((current) => ({ ...current, [key]: value }));
+    setAddressErrors((current) => ({ ...current, [key]: '' }));
+  };
+  const saveShippingAddress = async (event) => {
+    event.preventDefault();
+    const nextErrors = validateShippingAddress(shippingAddress, { wards, wardsReady });
+    setAddressErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return toast.error('Vui lòng kiểm tra lại địa chỉ nhận hàng');
+    const address = pickShippingAddress({
+      ...shippingAddress,
+      ward: (wardsReady && matchWard(wards, shippingAddress.ward)) || shippingAddress.ward,
+    });
+    setSavingAddress(true);
+    try {
+      await updateProfile({ shippingAddress: address });
+      setShippingAddress(address);
+      toast.success('Đã lưu địa chỉ nhận hàng mặc định');
+    } catch (error) {
+      toast.error(error.friendlyMessage || error.message);
+    } finally {
+      setSavingAddress(false);
+    }
   };
   const savePassword = async (event) => {
     event.preventDefault();
@@ -146,6 +179,7 @@ export default function Account() {
             <div className="account-user"><div>{(user.fullName || user.phone || '?').charAt(0)}</div><span><strong>{user.fullName}</strong><small>{user.phone}</small></span></div>
             <button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}><FiUser /> Thông tin cá nhân</button>
             <button className={tab === 'orders' ? 'active' : ''} onClick={() => setTab('orders')}><FiPackage /> Đơn hàng của tôi</button>
+            <button className={tab === 'vouchers' ? 'active' : ''} onClick={() => setTab('vouchers')}><FiGift /> Voucher của tôi</button>
             <button className={tab === 'password' ? 'active' : ''} onClick={() => setTab('password')}><FiLock /> Đổi mật khẩu</button>
             <button className="logout" onClick={logout}><FiLogOut /> Đăng xuất</button>
           </aside>
@@ -156,9 +190,22 @@ export default function Account() {
                 <div className="form-grid">
                   <label className="form-field"><span>Họ và tên *</span><input aria-invalid={Boolean(profileErrors.fullName)} aria-describedby={profileErrors.fullName ? 'profile-fullName-error' : undefined} value={profile.fullName} onChange={(event) => updateProfileField('fullName', event.target.value)} />{profileErrors.fullName && <small id="profile-fullName-error">{profileErrors.fullName}</small>}</label>
                   <label className="form-field"><span>Số điện thoại đăng nhập</span><input value={profile.phone} readOnly /><small>Đã xác minh qua SMS</small></label>
-                  <label className="form-field full"><span>Địa chỉ</span><textarea rows="3" value={profile.address} onChange={(event) => updateProfileField('address', event.target.value)} /></label>
                 </div>
                 <button className="btn btn-primary">Lưu thay đổi</button>
+              </form>
+            )}
+            {tab === 'profile' && (
+              <form className="account-address-form" onSubmit={saveShippingAddress}>
+                <div className="content-heading"><h2>Địa chỉ nhận hàng mặc định</h2><p>Tự điền sẵn khi thanh toán. Địa chỉ theo đơn vị hành chính mới (tỉnh/thành, phường/xã), không còn quận/huyện.</p></div>
+                <ShippingAddressFields
+                  idPrefix="profile-address"
+                  value={shippingAddress}
+                  errors={addressErrors}
+                  onChange={updateAddressField}
+                  wards={wards}
+                  wardsFailed={wardsFailed}
+                />
+                <button className="btn btn-primary" disabled={savingAddress}>{savingAddress ? 'Đang lưu…' : 'Lưu địa chỉ'}</button>
               </form>
             )}
             {tab === 'orders' && (
@@ -177,11 +224,18 @@ export default function Account() {
                            <div className="order-preview"><img src={order.items[0].image} alt="" /><div><strong>{order.items[0].name}</strong><small>{order.items.length > 1 ? `và ${order.items.length - 1} sản phẩm khác` : `${order.items[0].quantity} sản phẩm`}</small></div><b>{formatCurrency(order.total)}</b></div>
                            {order.trackingNumber && <div className="order-shipping-note"><strong>{order.shippingProvider || 'Đơn vị giao hàng'}</strong><span>Mã vận đơn: <b>{order.trackingNumber}</b></span>{order.estimatedDelivery && <span>Dự kiến giao: {formatDate(order.estimatedDelivery, true)}</span>}</div>}
                            <div className="order-card-actions"><button onClick={() => setSelectedOrder(order)}><FiEye /> Chi tiết</button><button disabled={reorderingId === order.id} onClick={() => reorder(order)}><FiRefreshCcw /> {reorderingId === order.id ? 'Đang thêm…' : 'Đặt lại'}</button>{canSelfCancel(order) && <button className="danger" onClick={() => setCancelOrderId(order.id)}><FiXCircle /> Hủy đơn</button>}</div>
+                           {order.status === 'confirmed' && <p className="order-cancel-note">Đơn đã được cửa hàng xác nhận nên không thể tự hủy. Cần hỗ trợ, vui lòng liên hệ cửa hàng.</p>}
                         </article>
                       );
                     })}
                   </div>
                 )}
+              </div>
+            )}
+            {tab === 'vouchers' && (
+              <div>
+                <div className="content-heading"><h2>Voucher của tôi</h2><p>Ưu đãi riêng cửa hàng tặng cho bạn. Mỗi mã dùng một lần, nhập ở bước giỏ hàng.</p></div>
+                <MyVouchers />
               </div>
             )}
             {tab === 'password' && (

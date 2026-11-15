@@ -151,6 +151,10 @@
   --color-rose-gold-bright: #e5aaa3;
   --color-on-gold: #1c1408;
   --color-on-dark-soft: #cfc6b4;
+  /* Ivory plate behind official brand logos so their own colors (including black marks) stay legible. */
+  --color-logo-plate: #faf6ee;
+  --color-logo-plate-shade: #ece4d3;
+  --color-logo-plate-edge: rgba(255, 248, 232, 0.55);
   --color-glass: rgba(24, 21, 17, 0.62);
   --color-glass-strong: rgba(14, 12, 10, 0.84);
   --color-glass-light: rgba(255, 244, 220, 0.035);

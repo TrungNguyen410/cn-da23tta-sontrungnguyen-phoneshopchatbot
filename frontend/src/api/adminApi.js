@@ -30,7 +30,17 @@ const resourceApi = (name, endpoint) => ({
 });
 
 export const adminApi = {
-  getDashboard: () => (USE_MOCK ? mockDb.dashboard() : axiosClient.get('/admin/dashboard')),
+  getDashboard: (params = {}) => (
+    USE_MOCK ? mockDb.dashboard(params) : axiosClient.get('/admin/dashboard', { params })
+  ),
+  getRevenue: (params = {}) => (
+    USE_MOCK ? mockDb.revenue(params) : axiosClient.get('/admin/dashboard/revenue', { params })
+  ),
+  giftVoucher: (customerId, payload) => (
+    USE_MOCK
+      ? mockDb.giftVoucher(customerId, payload)
+      : axiosClient.post(`/admin/customers/${customerId}/vouchers`, payload)
+  ),
   getCustomers: async ({ page = 1, limit = DEFAULT_PAGE_SIZE, search = '' } = {}) => {
     if (!USE_MOCK) {
       const response = await axiosClient.get('/admin/customers', { params: { page, limit, search } });
