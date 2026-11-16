@@ -1,4 +1,4 @@
-import { Bar } from 'react-chartjs-2';
+import { Bar, Line } from 'react-chartjs-2';
 import { formatCurrency } from '../../utils/formatCurrency';
 
 const numberFormat = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 });
@@ -12,24 +12,56 @@ export const compactMoney = (value) => {
   return numberFormat.format(amount);
 };
 
-// One revenue series per chart: a single gold column per period, thin, rounded at the data end only.
-export default function RevenueChart({ title, subtitle, labels, values, tooltipTitle, colors, maxBarThickness = 24, tableLabel }) {
+// Colors arrive as rgba() from toCanvasColor; the area fill reuses the accent at a lower opacity.
+const withAlpha = (color, alpha) => {
+  const match = /^rgba?\(([^,]+),([^,]+),([^,)]+)/.exec(color || '');
+  return match ? `rgba(${match[1].trim()}, ${match[2].trim()}, ${match[3].trim()}, ${alpha})` : color;
+};
+
+// Area fill fades from the line down to the x axis, so the outline stays the focus.
+const areaFill = (accent) => ({ chart }) => {
+  const { ctx, chartArea } = chart;
+  if (!chartArea) return withAlpha(accent, 0.12);
+  const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+  gradient.addColorStop(0, withAlpha(accent, 0.28));
+  gradient.addColorStop(1, withAlpha(accent, 0));
+  return gradient;
+};
+
+// One revenue series per chart. "bar": a single gold column per period, rounded at the data end only.
+// "area": a thin gold line with a point per period over a faded fill, for long day-by-day series.
+export default function RevenueChart({ title, subtitle, labels, values, tooltipTitle, colors, maxBarThickness = 24, tableLabel, variant = 'bar' }) {
+  const isArea = variant === 'area';
   const total = values.reduce((sum, value) => sum + value, 0);
   const best = values.reduce((bestIndex, value, index) => (value > values[bestIndex] ? index : bestIndex), 0);
-  const data = {
-    labels,
-    datasets: [{
-      label: 'Doanh thu',
-      data: values,
-      backgroundColor: colors.accent,
-      hoverBackgroundColor: colors.accentHover,
-      borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 },
-      borderSkipped: 'start',
-      maxBarThickness,
-      categoryPercentage: 0.8,
-      barPercentage: 0.9,
-    }],
+  const dataset = isArea ? {
+    label: 'Doanh thu',
+    data: values,
+    borderColor: colors.accent,
+    borderWidth: 2,
+    backgroundColor: areaFill(colors.accent),
+    fill: 'origin',
+    // Monotone keeps the curve from dipping below zero between days without revenue.
+    cubicInterpolationMode: 'monotone',
+    pointRadius: 2.5,
+    pointBackgroundColor: colors.accent,
+    pointBorderWidth: 0,
+    pointHoverRadius: 5,
+    pointHoverBackgroundColor: colors.accentHover,
+    pointHoverBorderWidth: 0,
+  } : {
+    label: 'Doanh thu',
+    data: values,
+    backgroundColor: colors.accent,
+    hoverBackgroundColor: colors.accentHover,
+    borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 },
+    borderSkipped: 'start',
+    maxBarThickness,
+    categoryPercentage: 0.8,
+    barPercentage: 0.9,
   };
+  const data = { labels, datasets: [dataset] };
+  const ChartType = isArea ? Line : Bar;
   const options = {
     responsive: true,
     maintainAspectRatio: false,
@@ -64,7 +96,7 @@ export default function RevenueChart({ title, subtitle, labels, values, tooltipT
         <div className="revenue-total"><small>Tổng</small><strong>{formatCurrency(total)}</strong></div>
       </div>
       <div className="revenue-canvas">
-        <Bar data={data} options={options} aria-label={`${title}: tổng ${formatCurrency(total)}`} role="img" />
+        <ChartType data={data} options={options} aria-label={`${title}: tổng ${formatCurrency(total)}`} role="img" />
         {total === 0 && <p className="revenue-empty">Chưa có doanh thu trong giai đoạn này</p>}
       </div>
       <details className="revenue-table">

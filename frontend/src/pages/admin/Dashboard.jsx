@@ -5,8 +5,11 @@ import {
   Chart as ChartJS,
   ArcElement,
   BarElement,
+  Filler,
   Legend,
   LinearScale,
+  LineElement,
+  PointElement,
   Tooltip,
 } from 'chart.js';
 import { FiAlertTriangle, FiDollarSign, FiGift, FiPackage, FiSmartphone, FiUsers } from 'react-icons/fi';
@@ -24,7 +27,7 @@ import { toCanvasColor } from '../../utils/canvasColor';
 import { formatCurrency, formatDate } from '../../utils/formatCurrency';
 import { getOrderStatus } from '../../utils/orderStatus';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Filler, ArcElement, Tooltip, Legend);
 
 // Tokens use the OKLCH color space; Chart.js needs them converted before it derives hover colors.
 const readChartColors = () => {
@@ -56,7 +59,14 @@ const greetingFor = (hour) => {
 
 const vietnamToday = () => {
   const now = new Date(Date.now() + 7 * 60 * 60 * 1000);
-  return { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
+  return { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1, day: now.getUTCDate() };
+};
+// The daily chart stops at today for the current month (future days would sit at 0)
+// and stays empty for a month that has not started yet.
+const daysToShow = (revenue, today) => {
+  if (revenue.year === today.year && revenue.month === today.month) return Math.min(today.day, revenue.daily.length);
+  const isFuture = revenue.year > today.year || (revenue.year === today.year && revenue.month > today.month);
+  return isFuture ? 0 : revenue.daily.length;
 };
 const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1);
 const typeLabel = (type) => (type === 'accessory' ? 'Phụ kiện' : 'Điện thoại');
@@ -65,7 +75,7 @@ const managePath = (type) => (type === 'accessory' ? '/admin/accessories' : '/ad
 export default function Dashboard() {
   const { user } = useAuth();
   const [today] = useState(vietnamToday);
-  const [period, setPeriod] = useState(today);
+  const [period, setPeriod] = useState(() => ({ year: today.year, month: today.month }));
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -78,7 +88,7 @@ export default function Dashboard() {
   useEffect(() => {
     let active = true;
     setLoadError('');
-    adminApi.getDashboard(today)
+    adminApi.getDashboard({ year: today.year, month: today.month })
       .then((dashboard) => { if (active) setData(dashboard); })
       .catch((error) => { if (active) setLoadError(error.friendlyMessage || error.message); });
     return () => { active = false; };
@@ -120,7 +130,9 @@ export default function Dashboard() {
 
   const { revenue, lowStock } = data;
   const years = Array.from({ length: 10 }, (_, index) => today.year - index);
-  const dailyLabels = revenue.daily.map((_, index) => String(index + 1));
+  const dailyValues = revenue.daily.slice(0, daysToShow(revenue, today));
+  const dailyLabels = dailyValues.map((_, index) => String(index + 1));
+  const isCurrentMonth = revenue.year === today.year && revenue.month === today.month;
 
   const orderColumns = [
     { key: 'orderNumber', label: 'Mã đơn', render: (order) => <strong>{order.orderNumber}</strong> },
@@ -211,12 +223,14 @@ export default function Dashboard() {
           />
           <RevenueChart
             title="Theo ngày"
-            subtitle={`Tháng ${revenue.month}/${revenue.year}`}
+            subtitle={isCurrentMonth
+              ? `Từ 1/${revenue.month} đến hôm nay ${today.day}/${revenue.month}/${revenue.year}`
+              : `Tháng ${revenue.month}/${revenue.year}`}
             labels={dailyLabels}
-            values={revenue.daily}
+            values={dailyValues}
             tooltipTitle={(index) => `Ngày ${index + 1}/${revenue.month}/${revenue.year}`}
             tableLabel="Ngày"
-            maxBarThickness={14}
+            variant="area"
             colors={chartColors}
           />
         </div>
