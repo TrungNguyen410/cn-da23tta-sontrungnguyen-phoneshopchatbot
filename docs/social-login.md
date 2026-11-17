@@ -67,14 +67,23 @@ Migration tạo index mới trước, rồi mới bỏ index cũ. Chạy lại n
 5. Quay lại Meta for Developers → **Use cases → Authentication and account creation → Customize → Settings** (Facebook Login settings) → dán URI đó vào **Valid OAuth Redirect URIs** → **Save changes**.
 6. Khi app ở chế độ **Development**, chỉ tài khoản Facebook có vai trò trong app (admin, developer, tester) đăng nhập được. Để demo cho người khác:
    - thêm họ ở **App roles → Roles → Add People** (tester); hoặc
-   - chuyển app sang **Live**. Meta yêu cầu Privacy Policy URL, hướng dẫn xóa dữ liệu, danh mục và icon. Có thể dùng trang chính sách của web.
+   - chuyển app sang **Live**. Meta yêu cầu Privacy Policy URL, hướng dẫn xóa dữ liệu, danh mục và icon. Web có sẵn hai trang:
+     - `/privacy`: chính sách quyền riêng tư;
+     - `/xoa-du-lieu`: hướng dẫn xóa dữ liệu người dùng (điền vào ô **User data deletion → Data deletion instructions URL**).
+
+     URL phải trỏ tới nơi web **đang thực sự chạy công khai** (ví dụ tên miền Render). `https://phoneshopai.firebaseapp.com/privacy` chỉ mở được nếu frontend được deploy lên Firebase Hosting; nếu không, đổi URL trong Meta sang tên miền thật của web.
+   - Quyền `email` và `public_profile` là quyền mặc định, dùng được ở chế độ Development mà không cần App Review.
 
 Tên mục trên Meta for Developers thay đổi khá thường xuyên. Nếu không thấy đúng tên, tìm mục **Facebook Login → Settings**.
 
 ### Chung
 
 - **Authentication → Settings → Authorized domains**: `localhost` có sẵn (dùng cho mọi cổng: 3000, 5173…). Khi deploy, thêm tên miền thật.
-- **Authentication → Settings → User account linking**: để mặc định (**Link accounts that use the same email**). Khi đó nếu khách đã vào bằng Google, lần sau bấm Facebook với cùng email, Firebase báo "Email này đã đăng nhập bằng cách khác…". Khách chọn lại Google là được.
+- **Authentication → Settings → User account linking**: để mặc định (**Link accounts that use the same email**). Khi đó nếu khách đã vào bằng Google, lần sau bấm Facebook với cùng email, Firebase trả lỗi `auth/account-exists-with-different-credential`. Web xử lý như sau:
+  1. Giữ lại thông tin đăng nhập Facebook vừa được cấp (`FacebookAuthProvider.credentialFromError`).
+  2. Hiện thông báo "Email … đã được dùng để đăng nhập bằng Google. Hãy tiếp tục với Google để gộp Facebook vào cùng tài khoản." và làm nổi nút Google.
+  3. Khách bấm Google (popup gợi ý sẵn đúng email), đăng nhập xong thì web gọi `linkWithCredential` để gắn Facebook vào cùng người dùng Firebase. Từ lần sau, bấm Google hay Facebook đều vào cùng một tài khoản cửa hàng (cùng Firebase uid).
+  4. Nếu gộp thất bại (ví dụ khách chọn tài khoản Google khác), khách vẫn được đăng nhập bằng Google, chỉ là Facebook chưa được gộp.
 - Không còn dùng Phone sign-in. Có thể tắt **Phone** trong Sign-in method và xóa các số thử nghiệm.
 
 ## Lỗi thường gặp

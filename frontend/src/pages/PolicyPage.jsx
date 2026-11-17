@@ -43,10 +43,39 @@ const policies = {
       ['Chuyển khoản thủ công', 'Đơn ở trạng thái chờ đối soát cho tới khi nhân viên xác nhận tiền đã vào tài khoản cửa hàng.'],
     ],
   },
+  // Meta (Facebook Login) requires a privacy policy URL and data deletion instructions: /privacy and /xoa-du-lieu.
+  privacy: {
+    path: '/privacy',
+    eyebrow: 'Quyền riêng tư',
+    title: 'Chính sách quyền riêng tư',
+    intro: 'Trang này cho biết PhoneShopAI thu thập dữ liệu gì khi bạn mua hàng hoặc đăng nhập, dùng vào việc gì và bạn có những quyền gì với dữ liệu đó.',
+    sections: [
+      ['Dữ liệu chúng tôi thu thập', 'Khi đăng ký bằng số điện thoại: họ tên, số điện thoại và mật khẩu (lưu dạng mã hóa). Khi đăng nhập bằng Google hoặc Facebook: họ tên, địa chỉ email và ảnh đại diện mà Google/Facebook cho phép chia sẻ (quyền email và public_profile). Khi đặt hàng: tên, số điện thoại, địa chỉ nhận hàng và nội dung đơn hàng. Khi trò chuyện với trợ lý AI: nội dung tin nhắn bạn gửi.'],
+      ['Mục đích sử dụng', 'Tạo và đăng nhập tài khoản, xử lý và giao đơn hàng, xác nhận thanh toán, trả lời câu hỏi của bạn và cải thiện tư vấn của trợ lý AI. Chúng tôi không bán dữ liệu cá nhân và không dùng dữ liệu Facebook/Google để quảng cáo.'],
+      ['Bên thứ ba', 'Đăng nhập Google/Facebook chạy qua Firebase Authentication (Google). Trợ lý AI gửi nội dung câu hỏi tới Google Gemini để soạn câu trả lời. Thông tin giao hàng được chia sẻ với đơn vị vận chuyển; thanh toán online đi qua cổng thanh toán (VNPay, ngân hàng). Mỗi bên chỉ nhận phần dữ liệu cần cho việc của họ.'],
+      ['Lưu trữ và bảo vệ', 'Dữ liệu được lưu trên máy chủ cơ sở dữ liệu của cửa hàng, truy cập qua kết nối mã hóa. Mật khẩu được băm, không ai đọc được. Dữ liệu đơn hàng được giữ trong thời gian cần cho bảo hành, đối soát và nghĩa vụ kế toán.'],
+      ['Quyền của bạn', 'Bạn có thể xem và sửa thông tin trong trang Tài khoản, và yêu cầu xóa tài khoản cùng dữ liệu cá nhân theo hướng dẫn ở trang Xóa dữ liệu người dùng.'],
+    ],
+  },
+  'data-deletion': {
+    path: '/xoa-du-lieu',
+    eyebrow: 'Quyền riêng tư',
+    title: 'Hướng dẫn xóa dữ liệu người dùng',
+    intro: 'Bạn có thể yêu cầu xóa tài khoản PhoneShopAI và dữ liệu cá nhân bất cứ lúc nào, kể cả khi bạn đăng nhập bằng Facebook hoặc Google.',
+    sections: [
+      ['Cách gửi yêu cầu', 'Gửi yêu cầu qua trang Liên hệ hoặc email/hotline của cửa hàng ở cuối trang, với tiêu đề "Yêu cầu xóa dữ liệu". Ghi rõ số điện thoại hoặc email của tài khoản và cách bạn đăng nhập (số điện thoại, Google hay Facebook).'],
+      ['Chúng tôi xử lý thế nào', 'Sau khi xác minh bạn là chủ tài khoản, chúng tôi xóa tài khoản, thông tin cá nhân, địa chỉ đã lưu, danh sách yêu thích và lịch sử trò chuyện trong vòng 30 ngày, rồi báo lại cho bạn. Đơn hàng đã phát sinh chỉ được giữ ở dạng ẩn danh khi pháp luật yêu cầu lưu chứng từ.'],
+      ['Gỡ quyền của ứng dụng trên Facebook', 'Trên Facebook, vào Cài đặt và quyền riêng tư → Cài đặt → Ứng dụng và trang web, chọn PhoneShopAI rồi bấm Gỡ. Facebook sẽ ngừng chia sẻ dữ liệu với chúng tôi; để xóa dữ liệu đã lưu tại cửa hàng, hãy gửi yêu cầu như trên.'],
+      ['Gỡ quyền trên Google', 'Vào myaccount.google.com → Bảo mật → Ứng dụng và dịch vụ của bên thứ ba, chọn PhoneShopAI rồi xóa quyền truy cập.'],
+    ],
+  },
 };
 
-export default function PolicyPage() {
-  const { type } = useParams();
+const policyPath = (key) => policies[key].path || `/policies/${key}`;
+
+export default function PolicyPage({ type: fixedType }) {
+  const params = useParams();
+  const type = fixedType || params.type;
   const settings = useStoreSettings();
   const policy = policies[type];
 
@@ -60,7 +89,7 @@ export default function PolicyPage() {
         <aside className="policy-index">
           <span className="eyebrow">Trung tâm chính sách</span>
           {Object.entries(policies).map(([key, item]) => (
-            <Link className={key === type ? 'active' : ''} key={key} to={`/policies/${key}`}>{item.title}</Link>
+            <Link className={key === type ? 'active' : ''} key={key} to={policyPath(key)}>{item.title}</Link>
           ))}
         </aside>
         <article className="policy-content">
