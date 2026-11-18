@@ -28,8 +28,6 @@ export const STORAGE_KEYS = {
 export const PAYMENT_METHODS = [
   { value: 'cod', label: 'Thanh toán khi nhận hàng (COD)' },
   { value: 'bank', label: 'Chuyển khoản ngân hàng' },
-  { value: 'momo', label: 'Ví điện tử MoMo' },
-  { value: 'card', label: 'Thẻ/QR qua VNPay' },
 ];
 
 export const ORDER_STATUSES = ['pending', 'confirmed', 'shipping', 'delivered', 'completed', 'cancelled'];

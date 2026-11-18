@@ -255,8 +255,8 @@ erDiagram
     PAYMENT_TRANSACTION {
         string _id PK
         string orderId FK
-        string provider "vnpay | sepay"
-        string method "card | bank"
+        string provider "sepay"
+        string method "bank"
         string status "pending | paid | failed | expired | refunded"
         number amount
         string reference UK "SEPAY-<id SePay>"

@@ -229,7 +229,7 @@ export default function OrderManagement() {
               <div><small>Ghi chú</small><strong>{selectedOrder.paymentAudit.note || '—'}</strong></div>
             </section>
           )}
-          {['bank', 'momo'].includes(selectedOrder.paymentMethod)
+          {selectedOrder.paymentMethod === 'bank'
             && ['pending', 'failed'].includes(selectedOrder.paymentStatus) && (
               <section className="admin-payment-reconciliation" aria-label="Manual payment reconciliation">
                 <h3>Đối soát thanh toán</h3>

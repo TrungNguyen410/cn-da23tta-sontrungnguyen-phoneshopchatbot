@@ -130,7 +130,7 @@ Không có key hoặc Gemini quá tải, chatbot tự chuyển sang chế độ 
 2. Trên SePay tạo webhook trỏ tới `<API_PUBLIC_URL>/api/payments/sepay/webhook`, kiểu xác thực **API Key**, đặt cùng giá trị vào `SEPAY_WEBHOOK_API_KEY`.
 3. SePay không gọi được `localhost`. Khi chạy trên máy cá nhân, bật tunnel ngrok trong `.env` gốc: `COMPOSE_PROFILES=tunnel`, `NGROK_AUTHTOKEN`, `NGROK_DOMAIN`.
 
-### 5.3 SMS OTP (Twilio) và VNPay
+### 5.3 SMS OTP (Twilio)
 
 Không bắt buộc khi phát triển. Xem chú thích trong `backend/.env.example` và [docs/otp-configuration.md](../docs/otp-configuration.md).
 

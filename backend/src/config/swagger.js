@@ -119,7 +119,7 @@ const swaggerDocument = {
         properties: {
           items: { type: 'array', items: { type: 'object' } },
           customer: { type: 'object' },
-          paymentMethod: { type: 'string', enum: ['cod', 'bank', 'momo', 'card'] },
+          paymentMethod: { type: 'string', enum: ['cod', 'bank'] },
           subtotal: { type: 'number' },
           shippingFee: { type: 'number' },
           discount: { type: 'number' },
@@ -377,19 +377,6 @@ const swaggerDocument = {
     },
     '/payments/config': {
       get: { tags: ['Payments'], summary: 'List enabled payment providers' },
-    },
-    '/payments/vnpay/checkout': {
-      post: {
-        tags: ['Payments'],
-        summary: 'Create an authenticated or guest order and VNPay payment URL',
-        requestBody: { content: { 'application/json': { schema: { $ref: '#/components/schemas/OrderRequest' } } } },
-      },
-    },
-    '/payments/vnpay/ipn': {
-      get: { tags: ['Payments'], summary: 'Receive and verify the server-to-server VNPay IPN' },
-    },
-    '/payments/vnpay/return': {
-      get: { tags: ['Payments'], summary: 'Verify the browser return and redirect to the storefront' },
     },
     '/payments/sepay/webhook': {
       post: {

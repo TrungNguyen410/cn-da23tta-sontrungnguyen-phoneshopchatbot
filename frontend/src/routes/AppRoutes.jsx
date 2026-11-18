@@ -23,7 +23,6 @@ const Login = lazy(() => import('../pages/Login'));
 const NotFound = lazy(() => import('../pages/NotFound'));
 const OrderSuccess = lazy(() => import('../pages/OrderSuccess'));
 const OrderLookup = lazy(() => import('../pages/OrderLookup'));
-const PaymentResult = lazy(() => import('../pages/PaymentResult'));
 const PolicyPage = lazy(() => import('../pages/PolicyPage'));
 const ProductDetail = lazy(() => import('../pages/ProductDetail'));
 const ProductCompare = lazy(() => import('../pages/ProductCompare'));
@@ -77,7 +76,6 @@ export default function AppRoutes() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/favorites" element={<Favorites />} />
           <Route path="/order-lookup" element={<OrderLookup />} />
-          <Route path="/payment-result" element={<PaymentResult />} />
           <Route path="/policies/:type" element={<PolicyPage />} />
           <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />

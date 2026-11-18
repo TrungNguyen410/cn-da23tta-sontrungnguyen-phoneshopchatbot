@@ -25,31 +25,15 @@ import { trackEvent } from '../utils/analytics';
 
 const paymentHint = (method) => {
   if (method === 'cod') return 'Thanh toán trực tiếp cho nhân viên giao hàng';
-  if (method === 'bank') return 'Đặt hàng rồi quét mã VietQR theo mã đơn; thanh toán được xác nhận tự động';
-  if (method === 'momo') return 'Quét mã MoMo và xác nhận thanh toán trước khi đặt hàng';
-  return 'Thanh toán an toàn trên cổng VNPay; PhoneShopAI không thu thập thông tin thẻ';
+  return 'Đặt hàng rồi quét mã VietQR theo mã đơn; thanh toán được xác nhận tự động';
 };
-const PAYMENT_CONFIRM_METHODS = ['momo'];
-const providerNameFor = (method) => (method === 'card' ? 'vnpay' : method);
 const createCheckoutKey = () =>
   `checkout-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
-const readPendingCheckout = () => {
-  try {
-    const pending = JSON.parse(sessionStorage.getItem('techphone_pending_payment') || 'null');
-    return typeof pending?.checkoutKey === 'string' && pending.checkoutKey.startsWith('checkout-')
-      ? pending
-      : null;
-  } catch {
-    return null;
-  }
-};
 
 export default function Checkout() {
   const navigate = useNavigate();
   const { user, updateLocalUser } = useAuth();
   const cart = useCart();
-  const [pendingCheckout] = useState(readPendingCheckout);
-  const retryingVnpay = Boolean(pendingCheckout);
   // A complete saved address skips the form; "Giao đến địa chỉ khác" opens it again.
   const [savedAddress] = useState(() => (
     isUsableSavedAddress(user?.shippingAddress) ? pickShippingAddress(user.shippingAddress) : null
@@ -59,21 +43,16 @@ export default function Checkout() {
   const [form, setForm] = useState(() => ({
     ...(savedAddress || emptyShippingAddress(user || {})),
     note: '',
-    paymentMethod: retryingVnpay ? 'card' : 'cod',
+    paymentMethod: 'cod',
   }));
   const { wards, ready: wardsReady, failed: wardsFailed } = useWards(form.province);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
-  const [paymentConfirmStep, setPaymentConfirmStep] = useState(false);
   const [paymentConfig, setPaymentConfig] = useState({
     providers: { cod: { enabled: true } },
   });
-  const [paymentReference] = useState(() => `TP${Date.now().toString().slice(-8)}`);
-  const paymentConfirmRef = useRef(null);
   const checkoutTrackedRef = useRef(false);
-  const [initialCheckoutKey] = useState(
-    () => pendingCheckout?.checkoutKey || createCheckoutKey(),
-  );
+  const [initialCheckoutKey] = useState(createCheckoutKey);
   const idempotencyKeyRef = useRef(initialCheckoutKey);
   const submissionInFlightRef = useRef(false);
 
@@ -89,10 +68,6 @@ export default function Checkout() {
     return () => { active = false; };
   }, []);
 
-  const transferContent = useMemo(
-    () => `${paymentReference} ${form.phone || 'PHONESHOPAI'}`.trim().toUpperCase(),
-    [form.phone, paymentReference],
-  );
   const shipping = useMemo(
     () => getShippingQuote({ province: form.province, subtotal: cart.subtotal }),
     [cart.subtotal, form.province],
@@ -102,7 +77,6 @@ export default function Checkout() {
     [cart.subtotal, cart.voucher, shipping.fee],
   );
   const orderTotal = Math.max(0, cart.subtotal + shipping.fee - checkoutDiscount);
-  const momoDisplay = paymentConfig.providers?.momo?.display || {};
 
   useEffect(() => {
     if (checkoutTrackedRef.current || !cart.cartItems.length) return;
@@ -113,11 +87,6 @@ export default function Checkout() {
       currency: 'VND',
     });
   }, [cart.cartCount, cart.cartItems.length, orderTotal]);
-
-  const momoQrUrl = useMemo(
-    () => `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`MOMO|${momoDisplay.phone || ''}|${orderTotal}|${transferContent}`)}`,
-    [momoDisplay.phone, orderTotal, transferContent],
-  );
 
   if (cart.cartItems.length === 0) {
     return (
@@ -132,7 +101,6 @@ export default function Checkout() {
   const update = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }));
     setErrors((current) => ({ ...current, [key]: '' }));
-    if (key === 'paymentMethod') setPaymentConfirmStep(false);
   };
   const showAddressForm = () => {
     setUseSavedAddress(false);
@@ -182,12 +150,7 @@ export default function Checkout() {
     items: checkoutItems,
     customer: receiver(),
     saveAddress: shouldSaveAddress,
-    note: [
-      form.note.trim(),
-      form.paymentMethod === 'momo' ? `Ma giao dich MoMo: ${transferContent}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n'),
+    note: form.note.trim(),
     paymentMethod: form.paymentMethod,
     voucherCode: cart.voucher?.code || null,
   });
@@ -210,53 +173,9 @@ export default function Checkout() {
     }
   };
 
-  const startVnpayCheckout = async () => {
-    if (submissionInFlightRef.current) return;
-    submissionInFlightRef.current = true;
-    setSubmitting(true);
-    try {
-      const payload = { ...orderPayload(), paymentMethod: 'card' };
-      const result = await paymentApi.createVnpayCheckout(payload, idempotencyKeyRef.current);
-      if (payload.saveAddress) updateLocalUser?.({ shippingAddress: payload.customer });
-      try {
-        sessionStorage.setItem('techphone_pending_payment', JSON.stringify({
-          orderId: result.order.id,
-          orderNumber: result.order.orderNumber,
-          phone: result.order.customer.phone,
-          reference: result.transaction.reference,
-          checkoutKey: idempotencyKeyRef.current,
-          paymentMethod: 'card',
-          ...(result.resultProof ? { resultProof: result.resultProof } : {}),
-          createdAt: Date.now(),
-        }));
-      } catch {
-        // Payment can continue when browser storage is unavailable.
-      }
-      if (result.paymentUrl.startsWith('/')) navigate(result.paymentUrl);
-      else window.location.assign(result.paymentUrl);
-    } catch (error) {
-      toast.error(error.friendlyMessage || error.message);
-      submissionInFlightRef.current = false;
-      setSubmitting(false);
-    }
-  };
-
   const submit = async (event) => {
     event.preventDefault();
     if (!validateCheckout()) return;
-
-    if (form.paymentMethod === 'card') {
-      await startVnpayCheckout();
-      return;
-    }
-
-    if (PAYMENT_CONFIRM_METHODS.includes(form.paymentMethod) && !paymentConfirmStep) {
-      setPaymentConfirmStep(true);
-      toast.info('Hoàn tất thanh toán và bấm "Tôi đã thanh toán" để tạo đơn hàng.');
-      requestAnimationFrame(() => paymentConfirmRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-      return;
-    }
-
     await createOrder();
   };
 
@@ -327,7 +246,7 @@ export default function Checkout() {
               <h2><FiCreditCard /> Phương thức thanh toán</h2>
               <div className="payment-options">
                 {PAYMENT_METHODS.filter(
-                  (method) => paymentConfig.providers?.[providerNameFor(method.value)]?.enabled,
+                  (method) => paymentConfig.providers?.[method.value]?.enabled,
                 ).map((method) => (
                   <label className={form.paymentMethod === method.value ? 'active' : ''} key={method.value}>
                     <input
@@ -335,7 +254,6 @@ export default function Checkout() {
                       name="payment"
                       value={method.value}
                       checked={form.paymentMethod === method.value}
-                      disabled={retryingVnpay && method.value !== 'card'}
                       onChange={(event) => update('paymentMethod', event.target.value)}
                     />
                     <span><strong>{method.label}</strong><small>{paymentHint(method.value)}</small></span>
@@ -343,8 +261,6 @@ export default function Checkout() {
                 ))}
               </div>
             </section>
-
-            {paymentConfirmStep && form.paymentMethod === 'momo' && <section className="panel checkout-section bank-transfer-section" ref={paymentConfirmRef}><h2><FiCreditCard /> Thanh toán qua MoMo</h2><div className="bank-transfer-grid"><div className="bank-qr-card"><img src={momoQrUrl} alt="Mã QR thanh toán MoMo" /></div><div className="bank-transfer-info"><span>Quét mã trong ứng dụng MoMo</span><div><small>Số điện thoại nhận</small><strong>{momoDisplay.phone}</strong></div><div><small>Chủ tài khoản</small><strong>{momoDisplay.accountName}</strong></div><div><small>Số tiền</small><strong>{formatCurrency(orderTotal)}</strong></div><div><small>Nội dung</small><strong>{transferContent}</strong></div></div></div><p className="bank-transfer-note">Sau khi thanh toán qua MoMo, bấm <strong>Tôi đã thanh toán</strong> để hoàn tất đơn hàng.</p></section>}
           </div>
 
           <aside className="panel checkout-order">
@@ -366,26 +282,8 @@ export default function Checkout() {
             </div>
             <div className="summary-total"><span>Tổng thanh toán</span><strong>{formatCurrency(orderTotal)}</strong></div>
             <button className="btn btn-primary checkout-button" disabled={submitting}>
-              {submitting
-                ? form.paymentMethod === 'card' ? 'Đang mở VNPay…' : 'Đang tạo đơn hàng...'
-                : paymentConfirmStep
-                  ? 'Tôi đã thanh toán'
-                  : form.paymentMethod === 'card'
-                    ? 'Thanh toán qua VNPay'
-                  : PAYMENT_CONFIRM_METHODS.includes(form.paymentMethod)
-                    ? 'Tiếp tục thanh toán'
-                    : 'Xác nhận đặt hàng'}
+              {submitting ? 'Đang tạo đơn hàng...' : 'Xác nhận đặt hàng'}
             </button>
-            {paymentConfirmStep && (
-              <>
-                <button type="button" className="bank-edit-button" onClick={() => setPaymentConfirmStep(false)}>
-                  Quay lại sửa thông tin
-                </button>
-                <p className="checkout-address-note">
-                  <FiCheckCircle /> Chưa tạo đơn hàng cho tới khi bạn xác nhận đã thanh toán
-                </p>
-              </>
-            )}
             <p className="checkout-address-note"><FiMapPin /> Giao đến địa chỉ bạn đã cung cấp</p>
           </aside>
         </form>

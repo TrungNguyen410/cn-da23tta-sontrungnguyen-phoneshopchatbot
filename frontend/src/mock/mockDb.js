@@ -57,7 +57,6 @@ const createId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(3
 const readOtpRequests = () => storage.get(STORAGE_KEYS.mockOtpRequests, []);
 const writeOtpRequests = (items) => storage.set(STORAGE_KEYS.mockOtpRequests, items);
 const mockOtp = '123456';
-const vnpayCheckoutAuthorization = Symbol('mock-vnpay-checkout');
 const currentMockUser = () => {
   const currentUser = storage.get(STORAGE_KEYS.currentUser);
   return currentUser?.id && storage.get(STORAGE_KEYS.token) ? currentUser : null;
@@ -293,10 +292,10 @@ export const mockDb = {
     return wait({ success: true });
   },
 
-  async createOrder(payload, idempotencyKey, authorization) {
+  async createOrder(payload, idempotencyKey) {
     const user = requireActiveCheckoutUser();
-    if (payload.paymentMethod === 'card' && authorization !== vnpayCheckoutAuthorization) {
-      fail('Thanh toán thẻ chỉ khả dụng qua VNPay', 422);
+    if (!['cod', 'bank'].includes(payload.paymentMethod || 'cod')) {
+      fail('Phương thức thanh toán không hợp lệ', 422);
     }
     const orders = read('orders');
     const scopedKey = scopedCheckoutKey(user.id, idempotencyKey);
@@ -385,27 +384,6 @@ export const mockDb = {
     write('orders', [order, ...orders]);
     rememberShippingAddress(user.id, order.customer, saveAddress === true);
     return wait(clone(order));
-  },
-
-  async createVnpayCheckout(payload, idempotencyKey) {
-    const paymentReference = createId('vnpay');
-    const resultProof = createId('proof');
-    const order = await this.createOrder({
-      ...payload,
-      paymentMethod: 'card',
-      paymentStatus: 'pending',
-      paymentReference,
-    }, idempotencyKey, vnpayCheckoutAuthorization);
-    return wait({
-      order,
-      transaction: {
-        reference: order.paymentReference,
-        provider: 'vnpay',
-        status: 'pending',
-      },
-      resultProof,
-      paymentUrl: `/payment-result?provider=vnpay&reference=${encodeURIComponent(order.paymentReference)}&code=00&mock=true&proof=${encodeURIComponent(resultProof)}`,
-    });
   },
 
   async ordersForUser(userId) {
@@ -522,7 +500,7 @@ export const mockDb = {
     const orders = read('orders');
     const order = orders.find((item) => item.id === id);
     if (!order) fail('Không tìm thấy đơn hàng', 404);
-    if (!['bank', 'momo'].includes(order.paymentMethod)) {
+    if (order.paymentMethod !== 'bank') {
       fail('Đơn hàng không dùng thanh toán thủ công', 409);
     }
     if (!['pending', 'failed'].includes(order.paymentStatus) || order.paymentStatus === payload.status) {

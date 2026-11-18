@@ -17,24 +17,9 @@ export const paymentApi = {
                 accountName: 'PHONESHOPAI DEMO',
               },
             },
-            momo: {
-              enabled: true,
-              display: { phone: '0900000000', accountName: 'PHONESHOPAI DEMO' },
-            },
-            vnpay: { enabled: true, mode: 'sandbox' },
           },
         })
       : axiosClient.get('/payments/config'),
-  createVnpayCheckout: (payload, idempotencyKey) =>
-    USE_MOCK
-      ? mockDb.createVnpayCheckout(payload, idempotencyKey)
-      : axiosClient.post('/payments/vnpay/checkout', payload, {
-          headers: { 'Idempotency-Key': idempotencyKey },
-        }),
-  verifyVnpayResult: (proof) =>
-    USE_MOCK
-      ? Promise.reject(new Error('Mock payment results are verified locally'))
-      : axiosClient.post('/payments/vnpay/result', { proof }),
   reconcileManualPayment: (orderId, payload) =>
     USE_MOCK
       ? mockDb.reconcileManualPayment(orderId, payload)

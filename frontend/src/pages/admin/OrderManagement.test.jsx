@@ -29,7 +29,7 @@ const pendingOrder = {
   }],
   total: 1000000,
   status: 'pending',
-  paymentMethod: 'momo',
+  paymentMethod: 'bank',
   paymentStatus: 'pending',
 };
 
@@ -48,10 +48,10 @@ describe('OrderManagement payment method', () => {
 
   it('shows payment method in the list and detail', async () => {
     const { container } = render(<OrderManagement />);
-    expect(await screen.findByText('Ví điện tử MoMo')).toBeInTheDocument();
+    expect(await screen.findByText('Chuyển khoản ngân hàng')).toBeInTheDocument();
     fireEvent.click(container.querySelector('.table-view-button'));
     expect(screen.getByText('Phương thức thanh toán')).toBeInTheDocument();
-    expect(screen.getAllByText('Ví điện tử MoMo')).toHaveLength(2);
+    expect(screen.getAllByText('Chuyển khoản ngân hàng')).toHaveLength(2);
   });
 
   it('offers only legal next states and restores the current state after a failed update', async () => {
@@ -133,7 +133,7 @@ describe('OrderManagement payment method', () => {
     expect(screen.queryByRole('button', { name: 'Trang 0' })).not.toBeInTheDocument();
   });
 
-  it('renders reconciliation actions only for eligible bank and MoMo payments', async () => {
+  it('renders reconciliation actions only for eligible bank-transfer payments', async () => {
     const { container } = render(<OrderManagement />);
     await screen.findByText(pendingOrder.orderNumber);
     fireEvent.click(container.querySelector('.table-view-button'));
@@ -145,15 +145,15 @@ describe('OrderManagement payment method', () => {
     adminApi.getOrders.mockResolvedValue({
       items: [{
         ...pendingOrder,
-        id: 'card-order',
+        id: 'cod-order',
         orderNumber: 'TP260602',
-        paymentMethod: 'card',
+        paymentMethod: 'cod',
       }],
       pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
     });
-    const cardView = render(<OrderManagement />);
+    const codView = render(<OrderManagement />);
     await screen.findByText('TP260602');
-    fireEvent.click(cardView.container.querySelector('.table-view-button'));
+    fireEvent.click(codView.container.querySelector('.table-view-button'));
     expect(screen.queryByRole('button', { name: /confirm paid payment/i })).not.toBeInTheDocument();
   });
 
@@ -161,12 +161,12 @@ describe('OrderManagement payment method', () => {
     paymentApi.reconcileManualPayment.mockResolvedValue({
       ...pendingOrder,
       paymentStatus: 'paid',
-      paymentReference: 'MOMO-REF-01',
+      paymentReference: 'BANK-REF-01',
       status: 'confirmed',
       paymentAudit: {
         confirmedBy: 'admin-1',
         confirmedAt: '2026-08-05T10:00:00.000Z',
-        note: 'Matched MoMo statement',
+        note: 'Matched bank statement',
       },
     });
     const { container } = render(<OrderManagement />);
@@ -177,10 +177,10 @@ describe('OrderManagement payment method', () => {
     expect(paymentApi.reconcileManualPayment).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByLabelText(/payment reference/i), {
-      target: { value: ' MOMO-REF-01 ' },
+      target: { value: ' BANK-REF-01 ' },
     });
     fireEvent.change(screen.getByLabelText(/reconciliation note/i), {
-      target: { value: 'Matched MoMo statement' },
+      target: { value: 'Matched bank statement' },
     });
     fireEvent.click(screen.getByRole('button', { name: /confirm paid payment/i }));
 
@@ -188,8 +188,8 @@ describe('OrderManagement payment method', () => {
       pendingOrder.id,
       {
         status: 'paid',
-        reference: 'MOMO-REF-01',
-        note: 'Matched MoMo statement',
+        reference: 'BANK-REF-01',
+        note: 'Matched bank statement',
       },
     ));
   });
@@ -220,7 +220,7 @@ describe('OrderManagement payment method', () => {
       items: [{
         ...pendingOrder,
         paymentStatus: 'paid',
-        paymentReference: 'MOMO-AUDIT-01',
+        paymentReference: 'BANK-AUDIT-01',
         paymentAudit: {
           confirmedBy: 'admin-auditor',
           confirmedAt: '2026-08-05T10:00:00.000Z',
@@ -233,7 +233,7 @@ describe('OrderManagement payment method', () => {
     await screen.findByText(pendingOrder.orderNumber);
     fireEvent.click(container.querySelector('.table-view-button'));
 
-    expect(screen.getByText('MOMO-AUDIT-01')).toBeInTheDocument();
+    expect(screen.getByText('BANK-AUDIT-01')).toBeInTheDocument();
     expect(screen.getByText('admin-auditor')).toBeInTheDocument();
     expect(screen.getByText('Matched statement row 42')).toBeInTheDocument();
     expect(screen.queryByLabelText(/payment reference/i)).not.toBeInTheDocument();

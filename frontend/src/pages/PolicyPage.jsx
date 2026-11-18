@@ -36,11 +36,11 @@ const policies = {
   payment: {
     eyebrow: 'Thanh toán',
     title: 'Chính sách thanh toán',
-    intro: 'Khách có thể chọn COD, chuyển khoản thủ công hoặc cổng VNPay khi merchant đã được cấu hình.',
+    intro: 'Khách có thể chọn thanh toán khi nhận hàng (COD) hoặc chuyển khoản ngân hàng qua mã VietQR.',
     sections: [
-      ['Thanh toán online', 'Thông tin thẻ được nhập trên cổng VNPay. PhoneShopAI không thu thập hoặc lưu số thẻ và CVV.'],
-      ['Xác nhận giao dịch', 'Đơn chỉ chuyển sang đã thanh toán sau khi server nhận thông báo có chữ ký hợp lệ và số tiền khớp từ nhà cung cấp.'],
-      ['Chuyển khoản thủ công', 'Đơn ở trạng thái chờ đối soát cho tới khi nhân viên xác nhận tiền đã vào tài khoản cửa hàng.'],
+      ['Chuyển khoản VietQR', 'Sau khi đặt hàng, khách quét mã VietQR với nội dung là mã đơn hàng. PhoneShopAI không thu thập hoặc lưu thông tin thẻ.'],
+      ['Xác nhận tự động', 'Đơn chuyển sang đã thanh toán khi server nhận webhook SePay hợp lệ và số tiền chuyển đủ so với tổng đơn.'],
+      ['Đối soát thủ công', 'Nếu giao dịch không tự khớp (ghi sai nội dung, chuyển thiếu), đơn ở trạng thái chờ cho tới khi nhân viên đối soát.'],
     ],
   },
 };

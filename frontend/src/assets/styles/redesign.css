@@ -870,79 +870,6 @@ h4,
   font-weight: 700;
 }
 
-.payment-result-card {
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  justify-items: start;
-  gap: var(--space-md);
-  padding: clamp(var(--space-lg), 5vw, var(--space-2xl));
-}
-
-.payment-result-card h1,
-.payment-result-card p {
-  min-width: 0;
-  max-width: 58ch;
-  overflow-wrap: anywhere;
-}
-
-.payment-result-icon {
-  display: grid;
-  width: 3.5rem;
-  height: 3.5rem;
-  place-items: center;
-  color: var(--color-ink);
-  border: 1px solid var(--color-rule-strong);
-  border-radius: var(--radius-control);
-  background: var(--color-paper-sunken);
-  font-size: var(--text-xl);
-}
-
-.payment-result-card.is-accepted .payment-result-icon {
-  color: var(--color-success);
-  border-color: var(--color-success);
-  background: var(--color-success-soft);
-}
-
-.payment-result-card.is-failed .payment-result-icon {
-  color: var(--color-danger);
-  border-color: var(--color-danger);
-  background: var(--color-danger-soft);
-}
-
-.payment-result-reference {
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  gap: var(--space-xs);
-  margin: 0;
-  padding: var(--space-md);
-  border-block: 1px solid var(--color-rule);
-}
-
-.payment-result-reference div {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: var(--space-xs) var(--space-lg);
-}
-
-.payment-result-reference dt {
-  color: var(--color-ink-muted);
-}
-
-.payment-result-reference dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-family: var(--font-mono);
-  font-weight: 700;
-}
-
-.payment-result-help {
-  color: var(--color-ink-muted);
-  font-size: var(--text-sm);
-}
-
 .admin-tracking-form {
   display: grid;
   gap: var(--space-md);
@@ -1056,28 +983,6 @@ h4,
   .product-review-summary {
     grid-template-columns: minmax(8rem, 0.35fr) minmax(0, 1fr) auto;
     align-items: center;
-  }
-}
-
-.payment-result-card .success-actions {
-  align-items: stretch;
-  width: 100%;
-  min-width: 0;
-}
-
-.payment-result-card .success-actions .btn {
-  justify-content: center;
-  width: 100%;
-}
-
-@media (min-width: 40rem) {
-  .payment-result-card .success-actions {
-    align-items: center;
-    width: auto;
-  }
-
-  .payment-result-card .success-actions .btn {
-    width: auto;
   }
 }
 

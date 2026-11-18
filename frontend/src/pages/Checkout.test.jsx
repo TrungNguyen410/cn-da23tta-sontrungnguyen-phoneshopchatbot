@@ -10,7 +10,6 @@ import Checkout from './Checkout';
 vi.mock('../api/orderApi', () => ({ orderApi: { create: vi.fn() } }));
 vi.mock('../api/paymentApi', () => ({
   paymentApi: {
-    createVnpayCheckout: vi.fn(),
     getConfig: vi.fn(),
   },
 }));
@@ -18,7 +17,7 @@ vi.mock('../hooks/useAuth', () => ({ useAuth: vi.fn() }));
 vi.mock('../hooks/useCart', () => ({ useCart: vi.fn() }));
 vi.mock('react-toastify', () => ({ toast: { error: vi.fn(), info: vi.fn() } }));
 
-describe('Checkout payment confirmations', () => {
+describe('Checkout payment methods', () => {
   let cart;
 
   const completeCurrentAddress = () => {
@@ -68,100 +67,48 @@ describe('Checkout payment confirmations', () => {
             accountName: 'PHONESHOPAI TEST',
           },
         },
-        momo: {
-          enabled: true,
-          display: { phone: '0901234567', accountName: 'PHONESHOPAI MOMO' },
-        },
-        vnpay: { enabled: true, mode: 'sandbox' },
       },
-    });
-    paymentApi.createVnpayCheckout.mockResolvedValue({
-      order: {
-        id: 'order-vnpay',
-        orderNumber: 'TP26072801',
-        customer: { phone: '0911111111' },
-      },
-      transaction: { reference: 'TP26072801REF' },
-      resultProof: 'mock-result-proof',
-      paymentUrl: '/payment-result?code=00&mock=true&proof=mock-result-proof',
     });
   });
   afterEach(cleanup);
 
-  it('confirms MoMo before creating the order', async () => {
+  it('offers only COD and bank transfer, even if the server lists other providers', async () => {
+    paymentApi.getConfig.mockResolvedValue({
+      providers: {
+        cod: { enabled: true },
+        bank: { enabled: true },
+        momo: { enabled: true },
+        vnpay: { enabled: true },
+      },
+    });
     render(<MemoryRouter><Checkout /></MemoryRouter>);
-    completeCurrentAddress();
-    fireEvent.click(await screen.findByRole('radio', { name: /Ví điện tử MoMo/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Tiếp tục thanh toán' }));
-    expect(await screen.findByRole('heading', { name: 'Thanh toán qua MoMo' })).toBeInTheDocument();
-    expect(orderApi.create).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Tôi đã thanh toán' }));
-    await waitFor(() => expect(orderApi.create).toHaveBeenCalledTimes(1));
-    expect(orderApi.create.mock.calls[0][0].paymentMethod).toBe('momo');
-    expect(orderApi.create.mock.calls[0][0].note).toMatch(/Ma giao dich MoMo:/);
-    expect(orderApi.create.mock.calls[0][0].items).toEqual([
-      { id: 'phone-1', productId: 'phone-1', type: 'product', quantity: 1 },
-    ]);
+
+    expect(await screen.findByRole('radio', { name: /Chuyển khoản ngân hàng/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('radio')).toHaveLength(2);
+    expect(screen.queryByRole('radio', { name: /MoMo/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /VNPay/i })).not.toBeInTheDocument();
   });
 
-  it('redirects card payments to VNPay without rendering card inputs', async () => {
+  it('sends cart items in the checkout request', async () => {
     cart.cartItems = [{
       id: 'case-1',
       productId: 'case-1',
       name: 'Case',
       image: 'case.png',
       price: 300000,
-      oldPrice: 350000,
       stock: 10,
       type: 'accessory',
       quantity: 2,
     }];
     render(<MemoryRouter><Checkout /></MemoryRouter>);
     completeCurrentAddress();
-    fireEvent.click(await screen.findByRole('radio', { name: /VNPay/i }));
-    expect(screen.queryByLabelText(/Số thẻ/i)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Thanh toán qua VNPay' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Xác nhận đặt hàng' }));
 
-    await waitFor(() => expect(paymentApi.createVnpayCheckout).toHaveBeenCalledTimes(1));
-    expect(paymentApi.createVnpayCheckout.mock.calls[0][0].paymentMethod).toBe('card');
-    expect(paymentApi.createVnpayCheckout.mock.calls[0][0].items).toEqual([
+    await waitFor(() => expect(orderApi.create).toHaveBeenCalledTimes(1));
+    expect(orderApi.create.mock.calls[0][0].paymentMethod).toBe('cod');
+    expect(orderApi.create.mock.calls[0][0].items).toEqual([
       { id: 'case-1', accessoryId: 'case-1', type: 'accessory', quantity: 2 },
     ]);
-    expect(paymentApi.createVnpayCheckout.mock.calls[0][1]).toMatch(/^checkout-/);
-    expect(cart.clearCart).not.toHaveBeenCalled();
-    expect(JSON.parse(sessionStorage.getItem('techphone_pending_payment'))).toEqual(
-      expect.objectContaining({
-        orderId: 'order-vnpay',
-        orderNumber: 'TP26072801',
-        checkoutKey: expect.stringMatching(/^checkout-/),
-        paymentMethod: 'card',
-        resultProof: 'mock-result-proof',
-      }),
-    );
-    expect(orderApi.create).not.toHaveBeenCalled();
-  });
-
-  it('restores and locks VNPay when following the browser-visible retry route', async () => {
-    sessionStorage.setItem('techphone_pending_payment', JSON.stringify({
-      orderId: 'existing-order',
-      orderNumber: 'TP26072800',
-      reference: 'FAILED-REFERENCE',
-      checkoutKey: 'checkout-existing-attempt',
-      paymentMethod: 'card',
-      createdAt: Date.now(),
-    }));
-    render(<MemoryRouter initialEntries={['/checkout']}><Checkout /></MemoryRouter>);
-    completeCurrentAddress();
-    const vnpay = await screen.findByRole('radio', { name: /VNPay/i });
-    expect(vnpay).toBeChecked();
-    expect(screen.getByRole('radio', { name: /COD/i })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: /VNPay/i }));
-
-    await waitFor(() => expect(paymentApi.createVnpayCheckout).toHaveBeenCalledTimes(1));
-    expect(paymentApi.createVnpayCheckout.mock.calls[0][1]).toBe('checkout-existing-attempt');
-    expect(orderApi.create).not.toHaveBeenCalled();
-    expect(JSON.parse(sessionStorage.getItem('techphone_pending_payment')).checkoutKey)
-      .toBe('checkout-existing-attempt');
   });
 
   it('keeps pricing fields out of the checkout request', async () => {
@@ -203,8 +150,6 @@ describe('Checkout payment confirmations', () => {
       providers: {
         cod: { enabled: true },
         bank: { enabled: false },
-        momo: { enabled: false },
-        vnpay: { enabled: false },
       },
     });
 
@@ -212,8 +157,6 @@ describe('Checkout payment confirmations', () => {
 
     await waitFor(() => expect(paymentApi.getConfig).toHaveBeenCalled());
     expect(screen.queryByRole('radio', { name: /Chuyển khoản ngân hàng/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: /MoMo/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: /VNPay/i })).not.toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /COD/i })).toBeInTheDocument();
   });
 

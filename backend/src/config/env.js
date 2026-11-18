@@ -53,15 +53,6 @@ const requiredOrigin = (name, developmentFallback = '', { rejectLoopback = false
   return parsed.origin;
 };
 
-const requiredUrl = (name, developmentFallback = '') => {
-  const parsed = parseHttpUrl(name, developmentFallback);
-  if (parsed.username || parsed.password) {
-    throw new Error(`${name} must not contain credentials`);
-  }
-
-  return parsed.href.replace(/\/+$/, '');
-};
-
 const getJwtSecret = (name, developmentFallback) => {
   const value = process.env[name] || (isProduction ? '' : developmentFallback);
   const looksLikePlaceholder = /^(change|replace|dev|docker|example|test)[\s_-]/i.test(value);
@@ -72,9 +63,6 @@ const getJwtSecret = (name, developmentFallback) => {
   return value;
 };
 
-const vnpayTmnCode = String(process.env.VNPAY_TMN_CODE || '').trim();
-const vnpayHashSecret = String(process.env.VNPAY_HASH_SECRET || '').trim();
-const vnpayEnabled = Boolean(vnpayTmnCode && vnpayHashSecret);
 const detectedPlatformTarget = process.env.VERCEL
   ? 'vercel'
   : process.env.NETLIFY
@@ -172,10 +160,6 @@ const env = {
     maxOutputTokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 2048),
     timeoutMs: Number(process.env.GEMINI_TIMEOUT_MS || 40000),
   },
-  momo: {
-    phone: process.env.MOMO_PHONE || '',
-    accountName: process.env.MOMO_ACCOUNT_NAME || '',
-  },
   // Firebase Authentication (Google/Facebook): POST /api/auth/social accepts ID tokens issued for this project only.
   firebase: {
     projectId: String(process.env.FIREBASE_PROJECT_ID || '').trim(),
@@ -184,21 +168,6 @@ const env = {
     accountSid: process.env.TWILIO_ACCOUNT_SID || '',
     authToken: process.env.TWILIO_AUTH_TOKEN || '',
     from: process.env.TWILIO_FROM || '',
-  },
-  vnpay: {
-    tmnCode: vnpayTmnCode,
-    hashSecret: vnpayHashSecret,
-    paymentUrl: process.env.VNPAY_PAYMENT_URL || 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
-    returnUrl: vnpayEnabled
-      ? requiredUrl(
-        'VNPAY_RETURN_URL',
-        `http://localhost:${port}/api/payments/vnpay/return`,
-      )
-      : String(
-        process.env.VNPAY_RETURN_URL
-          || (isProduction ? '' : `http://localhost:${port}/api/payments/vnpay/return`),
-      ).trim().replace(/\/+$/, ''),
-    version: process.env.VNPAY_VERSION || '2.1.0',
   },
 };
 
