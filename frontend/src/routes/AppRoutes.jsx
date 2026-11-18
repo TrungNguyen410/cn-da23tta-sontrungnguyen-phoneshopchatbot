@@ -5,6 +5,7 @@ import ProtectedRoute from '../components/auth/ProtectedRoute';
 import Footer from '../components/common/Footer';
 import Header from '../components/common/Header';
 import Loading from '../components/common/Loading';
+import MobileTabBar from '../components/common/MobileTabBar';
 import RouteMeta from '../components/common/RouteMeta';
 import SupportLauncher from '../components/common/SupportLauncher';
 import ChatWidget from '../components/chat/ChatWidget';
@@ -53,6 +54,7 @@ function StoreLayout() {
       <Footer />
       <SupportLauncher />
       <ChatWidget />
+      <MobileTabBar />
     </div>
   );
 }

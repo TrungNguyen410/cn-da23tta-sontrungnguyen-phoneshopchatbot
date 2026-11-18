@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { authApi } from '../api/authApi';
 import { isStrongEnoughPassword } from '../utils/validators';
+import AuthShowcase from '../components/auth/AuthShowcase';
 import StoreBrand from '../components/common/StoreBrand';
 
 export default function ForgotPassword() {
@@ -64,6 +65,7 @@ export default function ForgotPassword() {
   return (
     <main className="auth-page">
       <div className="auth-visual">
+        <AuthShowcase />
         <div><FiKey /><h1>Khôi phục tài khoản<br />an toàn bằng OTP</h1><p>Mã chỉ có hiệu lực trong 10 phút và được dùng một lần.</p></div>
       </div>
       <div className="auth-panel">

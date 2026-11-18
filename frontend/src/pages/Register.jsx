@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { useAuth } from '../hooks/useAuth';
 import { isStrongEnoughPassword, isValidVietnamesePhone, validateRequired } from '../utils/validators';
 import SocialLoginButtons from '../components/common/SocialLoginButtons';
+import AuthShowcase from '../components/auth/AuthShowcase';
 import StoreBrand from '../components/common/StoreBrand';
 
 export default function Register() {
@@ -47,7 +48,10 @@ export default function Register() {
 
   return (
     <main className="auth-page register-page">
-      <div className="auth-visual"><div><FiUserPlus /><h1>Gia nhập cộng đồng<br />PhoneShopAI</h1><p>Theo dõi đơn hàng, nhận ưu đãi và chăm sóc cá nhân hóa.</p></div></div>
+      <div className="auth-visual">
+        <AuthShowcase />
+        <div><FiUserPlus /><h1>Gia nhập cộng đồng<br />PhoneShopAI</h1><p>Theo dõi đơn hàng, nhận ưu đãi và chăm sóc cá nhân hóa.</p></div>
+      </div>
       <div className="auth-panel">
         <StoreBrand />
         <form className="auth-form" onSubmit={submit}>

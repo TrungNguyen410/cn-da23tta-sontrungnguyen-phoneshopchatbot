@@ -18,6 +18,7 @@ import { productApi } from '../api/productApi';
 import { accessoryApi } from '../api/accessoryApi';
 import Loading from '../components/common/Loading';
 import EmptyState from '../components/common/EmptyState';
+import ProductViewer from '../components/product/ProductViewer';
 import ProductGrid from '../components/product/ProductGrid';
 import ProductReview from '../components/product/ProductReview';
 import RecentlyViewed from '../components/product/RecentlyViewed';
@@ -143,7 +144,12 @@ export default function ProductDetail() {
         <nav className="breadcrumbs"><Link to="/">Trang chủ</Link><FiChevronRight /><Link to="/products">Điện thoại</Link><FiChevronRight /><span>{product.name}</span></nav>
         <section className="detail-grid">
           <div className="gallery">
-            <div className="main-image"><img src={selectedImage} alt={product.name} /></div>
+            <ProductViewer
+              key={selectedImage}
+              image={selectedImage}
+              backImage={galleryImages.find((image) => image !== selectedImage)}
+              alt={product.name}
+            />
             <div className="thumbnail-row">
               {galleryImages.map((image, index) => (
                 <button className={selectedImage === image ? 'active' : ''} key={image} onClick={() => setSelectedImage(image)}>
@@ -153,10 +159,15 @@ export default function ProductDetail() {
             </div>
           </div>
           <div className="detail-info">
-            <span className="detail-brand">{product.brand}</span>
+            <div className="detail-tags">
+              <span className="detail-brand">{product.brand}</span>
+              {product.discountPercent > 0 && <span className="detail-tag is-coral">-{product.discountPercent}%</span>}
+              <span className="detail-tag is-green">Chính hãng</span>
+            </div>
             <h1>{product.name}</h1>
             <div className="detail-rating"><span><FiStar /> {product.rating}</span><span>{product.sold} sản phẩm đã bán</span></div>
             <div className="detail-price">
+              <small>Giá ưu đãi</small>
               <strong>{formatCurrency(product.price)}</strong>
               <del>{formatCurrency(product.oldPrice)}</del>
               <span>Tiết kiệm {product.discountPercent}%</span>

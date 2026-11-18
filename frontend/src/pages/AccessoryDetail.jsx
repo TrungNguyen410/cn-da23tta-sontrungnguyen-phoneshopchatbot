@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { accessoryApi } from '../api/accessoryApi';
 import EmptyState from '../components/common/EmptyState';
 import Loading from '../components/common/Loading';
+import ProductViewer from '../components/product/ProductViewer';
 import ProductGrid from '../components/product/ProductGrid';
 import ProductReview from '../components/product/ProductReview';
 import { useCart } from '../hooks/useCart';
@@ -82,7 +83,12 @@ export default function AccessoryDetail() {
         <nav className="breadcrumbs"><Link to="/">Trang chủ</Link><FiChevronRight /><span>Phụ kiện</span><FiChevronRight /><span>{accessory.name}</span></nav>
         <section className="detail-grid">
           <div className="gallery">
-            <div className="main-image"><img src={selectedImage} alt={accessory.name} /></div>
+            <ProductViewer
+              key={selectedImage}
+              image={selectedImage}
+              backImage={galleryImages.find((image) => image !== selectedImage)}
+              alt={accessory.name}
+            />
             {galleryImages.length > 1 && (
               <div className="thumbnail-row">
                 {galleryImages.map((image, index) => (

@@ -379,7 +379,7 @@
   box-shadow: 0 12px 30px var(--color-overlay-cobalt-16);
 }
 
-.dashboard-welcome span {
+.dashboard-welcome > div > span {
   color: var(--color-on-dark-soft);
   font-size: 9px;
   font-weight: 800;

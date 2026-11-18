@@ -3,9 +3,12 @@ import {
   FiArrowRight,
   FiAward,
   FiPause,
+  FiPercent,
   FiPlay,
   FiRefreshCcw,
+  FiSend,
   FiShield,
+  FiStar,
   FiTruck,
 } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
@@ -13,12 +16,27 @@ import { accessoryApi } from '../api/accessoryApi';
 import { bannerApi } from '../api/bannerApi';
 import { productApi } from '../api/productApi';
 import Loading from '../components/common/Loading';
+import Phone3D, { phoneTone } from '../components/common/Phone3D';
+import RobotMascot from '../components/chat/RobotMascot';
 import EmptyState from '../components/common/EmptyState';
 import CategoryCarousel from '../components/home/CategoryCarousel';
 import ProductGrid from '../components/product/ProductGrid';
 import PersonalizedRecommendations from '../components/product/PersonalizedRecommendations';
 import { brandShowcase } from '../utils/brandShowcase';
 import { bestDeals, bestSellers, featuredAccessories } from '../utils/merchandising';
+import { openAssistant } from '../utils/assistant';
+import { formatCurrency } from '../utils/formatCurrency';
+
+const ASK_PLACEHOLDER = 'Máy chụp ảnh đẹp dưới 15 triệu?';
+const ASK_SUGGESTIONS = ['Máy nào pin trâu nhất?', 'Điện thoại chơi game mượt', 'Có mã giảm giá nào không?'];
+
+// Paints the second half of a banner title with the holographic gradient.
+function HoloTitle({ text = '' }) {
+  const words = String(text).trim().split(/\s+/);
+  if (words.length < 2) return <span className="holo-text">{text}</span>;
+  const split = Math.floor(words.length / 2);
+  return <>{words.slice(0, split).join(' ')} <span className="holo-text">{words.slice(split).join(' ')}</span></>;
+}
 
 export default function Home() {
   const [products, setProducts] = useState([]);
@@ -30,6 +48,7 @@ export default function Home() {
   const [reducedMotion, setReducedMotion] = useState(
     () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
   );
+  const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -85,6 +104,8 @@ export default function Home() {
   const saleProducts = bestDeals(products);
   const highlightedAccessories = featuredAccessories(accessories);
   const brands = brandShowcase(products, accessories);
+  const spotlight = hotProducts[0];
+  const topDeal = saleProducts[0];
 
   return (
     <>
@@ -99,6 +120,7 @@ export default function Home() {
               if (!event.currentTarget.contains(event.relatedTarget)) setBannerInteractionPaused(false);
             }}
           >
+            <span className="hero-floor" aria-hidden="true" />
             {banners.map((banner, index) => (
               <Link
                 to={banner.link}
@@ -111,13 +133,48 @@ export default function Home() {
                   : { visibility: 'hidden', pointerEvents: 'none' }}
               >
                 <img src={banner.image} alt={banner.title} />
-                <span className="hero-mobile-copy" aria-hidden="true">
-                  <strong>{banner.title}</strong>
+                <span className="hero-mobile-copy hero-copy" aria-hidden="true">
+                  <em className="hero-eyebrow">Ưu đãi {String(index + 1).padStart(2, '0')} / {String(banners.length).padStart(2, '0')}</em>
+                  <strong><HoloTitle text={banner.title} /></strong>
                   {banner.description && <small>{banner.description}</small>}
-                  <b>Khám phá ngay</b>
+                  <b>Khám phá ngay <FiArrowRight /></b>
                 </span>
               </Link>
             ))}
+            <div className="hero-stage" aria-hidden="true">
+              <Phone3D className="hero-phone hero-phone-back" tone="pink" ry={150} rx={10} rz={8} layers={8} />
+              <Phone3D className="hero-phone hero-phone-front" tone="violet" ry={-20} rx={8} rz={-4} layers={10} />
+              <span className="hero-chip hero-chip-installment"><FiPercent /><span><b>Trả góp 0%</b><small>Kỳ hạn 6–12 tháng</small></span></span>
+              {spotlight && (
+                <span className="hero-chip hero-chip-product"><FiStar /><span><b>{spotlight.name}</b><small>từ {formatCurrency(spotlight.price)}</small></span></span>
+              )}
+              <span className="hero-chip hero-chip-warranty"><FiShield /><span><b>Bảo hành chính hãng</b><small>1 đổi 1 nếu lỗi nhà sản xuất</small></span></span>
+            </div>
+            <form
+              className="hero-ask"
+              onSubmit={(event) => {
+                event.preventDefault();
+                openAssistant(question || ASK_PLACEHOLDER);
+                setQuestion('');
+              }}
+            >
+              <div className="hero-ask-box">
+                <RobotMascot />
+                <input
+                  value={question}
+                  maxLength={1000}
+                  onChange={(event) => setQuestion(event.target.value)}
+                  placeholder={`Hỏi AI: "${ASK_PLACEHOLDER}"`}
+                  aria-label="Hỏi trợ lý AI"
+                />
+                <button type="submit" aria-label="Gửi câu hỏi cho trợ lý AI"><FiSend /></button>
+              </div>
+              <div className="hero-ask-chips">
+                {ASK_SUGGESTIONS.map((suggestion) => (
+                  <button type="button" key={suggestion} onClick={() => openAssistant(suggestion)}>{suggestion}</button>
+                ))}
+              </div>
+            </form>
             <div className="slider-dots">
               {banners.map((banner, index) => (
                 <button
@@ -168,7 +225,22 @@ export default function Home() {
             <div><span>Giảm từ 10%, ưu tiên số tiền tiết kiệm cao</span><h2>Ưu đãi tiết kiệm nhất</h2></div>
             <Link to="/products">Săn ưu đãi <FiArrowRight /></Link>
           </div>
-          <ProductGrid products={saleProducts} />
+          <div className={topDeal ? 'sale-layout' : undefined}>
+            {topDeal && (
+              <Link className="sale-feature" to={`/products/${topDeal.id}`}>
+                <span className="sale-feature-tag">Tiết kiệm nhất</span>
+                <strong>Giảm {formatCurrency(topDeal.oldPrice - topDeal.price)} cho {topDeal.name}</strong>
+                <ul>
+                  <li>Giá chỉ còn {formatCurrency(topDeal.price)}</li>
+                  <li>Còn {topDeal.stock} sản phẩm</li>
+                  <li>Thanh toán COD hoặc chuyển khoản VietQR</li>
+                </ul>
+                <b>Mua ngay <FiArrowRight /></b>
+                <Phone3D tone={phoneTone(topDeal.id)} ry={-24} rx={6} rz={-8} layers={8} />
+              </Link>
+            )}
+            <ProductGrid products={topDeal ? saleProducts.slice(1, 7) : saleProducts} />
+          </div>
         </div>
       </section>
 

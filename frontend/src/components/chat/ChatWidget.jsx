@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FiSend, FiShoppingCart, FiThumbsDown, FiThumbsUp, FiTrash2, FiX } from 'react-icons/fi';
+import { FiSend, FiShoppingCart, FiThumbsDown, FiThumbsUp, FiRefreshCw, FiX } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { chatApi, DEFAULT_CHAT_CONFIG } from '../../api/chatApi';
@@ -7,6 +7,7 @@ import { useCart } from '../../hooks/useCart';
 import { APP_NAME } from '../../utils/constants';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { storage } from '../../utils/storage';
+import { OPEN_ASSISTANT_EVENT } from '../../utils/assistant';
 import RichText from './RichText';
 import RobotMascot from './RobotMascot';
 
@@ -178,6 +179,21 @@ export default function ChatWidget() {
     }
   };
 
+  // Other parts of the store (hero ask box, mobile tab bar) open the assistant through a window event.
+  const sendRef = useRef(send);
+  useEffect(() => {
+    sendRef.current = send;
+  });
+  useEffect(() => {
+    const openFromEvent = (event) => {
+      setOpen(true);
+      const text = event.detail?.text;
+      if (text) sendRef.current(text);
+    };
+    window.addEventListener(OPEN_ASSISTANT_EVENT, openFromEvent);
+    return () => window.removeEventListener(OPEN_ASSISTANT_EVENT, openFromEvent);
+  }, []);
+
   const rate = async (message, value) => {
     const next = message.feedback === value ? null : value;
     setMessages((current) => current.map((item) => (item.id === message.id ? { ...item, feedback: next } : item)));
@@ -208,24 +224,25 @@ export default function ChatWidget() {
     <div className={`chat-widget ${open ? 'is-open' : ''}`}>
       {open && (
         <section className="chat-panel panel" role="dialog" aria-label="Trợ lý AI tư vấn">
-          <header className="chat-header">
-            <span className="chat-avatar"><RobotMascot thinking={sending} /></span>
-            <div>
-              <strong>Trợ lý AI tư vấn</strong>
-              <small>Trả lời dựa trên dữ liệu cửa hàng</small>
+          <header className={`chat-header ${freshChat ? 'is-fresh' : ''}`.trim()}>
+            <div className="chat-header-bar">
+              <span className="chat-avatar"><RobotMascot thinking={sending} /></span>
+              <div className="chat-header-title">
+                <strong>Trợ lý {APP_NAME}</strong>
+                <small><i className="chat-online-dot" />Đang trực tuyến · Trả lời theo dữ liệu cửa hàng</small>
+              </div>
+              <button type="button" aria-label="Cuộc trò chuyện mới" title="Cuộc trò chuyện mới" onClick={reset}><FiRefreshCw /></button>
+              <button type="button" aria-label="Đóng trợ lý AI" onClick={() => setOpen(false)}><FiX /></button>
             </div>
-            <button type="button" aria-label="Cuộc trò chuyện mới" title="Cuộc trò chuyện mới" onClick={reset}><FiTrash2 /></button>
-            <button type="button" aria-label="Đóng trợ lý AI" onClick={() => setOpen(false)}><FiX /></button>
+            {freshChat && (
+              <div className="chat-hero">
+                <p><span>Xin chào bạn 👋</span><span>Hôm nay bạn cần tìm gì?</span></p>
+                <span className="chat-hero-robot"><RobotMascot float /></span>
+              </div>
+            )}
           </header>
 
           <div className="chat-messages" ref={listRef} aria-live="polite">
-            {freshChat && (
-              <div className="chat-hero">
-                <span className="chat-hero-robot"><RobotMascot float /></span>
-                <strong>Trợ lý AI {APP_NAME}</strong>
-                <small>Đang trực tuyến · Trả lời theo dữ liệu cửa hàng</small>
-              </div>
-            )}
             {messages.map((message) => {
               const withAvatar = message.role === 'assistant' && !(freshChat && message.id === 'welcome');
               return (
@@ -284,6 +301,10 @@ export default function ChatWidget() {
             />
             <button type="submit" aria-label="Gửi tin nhắn" disabled={sending || !input.trim()}><FiSend /></button>
           </form>
+          <p className="chat-input-note">
+            <span>Trợ lý AI có thể nhầm, hãy kiểm tra lại thông tin quan trọng.</span>
+            <span>{input.length}/1000</span>
+          </p>
         </section>
       )}
       <button

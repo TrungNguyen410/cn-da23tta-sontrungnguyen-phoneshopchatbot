@@ -20,6 +20,7 @@ import DataTable from '../../components/admin/DataTable';
 import GiftVoucherDialog from '../../components/admin/GiftVoucherDialog';
 import RevenueChart from '../../components/admin/RevenueChart';
 import StatCard from '../../components/admin/StatCard';
+import Phone3D from '../../components/common/Phone3D';
 import Loading from '../../components/common/Loading';
 import LoadError from '../../components/common/LoadError';
 import { useAuth } from '../../hooks/useAuth';
@@ -171,7 +172,21 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className="dashboard-welcome"><div><span>Cập nhật hôm nay</span><h2>{greetingFor(new Date().getHours())}, {user?.fullName || 'Admin'}</h2><p>Đây là tình hình hoạt động mới nhất của cửa hàng.</p></div><Link className="btn btn-primary" to="/admin/products">Quản lý sản phẩm</Link></div>
+      <div className="dashboard-welcome">
+        <div>
+          <span>Cập nhật hôm nay</span>
+          <h2>{greetingFor(new Date().getHours())}, {user?.fullName || 'Admin'}</h2>
+          <p>Đây là tình hình hoạt động mới nhất của cửa hàng.</p>
+          <div className="dashboard-welcome-actions">
+            <Link className="btn btn-success" to="/admin/orders">Xử lý đơn hàng</Link>
+            <Link className="btn btn-light" to="/admin/products">Quản lý sản phẩm</Link>
+          </div>
+        </div>
+        <div className="dashboard-welcome-phones" aria-hidden="true">
+          <Phone3D tone="blue" ry={150} rx={8} rz={-6} layers={7} />
+          <Phone3D tone="lime" ry={-24} rx={10} rz={10} layers={7} />
+        </div>
+      </div>
       <section className="stat-grid">
         <StatCard label="Tổng sản phẩm" value={data.stats.products} change="Đang được quản lý" icon={FiSmartphone} color="blue" />
         <StatCard label="Tổng đơn hàng" value={data.stats.orders} change="Đơn hàng trong hệ thống" icon={FiPackage} color="violet" />

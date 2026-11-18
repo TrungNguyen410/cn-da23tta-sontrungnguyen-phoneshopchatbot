@@ -18,6 +18,7 @@ import './assets/styles/admin.css';
 import './assets/styles/responsive.css';
 import './assets/styles/redesign.css';
 import './assets/styles/luxe.css';
+import './assets/styles/holo.css';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -38,7 +39,7 @@ createRoot(document.getElementById('root')).render(
             autoClose={2600}
             hideProgressBar
             closeOnClick
-            theme="dark"
+            theme="light"
           />
         </CartProvider>
       </AuthProvider>
