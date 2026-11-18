@@ -98,20 +98,7 @@ Actual `VERCEL`, `NETLIFY`, and `AWS_LAMBDA_FUNCTION_NAME` platform markers take
 precedence over `DEPLOYMENT_TARGET`, so an explicit Render/Docker value cannot
 hide a serverless runtime.
 
-VNPay remains disabled when either merchant credential is empty. To enable it,
-set the provider values and an absolute callback URL:
-
-```env
-VNPAY_TMN_CODE=<sandbox-merchant-code>
-VNPAY_HASH_SECRET=<sandbox-hash-secret>
-VNPAY_PAYMENT_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
-VNPAY_RETURN_URL=https://api.techphone.example/api/payments/vnpay/return
-VNPAY_VERSION=2.1.0
-```
-
-Configure the VNPay IPN URL as
-`https://api.techphone.example/api/payments/vnpay/ipn`. Do not commit merchant,
-JWT, database, SMTP, or SMS credentials.
+Do not commit bank, SePay, JWT, database, SMTP, or SMS credentials.
 
 ## Database and release checks
 

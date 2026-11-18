@@ -10,9 +10,6 @@ const productionEnv = (overrides = {}) => ({
   API_PUBLIC_URL: 'https://api.techphone.example/',
   DEPLOYMENT_TARGET: 'render',
   UPLOAD_DIR: '/app/uploads',
-  VNPAY_TMN_CODE: '',
-  VNPAY_HASH_SECRET: '',
-  VNPAY_RETURN_URL: '',
   VERCEL: '',
   NETLIFY: '',
   AWS_LAMBDA_FUNCTION_NAME: '',
@@ -75,22 +72,6 @@ describe('production environment configuration', () => {
         .toThrow(new RegExp(`${name}.*origin`, 'i'));
     },
   );
-
-  it('requires VNPAY_RETURN_URL only when VNPay is enabled', () => {
-    expect(() => loadEnv()).not.toThrow();
-    expect(() => loadEnv(productionEnv({
-      VNPAY_TMN_CODE: 'merchant-code',
-      VNPAY_HASH_SECRET: 'merchant-secret',
-    }))).toThrow('VNPAY_RETURN_URL');
-
-    const env = loadEnv(productionEnv({
-      VNPAY_TMN_CODE: 'merchant-code',
-      VNPAY_HASH_SECRET: 'merchant-secret',
-      VNPAY_RETURN_URL: 'https://api.techphone.example/api/payments/vnpay/return/',
-    }));
-    expect(env.vnpay.returnUrl)
-      .toBe('https://api.techphone.example/api/payments/vnpay/return');
-  });
 
   it('normalizes an allowlisted deployment target', () => {
     expect(loadEnv(productionEnv({ DEPLOYMENT_TARGET: '  RENDER  ' })).deploymentTarget)

@@ -33,7 +33,7 @@ export const mockOrders = rawOrders.map(([orderNumber, userId, status, start, co
     shippingFee,
     discount: index === 1 ? 200000 : 0,
     total: subtotal + shippingFee - (index === 1 ? 200000 : 0),
-    paymentMethod: ['cod', 'bank', 'momo', 'card'][index % 4],
+    paymentMethod: ['cod', 'bank'][index % 2],
     customer: {
       fullName: index < 2 ? 'Nguyễn Minh Anh' : index === 2 || index === 4 ? 'Trần Hoàng Nam' : 'Lê Thảo Vy',
       email: index < 2 ? 'user@gmail.com' : 'customer@example.com',

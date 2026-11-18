@@ -52,9 +52,6 @@ describe('Swagger OpenAPI document', () => {
       API_PUBLIC_URL: 'https://api.techphone.example/',
       DEPLOYMENT_TARGET: 'render',
       UPLOAD_DIR: '/app/uploads',
-      VNPAY_TMN_CODE: '',
-      VNPAY_HASH_SECRET: '',
-      VNPAY_RETURN_URL: '',
     };
     jest.resetModules();
 
@@ -82,9 +79,6 @@ describe('Swagger OpenAPI document', () => {
       API_PUBLIC_URL: 'https://api.techphone.example/',
       DEPLOYMENT_TARGET: 'render',
       UPLOAD_DIR: '/app/uploads',
-      VNPAY_TMN_CODE: '',
-      VNPAY_HASH_SECRET: '',
-      VNPAY_RETURN_URL: '',
     };
     jest.resetModules();
 

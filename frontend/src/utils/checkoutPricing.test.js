@@ -206,24 +206,14 @@ describe('mock checkout invariants', () => {
     expect(storage.get(STORAGE_KEYS.mockProducts)[0].stock).toBe(2);
   });
 
-  it('rejects direct card checkout before inventory changes', async () => {
+  it.each(['card', 'momo'])('rejects the removed %s payment method before inventory changes', async (paymentMethod) => {
     await expect(mockDb.createOrder({
-      paymentMethod: 'card',
+      paymentMethod,
       items: [{ id: 'current-phone', quantity: 1 }],
       customer: { phone: '0911111111' },
-    }, 'direct-card')).rejects.toThrow();
+    }, `direct-${paymentMethod}`)).rejects.toThrow();
 
     expect(storage.get(STORAGE_KEYS.mockProducts)[0].stock).toBe(2);
-  });
-
-  it('allows an active session to create a VNPay checkout', async () => {
-    const checkout = await mockDb.createVnpayCheckout({
-      items: [{ id: 'current-phone', quantity: 1 }],
-      customer: { phone: '0911111111' },
-    }, 'vnpay-active');
-
-    expect(checkout.order.userId).toBe('user-customer');
-    expect(checkout.order.paymentMethod).toBe('card');
   });
 
   it('rejects an inactive catalog item without decrementing stock', async () => {

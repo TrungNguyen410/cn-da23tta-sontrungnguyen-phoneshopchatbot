@@ -2385,17 +2385,6 @@ p {
   .spin { animation: none; }
 }
 
-.bank-edit-button {
-  width: 100%;
-  margin-top: 10px;
-  padding: 11px 14px;
-  color: var(--primary);
-  border: 1px solid var(--color-cobalt-rule);
-  border-radius: 12px;
-  background: var(--color-paper-raised);
-  font-weight: 800;
-}
-
 .checkout-order {
   position: sticky;
   top: 178px;

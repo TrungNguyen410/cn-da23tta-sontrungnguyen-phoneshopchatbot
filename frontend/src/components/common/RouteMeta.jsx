@@ -64,7 +64,6 @@ const prefixRoutes = [
   ['/products/', { title: 'Chi tiết điện thoại', description: 'Thông tin, cấu hình, giá và đánh giá điện thoại tại PhoneShopAI.' }],
   ['/accessories/', { title: 'Chi tiết phụ kiện', description: 'Thông tin, khả năng tương thích, giá và đánh giá phụ kiện tại PhoneShopAI.' }],
   ['/order-success/', { title: 'Đặt hàng thành công', description: 'Thông tin xác nhận và theo dõi đơn hàng PhoneShopAI.' }],
-  ['/payment-result', { title: 'Kết quả thanh toán', description: 'Kiểm tra kết quả thanh toán đơn hàng PhoneShopAI.' }],
   ['/policies/', { title: 'Chính sách mua hàng', description: 'Chính sách bảo hành, đổi trả, vận chuyển và thanh toán tại PhoneShopAI.' }],
   ['/admin', { title: 'Quản trị cửa hàng', description: 'Khu vực quản trị PhoneShopAI.' }],
 ];

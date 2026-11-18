@@ -47,7 +47,7 @@ const orderSchema = new mongoose.Schema(
     shippingFee: { type: Number, default: 0, min: 0 },
     discount: { type: Number, default: 0, min: 0 },
     total: { type: Number, required: true, min: 0 },
-    paymentMethod: { type: String, enum: ['cod', 'bank', 'momo', 'card'], default: 'cod' },
+    paymentMethod: { type: String, enum: ['cod', 'bank'], default: 'cod' },
     paymentStatus: {
       type: String,
       enum: ['pending', 'paid', 'failed', 'refund_required', 'refunded'],

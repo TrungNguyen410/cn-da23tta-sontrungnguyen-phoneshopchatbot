@@ -195,14 +195,14 @@ await run('Thanh toán', 'Chuyển khoản: đặt đơn → webhook SePay tự 
       && retry.json.duplicate && after.data?.paymentStatus === 'paid' && after.data?.status === 'confirmed',
     `${order.status}/${badKey.status}/${JSON.stringify(full.json)}/${after.data?.paymentStatus}`);
 });
-await run('Thanh toán', 'MoMo: admin đối soát thủ công', async () => {
-  const order = await placeOrder('momo');
-  const reconcile = await call('PUT', `/admin/orders/${order.data?.id}/payment`, { token: adminToken, body: { status: 'paid', reference: 'MOMO123', note: 'Đã nhận' } });
-  check('Thanh toán', 'MoMo: admin đối soát thủ công', order.status === 201 && reconcile.data?.paymentStatus === 'paid', `${order.status}/${reconcile.status} ${reconcile.message}`);
+await run('Thanh toán', 'Chuyển khoản: admin đối soát thủ công', async () => {
+  const order = await placeOrder('bank');
+  const reconcile = await call('PUT', `/admin/orders/${order.data?.id}/payment`, { token: adminToken, body: { status: 'paid', reference: 'FT-SMOKE-123', note: 'Đã nhận' } });
+  check('Thanh toán', 'Chuyển khoản: admin đối soát thủ công', order.status === 201 && reconcile.data?.paymentStatus === 'paid', `${order.status}/${reconcile.status} ${reconcile.message}`);
 });
-await run('Thanh toán', 'VNPay (chưa cấu hình → báo 503 rõ ràng)', async () => {
-  const r = await call('POST', '/payments/vnpay/checkout', { token: customerToken, headers: { 'Idempotency-Key': `checkout-smoke-vnpay-${Date.now()}` }, body: { items: [{ id: accessories[0]?.id, type: 'accessory', quantity: 1 }], customer: shipping, paymentMethod: 'card' } });
-  check('Thanh toán', 'VNPay (chưa cấu hình → báo 503 rõ ràng)', r.status === 503, `${r.status} ${r.message}`);
+await run('Thanh toán', 'Từ chối phương thức không hỗ trợ (MoMo/thẻ)', async () => {
+  const [momo, card] = await Promise.all([placeOrder('momo'), placeOrder('card')]);
+  check('Thanh toán', 'Từ chối phương thức không hỗ trợ (MoMo/thẻ)', momo.status === 422 && card.status === 422, `${momo.status}/${card.status}`);
 });
 
 // ---------- Quản trị ----------

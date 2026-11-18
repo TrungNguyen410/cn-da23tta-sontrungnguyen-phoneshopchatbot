@@ -173,7 +173,7 @@ class OrderService {
   calculateDiscount(voucher, subtotal, shippingFee) {
     if (!voucher) return 0;
     if (voucher.type === 'percent') {
-      // Rounded to whole đồng so the total matches bank transfers (VietQR/SePay) and VNPay amounts.
+      // Rounded to whole đồng so the total matches bank transfers (VietQR/SePay).
       return Math.round(Math.min((subtotal * voucher.value) / 100, voucher.maxDiscount || Infinity));
     }
     if (voucher.type === 'fixed') return Math.min(voucher.value, subtotal);

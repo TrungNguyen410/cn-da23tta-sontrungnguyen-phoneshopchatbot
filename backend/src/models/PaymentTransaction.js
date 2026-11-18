@@ -6,8 +6,8 @@ const paymentTransactionSchema = new mongoose.Schema(
   {
     _id: stringId,
     orderId: { type: String, ref: 'Order', required: true, index: true },
-    provider: { type: String, enum: ['vnpay', 'sepay'], required: true, index: true },
-    method: { type: String, enum: ['card', 'bank'], required: true },
+    provider: { type: String, enum: ['sepay'], required: true, index: true },
+    method: { type: String, enum: ['bank'], required: true },
     status: {
       type: String,
       enum: ['pending', 'paid', 'failed', 'expired', 'refunded'],
@@ -18,8 +18,6 @@ const paymentTransactionSchema = new mongoose.Schema(
     currency: { type: String, default: 'VND' },
     reference: { type: String, required: true, unique: true, index: true },
     providerTransactionId: { type: String, default: '' },
-    idempotencyKey: { type: String, default: undefined, index: true },
-    activeIdempotencyKey: { type: String, default: undefined, unique: true, sparse: true },
     bankCode: { type: String, default: '' },
     responseCode: { type: String, default: '' },
     rawResponse: { type: mongoose.Schema.Types.Mixed, default: {} },

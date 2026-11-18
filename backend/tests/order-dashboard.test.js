@@ -65,7 +65,7 @@ describe('Orders and dashboard APIs', () => {
     expect((await Product.findById(product.id)).stock).toBe(2);
   });
 
-  it('rejects card orders outside the VNPay checkout endpoint', async () => {
+  it('rejects removed MoMo and card payment methods before inventory changes', async () => {
     await createUser({ email: 'direct-card@test.com', phone: '0912121212' });
     const token = await login('direct-card@test.com');
     const taxonomy = await seedTaxonomy();
@@ -78,12 +78,14 @@ describe('Orders and dashboard APIs', () => {
       status: 'active',
     });
 
-    const response = await request(app)
-      .post('/api/orders')
-      .set('Authorization', `Bearer ${token}`)
-      .send(orderPayload(product.id, { paymentMethod: 'card' }));
+    for (const paymentMethod of ['momo', 'card']) {
+      const response = await request(app)
+        .post('/api/orders')
+        .set('Authorization', `Bearer ${token}`)
+        .send(orderPayload(product.id, { paymentMethod }));
 
-    expect(response.status).toBe(422);
+      expect(response.status).toBe(422);
+    }
     expect((await Product.findById(product.id)).stock).toBe(2);
   });
 

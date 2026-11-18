@@ -19,7 +19,7 @@ Website bán điện thoại và phụ kiện, tích hợp **Chatbot AI** (Googl
 
 ### Kế thừa & hoàn thiện (hệ thống bán hàng)
 - Khách hàng: trang chủ, tìm kiếm/lọc/sắp xếp sản phẩm, chi tiết, so sánh, giỏ hàng, voucher, đặt hàng, tra cứu đơn, đánh giá, tài khoản (đăng ký số điện thoại + mật khẩu, đăng nhập JWT hoặc Google/Facebook qua Firebase, quên mật khẩu bằng OTP).
-- Thanh toán: COD, chuyển khoản VietQR, MoMo, VNPay (sandbox).
+- Thanh toán: COD và chuyển khoản VietQR, xác nhận tự động qua webhook SePay.
 - Quản trị: dashboard doanh thu, sản phẩm, phụ kiện, đơn hàng, khách hàng, đánh giá, banner, voucher, danh mục, thương hiệu, cài đặt.
 
 ### Mới trong đồ án
@@ -40,7 +40,7 @@ Website bán điện thoại và phụ kiện, tích hợp **Chatbot AI** (Googl
 | Backend | Node.js 22, Express 5, Mongoose 9 (Clean Architecture: routes → controllers → services → repositories → models) |
 | Cơ sở dữ liệu | MongoDB 7 (replica set) / MongoDB Atlas |
 | AI | Google Gemini API (`gemini-3.5-flash`, dự phòng `gemini-3.5-flash-lite` → `gemini-flash-lite-latest`, function calling) |
-| Thanh toán | VietQR, SePay webhook, VNPay sandbox |
+| Thanh toán | VietQR, SePay webhook |
 | Kiểm thử | Jest + Supertest + mongodb-memory-server (backend), Vitest + Testing Library (frontend) |
 | Triển khai | Docker Compose, Nginx |
 

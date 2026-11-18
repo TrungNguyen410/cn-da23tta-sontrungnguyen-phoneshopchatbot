@@ -59,14 +59,8 @@ const commonCreate = [
 
 const createDirect = [
   ...commonCreate,
-  body('paymentMethod').optional().isIn(['cod', 'bank', 'momo'])
-    .withMessage('Đơn thẻ phải được tạo qua cổng VNPay'),
-];
-
-const createVnpay = [
-  ...commonCreate,
-  body('paymentMethod').optional().isIn(['card'])
-    .withMessage('Phương thức thanh toán VNPay không hợp lệ'),
+  body('paymentMethod').optional().isIn(['cod', 'bank'])
+    .withMessage('Phương thức thanh toán không hợp lệ'),
 ];
 
 const update = [
@@ -117,4 +111,4 @@ const lookup = [
   query('phone').trim().notEmpty().withMessage('Số điện thoại là bắt buộc'),
 ];
 
-module.exports = { createDirect, createVnpay, update, updateStatus, reconcilePayment, lookup };
+module.exports = { createDirect, update, updateStatus, reconcilePayment, lookup };
