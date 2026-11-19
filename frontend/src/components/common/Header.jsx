@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  FiChevronDown,
   FiHeart,
+  FiLogOut,
   FiMenu,
   FiPhoneCall,
   FiSearch,
@@ -9,6 +9,7 @@ import {
   FiUser,
   FiX,
 } from 'react-icons/fi';
+import { HiOutlineSparkles } from 'react-icons/hi2';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useCart } from '../../hooks/useCart';
@@ -22,12 +23,17 @@ import { storage } from '../../utils/storage';
 import StoreBrand from './StoreBrand';
 import AccessibleDialog from './AccessibleDialog';
 import { trackEvent } from '../../utils/analytics';
+import { openAssistant } from '../../utils/assistant';
 
 const normalizeSearch = (value = '') => value
   .normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '')
   .replaceAll('đ', 'd')
   .toLowerCase();
+
+const displayName = (user) => user?.fullName || user?.email || user?.phone || '';
+const shortName = (user) => displayName(user).split(' ').slice(-2).join(' ');
+const initialOf = (user) => (displayName(user).trim().split(' ').pop() || '?').charAt(0).toUpperCase();
 
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -119,12 +125,25 @@ export default function Header() {
     setMobileOpen(false);
   };
 
+  const askAssistant = () => {
+    openAssistant(search);
+    setSearch('');
+    setSearchFocused(false);
+  };
+
   return (
     <>
       <div className="topbar">
         <div className="container topbar-inner">
-          <span>Miễn phí vận chuyển đơn từ 10 triệu</span>
-          <div><FiPhoneCall /> Hotline: <strong>{settings.hotline}</strong></div>
+          <div className="topbar-marquee">
+            <span><i />Miễn phí vận chuyển đơn từ <strong>10 triệu</strong></span>
+            <span><i />Trả góp 0% qua thẻ tín dụng</span>
+            <span><i />Trợ lý AI tư vấn 24/7</span>
+          </div>
+          <div className="topbar-links">
+            <Link to="/order-lookup">Tra cứu đơn</Link>
+            <span><FiPhoneCall /> Hotline: <strong>{settings.hotline}</strong></span>
+          </div>
         </div>
       </div>
       <header className="site-header">
@@ -139,13 +158,22 @@ export default function Header() {
             <FiMenu />
           </button>
           <StoreBrand />
+          <nav className="desktop-nav" aria-label="Điều hướng chính">
+            <NavLink to="/" end>Trang chủ</NavLink>
+            <NavLink to="/products">Điện thoại</NavLink>
+            <NavLink to="/accessories">Phụ kiện</NavLink>
+            <NavLink to="/compare">So sánh</NavLink>
+            <NavLink to="/reviews">Đánh giá</NavLink>
+            <NavLink to="/contact">Liên hệ</NavLink>
+            {user?.role === 'admin' && <NavLink to="/admin/dashboard">Quản trị</NavLink>}
+          </nav>
           <form
             className="header-search"
             onSubmit={submitSearch}
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setTimeout(() => setSearchFocused(false), 120)}
           >
-            <FiSearch />
+            <button type="submit" className="header-search-submit" aria-label="Tìm kiếm"><FiSearch /></button>
             <input
               role="combobox"
               aria-label="Tìm kiếm sản phẩm"
@@ -158,7 +186,9 @@ export default function Header() {
               onKeyDown={handleSearchKeyDown}
               placeholder="Bạn cần tìm điện thoại nào?"
             />
-            <button>Tìm kiếm</button>
+            <button type="button" className="header-ask-ai" onClick={askAssistant}>
+              <HiOutlineSparkles /> Hỏi AI
+            </button>
             {searchFocused && debouncedSearch.length >= 2 && (
               <div className="search-suggestions" id="header-search-suggestions" role="listbox">
                 {suggestions.length ? suggestions.map((item) => (
@@ -180,38 +210,31 @@ export default function Header() {
             )}
           </form>
           <div className="header-actions">
-            <Link className="header-action favorite-action" to="/favorites">
+            <Link className="header-action favorite-action" to="/favorites" aria-label="Yêu thích" title="Yêu thích">
               <FiHeart />
-              <span><small>Đã lưu</small><strong>Yêu thích</strong></span>
               {wishlistCount > 0 && <b>{wishlistCount}</b>}
             </Link>
-            <Link className="header-action" to={isAuthenticated ? '/account' : '/login'}>
-              <FiUser />
-              <span>
-                <small>{isAuthenticated ? 'Xin chào' : 'Tài khoản'}</small>
-                <strong>{isAuthenticated ? (user.fullName || user.email).split(' ').slice(-2).join(' ') : 'Đăng nhập'}</strong>
-              </span>
-              <FiChevronDown className="chevron" />
-            </Link>
-            <Link className="header-action cart-action" to="/cart">
+            <Link className="header-action cart-action" to="/cart" aria-label={`Giỏ hàng, ${cartCount} sản phẩm`} title="Giỏ hàng">
               <FiShoppingBag />
-              <span><small>Giỏ hàng</small><strong>{cartCount} sản phẩm</strong></span>
               {cartCount > 0 && <b>{cartCount}</b>}
             </Link>
+            {isAuthenticated ? (
+              <>
+                <Link className="header-account is-signed-in" to="/account" title="Tài khoản của tôi">
+                  <span className="header-avatar" aria-hidden="true">{initialOf(user)}</span>
+                  <span className="header-account-name">{shortName(user)}</span>
+                </Link>
+                <button type="button" className="header-action nav-logout" onClick={logout} aria-label="Đăng xuất" title="Đăng xuất">
+                  <FiLogOut />
+                </button>
+              </>
+            ) : (
+              <Link className="header-account" to="/login">
+                <FiUser /> <span>Đăng nhập</span>
+              </Link>
+            )}
           </div>
         </div>
-        <nav className="desktop-nav">
-          <div className="container nav-inner">
-            <NavLink to="/" end>Trang chủ</NavLink>
-            <NavLink to="/products">Điện thoại</NavLink>
-            <NavLink to="/accessories">Phụ kiện</NavLink>
-            <NavLink to="/compare">So sánh</NavLink>
-            <NavLink to="/reviews">Đánh giá</NavLink>
-            <NavLink to="/contact">Liên hệ</NavLink>
-            {user?.role === 'admin' && <NavLink to="/admin/dashboard">Quản trị</NavLink>}
-            {isAuthenticated && <button className="nav-logout" onClick={logout}>Đăng xuất</button>}
-          </div>
-        </nav>
       </header>
       <AccessibleDialog
         open={mobileOpen}
@@ -241,6 +264,18 @@ export default function Header() {
             {isAuthenticated ? 'Tài khoản của tôi' : 'Đăng nhập'}
           </NavLink>
           {user?.role === 'admin' && <NavLink to="/admin/dashboard">Quản trị</NavLink>}
+          {isAuthenticated && (
+            <button
+              type="button"
+              className="mobile-drawer-logout"
+              onClick={() => {
+                setMobileOpen(false);
+                logout();
+              }}
+            >
+              Đăng xuất
+            </button>
+          )}
         </nav>
       </AccessibleDialog>
     </>

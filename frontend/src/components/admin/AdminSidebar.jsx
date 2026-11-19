@@ -11,6 +11,7 @@ import {
   FiSettings,
   FiShoppingBag,
   FiSmartphone,
+  FiStar,
   FiTag,
   FiUsers,
   FiX,
@@ -18,21 +19,36 @@ import {
 import { NavLink } from 'react-router-dom';
 import LogoMark from '../common/LogoMark';
 
-const links = [
-  { to: '/admin/dashboard', label: 'Tổng quan', icon: FiGrid },
-  { to: '/admin/products', label: 'Sản phẩm', icon: FiSmartphone },
-  { to: '/admin/accessories', label: 'Phụ kiện', icon: FiShoppingBag },
-  { to: '/admin/orders', label: 'Đơn hàng', icon: FiPackage },
-  { to: '/admin/customers', label: 'Khách hàng', icon: FiUsers },
-  { to: '/admin/contacts', label: 'Liên hệ hỗ trợ', icon: FiMessageSquare },
-  { to: '/admin/reviews', label: 'Đánh giá', icon: FiMessageSquare },
-  { to: '/admin/chatbot', label: 'Chatbot AI', icon: FiCpu },
-  { to: '/admin/knowledge', label: 'Kho kiến thức AI', icon: FiBookOpen },
-  { to: '/admin/banners', label: 'Banner', icon: FiImage },
-  { to: '/admin/vouchers', label: 'Voucher', icon: FiTag },
-  { to: '/admin/categories', label: 'Danh mục', icon: FiLayers },
-  { to: '/admin/brands', label: 'Thương hiệu', icon: FiBox },
-  { to: '/admin/settings', label: 'Cài đặt', icon: FiSettings },
+const groups = [
+  { title: 'Tổng quan', links: [{ to: '/admin/dashboard', label: 'Tổng quan', icon: FiGrid }] },
+  {
+    title: 'Bán hàng',
+    links: [
+      { to: '/admin/products', label: 'Sản phẩm', icon: FiSmartphone },
+      { to: '/admin/accessories', label: 'Phụ kiện', icon: FiShoppingBag },
+      { to: '/admin/orders', label: 'Đơn hàng', icon: FiPackage },
+      { to: '/admin/customers', label: 'Khách hàng', icon: FiUsers },
+      { to: '/admin/contacts', label: 'Liên hệ hỗ trợ', icon: FiMessageSquare },
+      { to: '/admin/reviews', label: 'Đánh giá', icon: FiStar },
+    ],
+  },
+  {
+    title: 'Trí tuệ nhân tạo',
+    links: [
+      { to: '/admin/chatbot', label: 'Chatbot AI', icon: FiCpu },
+      { to: '/admin/knowledge', label: 'Kho kiến thức AI', icon: FiBookOpen },
+    ],
+  },
+  {
+    title: 'Nội dung',
+    links: [
+      { to: '/admin/banners', label: 'Banner', icon: FiImage },
+      { to: '/admin/vouchers', label: 'Voucher', icon: FiTag },
+      { to: '/admin/categories', label: 'Danh mục', icon: FiLayers },
+      { to: '/admin/brands', label: 'Thương hiệu', icon: FiBox },
+      { to: '/admin/settings', label: 'Cài đặt', icon: FiSettings },
+    ],
+  },
 ];
 
 export default function AdminSidebar({ open, onClose }) {
@@ -40,12 +56,17 @@ export default function AdminSidebar({ open, onClose }) {
     <aside className={`admin-sidebar ${open ? 'open' : ''}`}>
       <div className="admin-brand">
         <LogoMark className="brand-logo-mark" />
-        <span>PhoneShopAI<small>ADMIN CENTER</small></span>
+        <span>PhoneShop<em>AI</em><small>ADMIN CENTER</small></span>
         <button onClick={onClose}><FiX /></button>
       </div>
       <nav>
-        {links.map(({ to, label, icon: Icon }) => (
-          <NavLink key={to} to={to} onClick={onClose}><Icon /><span>{label}</span></NavLink>
+        {groups.map((group) => (
+          <div className="admin-nav-group" key={group.title}>
+            <p className="admin-nav-title">{group.title}</p>
+            {group.links.map(({ to, label, icon: Icon }) => (
+              <NavLink key={to} to={to} onClick={onClose}><Icon /><span>{label}</span></NavLink>
+            ))}
+          </div>
         ))}
       </nav>
       <div className="admin-sidebar-bottom">

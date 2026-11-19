@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FiBarChart2, FiHeart, FiShoppingCart, FiStar } from 'react-icons/fi';
+import { FiBarChart2, FiHeart, FiPlus, FiShoppingCart, FiStar } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useCart } from '../../hooks/useCart';
@@ -63,7 +63,13 @@ export default function ProductCard({ product, type = 'product' }) {
           {isOutOfStock && <span className="stock-badge">Hết hàng</span>}
         </div>
         <div className="product-card-body">
-          <span className="product-brand">{product.brand}</span>
+          <div className="product-card-top">
+            <span className="product-brand">{product.brand}</span>
+            <span className="product-meta">
+              <span><FiStar /> {product.rating}</span>
+              <span>· {product.sold} đã bán</span>
+            </span>
+          </div>
           <h3>{product.name}</h3>
           {type === 'product' && (
             <div className="spec-chips">
@@ -74,10 +80,6 @@ export default function ProductCard({ product, type = 'product' }) {
           <div className="price-row">
             <strong>{formatCurrency(product.price)}</strong>
             {product.oldPrice > product.price && <del>{formatCurrency(product.oldPrice)}</del>}
-          </div>
-          <div className="product-meta">
-            <span><FiStar /> {product.rating}</span>
-            <span>Đã bán {product.sold}</span>
           </div>
         </div>
       </Link>
@@ -98,12 +100,13 @@ export default function ProductCard({ product, type = 'product' }) {
           aria-pressed={compared}
           onClick={toggleCompare}
         >
-          <FiBarChart2 />
+          <FiBarChart2 /> <span className="compare-card-label" aria-hidden="true">So sánh</span>
         </button>
       )}
       <div className="product-card-actions">
-        <button className="add-cart-button" disabled={isOutOfStock} onClick={add}>
-          <FiShoppingCart /> {isOutOfStock ? 'Hết hàng' : 'Thêm vào giỏ'}
+        <button className="add-cart-button" disabled={isOutOfStock} onClick={add} title={isOutOfStock ? 'Hết hàng' : 'Thêm vào giỏ'}>
+          {isOutOfStock ? <FiShoppingCart aria-hidden="true" /> : <FiPlus aria-hidden="true" />}
+          <span className="add-cart-label">{isOutOfStock ? 'Hết hàng' : 'Thêm vào giỏ'}</span>
         </button>
       </div>
     </article>

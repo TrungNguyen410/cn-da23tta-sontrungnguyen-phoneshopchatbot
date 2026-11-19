@@ -137,12 +137,7 @@ h5 {
 .auth-form h1,
 .dashboard-welcome h2,
 .not-found-page h1 {
-  color: var(--color-transparent);
-  background: var(--gradient-text);
-  background-size: 220% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  animation: nb-gradient-pan 16s var(--ease-in-out) infinite;
+  color: var(--color-ink);
 }
 
 .section-heading > div > span,
@@ -150,7 +145,7 @@ h5 {
 .page-hero.centered > span,
 .eyebrow,
 .auth-form .eyebrow,
-.dashboard-welcome span {
+.dashboard-welcome > div > span {
   display: inline-flex;
   align-items: center;
   gap: 12px;
@@ -216,8 +211,8 @@ a {
 .search-suggestions,
 .admin-header-popover,
 .modal-content {
-  border-color: var(--color-glass-edge) !important;
-  background: var(--color-glass) !important;
+  border-color: var(--color-glass-edge);
+  background: var(--color-glass);
   box-shadow: var(--shadow-glass);
   backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
   -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
@@ -231,7 +226,7 @@ hr,
 .border,
 .border-top,
 .border-bottom {
-  border-color: var(--color-rule) !important;
+  border-color: var(--color-rule);
 }
 
 /* ---------- Buttons ---------- */
@@ -249,10 +244,10 @@ hr,
 .header-search button[type='submit'] {
   position: relative;
   overflow: hidden;
-  color: var(--color-on-gold) !important;
-  border: 0 !important;
-  background: var(--gradient-gold) !important;
-  background-size: 200% 100% !important;
+  color: var(--color-on-gold);
+  border: 0;
+  background: var(--gradient-gold);
+  background-size: 200% 100%;
   box-shadow: var(--shadow-gold);
   letter-spacing: 0.02em;
   isolation: isolate;
@@ -277,7 +272,7 @@ hr,
 .auth-submit:hover,
 .add-cart-button:not(:disabled):hover,
 .header-search > button:hover {
-  background-position: 100% 50% !important;
+  background-position: 100% 50%;
   box-shadow: 0 16px 36px -10px var(--color-glow-gold), 0 0 0 1px var(--color-glass-highlight) inset;
   transform: translateY(-2px);
 }
@@ -305,9 +300,9 @@ hr,
 .btn-outline-dark,
 .btn-secondary,
 .btn-light {
-  color: var(--color-ink) !important;
-  border: 1px solid var(--color-glass-edge) !important;
-  background: var(--color-glass-light) !important;
+  color: var(--color-ink);
+  border: 1px solid var(--color-glass-edge);
+  background: var(--color-glass-light);
   backdrop-filter: blur(10px);
 }
 
@@ -316,34 +311,34 @@ hr,
 .btn-outline-dark:hover,
 .btn-secondary:hover,
 .btn-light:hover {
-  color: var(--color-static-white) !important;
-  border-color: var(--color-glass-edge-strong) !important;
-  background: var(--color-accent-soft) !important;
+  color: var(--color-static-white);
+  border-color: var(--color-glass-edge-strong);
+  background: var(--color-accent-soft);
   box-shadow: 0 0 26px var(--color-glow-gold-soft);
   transform: translateY(-2px);
 }
 
 .btn-outline-danger,
 .btn-danger {
-  border-color: var(--color-danger) !important;
+  border-color: var(--color-danger);
 }
 
 .btn-danger {
-  color: var(--color-static-white) !important;
-  background: var(--color-danger-vivid) !important;
+  color: var(--color-static-white);
+  background: var(--color-danger-vivid);
   box-shadow: 0 10px 26px -10px var(--color-danger-vivid);
 }
 
 .btn-success {
-  color: var(--color-graphite) !important;
-  border: 0 !important;
-  background: var(--color-success-bright) !important;
+  color: var(--color-graphite);
+  border: 0;
+  background: var(--color-success-bright);
 }
 
 /* ---------- Forms ---------- */
 .form-control,
 .form-select,
-input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+input:where(:not([type='checkbox'], [type='radio'], [type='range'], [type='file'])),
 select,
 textarea {
   color: var(--color-ink);
@@ -359,7 +354,7 @@ textarea::placeholder {
 
 .form-control:focus,
 .form-select:focus,
-input:not([type='checkbox']):not([type='radio']):focus,
+input:where(:not([type='checkbox'], [type='radio'])):focus,
 select:focus,
 textarea:focus {
   color: var(--color-ink);
@@ -381,22 +376,22 @@ label > span {
 .input-with-icon > div,
 .header-search,
 .mobile-search {
-  border-color: var(--color-glass-edge) !important;
-  background: var(--color-paper-sunken) !important;
+  border-color: var(--color-glass-edge);
+  background: var(--color-paper-sunken);
   transition: border-color var(--dur-short) var(--ease-out), box-shadow var(--dur-short) var(--ease-out);
 }
 
 .input-with-icon > div:focus-within,
 .header-search:focus-within {
-  border-color: var(--color-gold-bright) !important;
+  border-color: var(--color-gold-bright);
   box-shadow: 0 0 0 3px var(--color-glow-gold-soft), 0 0 30px var(--color-glow-gold-soft);
 }
 
 .input-with-icon input,
 .header-search input,
 .mobile-search input {
-  background: var(--color-transparent) !important;
-  box-shadow: none !important;
+  background: var(--color-transparent);
+  box-shadow: none;
 }
 
 /* ---------- Header ---------- */
@@ -407,8 +402,8 @@ label > span {
 }
 
 .site-header {
-  border-bottom: 1px solid var(--color-glass-edge) !important;
-  background: var(--color-glass-strong) !important;
+  border-bottom: 1px solid var(--color-glass-edge);
+  background: var(--color-glass-strong);
   backdrop-filter: blur(22px) saturate(1.4);
   -webkit-backdrop-filter: blur(22px) saturate(1.4);
   box-shadow: 0 10px 40px -20px var(--color-shadow-deep);
@@ -429,14 +424,14 @@ label > span {
 }
 
 .brand {
-  color: var(--color-ink) !important;
+  color: var(--color-ink);
 }
 
 .brand-mark {
   position: relative;
-  color: var(--color-on-gold) !important;
-  background: var(--gradient-gold-rich) !important;
-  background-size: 200% 200% !important;
+  color: var(--color-on-gold);
+  background: var(--gradient-gold-rich);
+  background-size: 200% 200%;
   box-shadow: 0 0 0 1px var(--color-glass-highlight) inset, 0 8px 22px -6px var(--color-glow-gold), 0 0 30px -8px var(--color-glow-champagne);
   animation: nb-gradient-pan 6s var(--ease-in-out) infinite;
   transform: perspective(200px) rotateY(-12deg);
@@ -450,7 +445,7 @@ label > span {
 .header-action,
 .header-actions a,
 .header-actions button {
-  color: var(--color-ink) !important;
+  color: var(--color-ink);
 }
 
 .header-action svg {
@@ -465,28 +460,28 @@ label > span {
 
 .header-action small,
 .header-action span small {
-  color: var(--color-ink-subtle) !important;
+  color: var(--color-ink-subtle);
 }
 
 .desktop-nav a {
   position: relative;
-  color: var(--color-ink-muted) !important;
+  color: var(--color-ink-muted);
   transition: color var(--dur-short) var(--ease-out);
 }
 
 .desktop-nav a:hover,
 .desktop-nav a.active {
-  color: var(--color-static-white) !important;
+  color: var(--color-static-white);
   text-shadow: 0 0 18px var(--color-glow-gold);
 }
 
 .desktop-nav a::after {
-  background: var(--gradient-gold) !important;
+  background: var(--gradient-gold);
   box-shadow: 0 0 12px var(--color-glow-gold);
 }
 
 .mobile-drawer {
-  background: var(--color-glass-strong) !important;
+  background: var(--color-glass-strong);
   backdrop-filter: blur(24px);
 }
 
@@ -498,14 +493,14 @@ label > span {
 
 .hero-slider {
   border: 1.5px solid var(--color-transparent);
-  border-radius: calc(var(--radius-image) + 8px) !important;
+  border-radius: calc(var(--radius-image) + 8px);
   background:
     linear-gradient(var(--color-graphite), var(--color-graphite)) padding-box,
     var(--gradient-border) border-box;
   box-shadow:
     0 40px 90px -30px var(--color-shadow-deep),
     0 0 70px -20px var(--color-glow-gold),
-    0 0 120px -40px var(--color-glow-champagne) !important;
+    0 0 120px -40px var(--color-glow-champagne);
   transform: rotateX(var(--nb-rx, 0deg)) rotateY(var(--nb-ry, 0deg));
   transform-style: preserve-3d;
   transition: transform 600ms var(--ease-out);
@@ -538,38 +533,38 @@ label > span {
 }
 
 .slider-dots {
-  z-index: var(--z-local-control) !important;
+  z-index: var(--z-local-control);
 }
 
 .slider-dots button {
-  background: var(--color-overlay-white-24) !important;
+  background: var(--color-overlay-white-24);
   backdrop-filter: blur(6px);
 }
 
 .slider-dots button.active {
-  background: var(--gradient-gold) !important;
+  background: var(--gradient-gold);
   box-shadow: 0 0 14px var(--color-glow-champagne);
 }
 
 .slider-pause-button,
 .carousel-pause-button {
   z-index: var(--z-local-control);
-  color: var(--color-static-white) !important;
-  border: 1px solid var(--color-glass-edge) !important;
-  background: var(--color-glass) !important;
+  color: var(--color-static-white);
+  border: 1px solid var(--color-glass-edge);
+  background: var(--color-glass);
   backdrop-filter: blur(10px);
 }
 
 .hero-mobile-copy {
-  background: linear-gradient(180deg, var(--color-transparent), var(--color-overlay-ink-70)) !important;
+  background: linear-gradient(180deg, var(--color-transparent), var(--color-overlay-ink-70));
 }
 
 /* ---------- Category rail ---------- */
 .category-card {
   position: relative;
   overflow: hidden;
-  border-color: var(--color-glass-edge) !important;
-  background: var(--color-glass) !important;
+  border-color: var(--color-glass-edge);
+  background: var(--color-glass);
   backdrop-filter: blur(var(--blur-glass));
   box-shadow: var(--shadow-glass);
   transform-style: preserve-3d;
@@ -588,7 +583,7 @@ label > span {
 }
 
 .category-card:hover {
-  border-color: var(--color-glass-edge-strong) !important;
+  border-color: var(--color-glass-edge-strong);
   box-shadow: var(--shadow-lift);
 }
 
@@ -597,7 +592,7 @@ label > span {
 }
 
 .category-card strong {
-  color: var(--color-ink) !important;
+  color: var(--color-ink);
 }
 
 .category-icon {
@@ -629,18 +624,18 @@ label > span {
 }
 
 .product-card {
-  border: 1px solid var(--color-glass-edge) !important;
-  border-radius: var(--radius-image) !important;
-  background: var(--color-glass) !important;
+  border: 1px solid var(--color-glass-edge);
+  border-radius: var(--radius-image);
+  background: var(--color-glass);
   backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
   -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
-  box-shadow: var(--shadow-glass) !important;
+  box-shadow: var(--shadow-glass);
   transform-style: preserve-3d;
   transform: perspective(1000px) rotateX(var(--nb-rx, 0deg)) rotateY(var(--nb-ry, 0deg)) translateZ(0);
   transition:
     transform 500ms var(--ease-out),
     border-color var(--dur-short) var(--ease-out),
-    box-shadow var(--dur-long) var(--ease-out) !important;
+    box-shadow var(--dur-long) var(--ease-out);
 }
 
 .product-card::before {
@@ -661,8 +656,8 @@ label > span {
 }
 
 .product-card:hover {
-  border-color: var(--color-glass-edge-strong) !important;
-  box-shadow: var(--shadow-lift) !important;
+  border-color: var(--color-glass-edge-strong);
+  box-shadow: var(--shadow-lift);
 }
 
 .product-card:hover::before {
@@ -671,7 +666,7 @@ label > span {
 
 .product-image-wrap {
   padding: 10px 10px 0;
-  background: var(--gradient-stage) !important;
+  background: var(--gradient-stage);
   transform-style: preserve-3d;
 }
 
@@ -693,11 +688,11 @@ label > span {
 .product-image-wrap img {
   border-radius: calc(var(--radius-image) - 4px);
   transform: translateZ(0);
-  transition: transform 700ms var(--ease-spring) !important;
+  transition: transform 700ms var(--ease-spring);
 }
 
 .product-card:hover .product-image-wrap img {
-  transform: translate3d(calc(var(--nb-mx, 0) * 8px), -8px, 40px) scale(1.06) !important;
+  transform: translate3d(calc(var(--nb-mx, 0) * 8px), -8px, 40px) scale(1.06);
 }
 
 .product-card:hover .product-image-wrap::after {
@@ -712,11 +707,11 @@ label > span {
 }
 
 .product-card h3 {
-  color: var(--color-ink) !important;
+  color: var(--color-ink);
 }
 
 .product-brand {
-  color: var(--color-champagne) !important;
+  color: var(--color-champagne);
 }
 
 .price-row strong,
@@ -724,7 +719,7 @@ label > span {
 .detail-price > strong,
 .summary-total strong,
 .chat-product-card strong {
-  color: var(--color-transparent) !important;
+  color: var(--color-transparent);
   background: var(--gradient-gold-rich);
   -webkit-background-clip: text;
   background-clip: text;
@@ -732,17 +727,17 @@ label > span {
 
 .price-row del,
 .detail-price del {
-  color: var(--color-ink-subtle) !important;
+  color: var(--color-ink-subtle);
 }
 
 .spec-chips span {
-  color: var(--color-on-dark-soft) !important;
-  border: 1px solid var(--color-glass-edge) !important;
-  background: var(--color-glass-light) !important;
+  color: var(--color-on-dark-soft);
+  border: 1px solid var(--color-glass-edge);
+  background: var(--color-glass-light);
 }
 
 .product-meta {
-  color: var(--color-ink-subtle) !important;
+  color: var(--color-ink-subtle);
 }
 
 .product-meta svg {
@@ -752,28 +747,28 @@ label > span {
 
 .discount-badge {
   z-index: var(--z-raised);
-  color: var(--color-static-white) !important;
-  background: var(--gradient-rose-gold) !important;
+  color: var(--color-static-white);
+  background: var(--gradient-rose-gold);
   box-shadow: 0 6px 18px -4px var(--color-glow-rose);
   transform: translateZ(40px);
 }
 
 .stock-badge {
   z-index: var(--z-raised);
-  color: var(--color-ink) !important;
+  color: var(--color-ink);
   border: 1px solid var(--color-glass-edge);
-  background: var(--color-glass-strong) !important;
+  background: var(--color-glass-strong);
 }
 
 .wishlist-button,
 .compare-card-button {
-  z-index: var(--z-raised) !important;
-  color: var(--color-ink) !important;
-  border: 1px solid var(--color-glass-edge) !important;
-  background: var(--color-glass-strong) !important;
+  z-index: var(--z-raised);
+  color: var(--color-ink);
+  border: 1px solid var(--color-glass-edge);
+  background: var(--color-glass-strong);
   backdrop-filter: blur(10px);
   transform: translateZ(50px);
-  transition: transform var(--dur-short) var(--ease-spring), color var(--dur-short) var(--ease-out), box-shadow var(--dur-short) var(--ease-out) !important;
+  transition: transform var(--dur-short) var(--ease-spring), color var(--dur-short) var(--ease-out), box-shadow var(--dur-short) var(--ease-out);
 }
 
 .wishlist-button:hover,
@@ -783,25 +778,25 @@ label > span {
 }
 
 .wishlist-button.active {
-  color: var(--color-rose-gold-bright) !important;
-  border-color: var(--color-rose-gold-bright) !important;
+  color: var(--color-rose-gold-bright);
+  border-color: var(--color-rose-gold-bright);
   box-shadow: 0 0 18px var(--color-glow-rose);
 }
 
 .compare-card-button.active {
-  color: var(--color-champagne) !important;
-  border-color: var(--color-champagne) !important;
+  color: var(--color-champagne);
+  border-color: var(--color-champagne);
   box-shadow: 0 0 18px var(--color-glow-champagne);
 }
 
 .add-cart-button {
-  border-radius: var(--radius-control) !important;
+  border-radius: var(--radius-control);
 }
 
 .add-cart-button:disabled {
-  color: var(--color-ink-subtle) !important;
-  border: 1px solid var(--color-rule) !important;
-  background: var(--color-glass-light) !important;
+  color: var(--color-ink-subtle);
+  border: 1px solid var(--color-rule);
+  background: var(--color-glass-light);
 }
 
 /* ---------- Bands & story ---------- */
@@ -812,11 +807,11 @@ label > span {
   background:
     radial-gradient(50% 70% at 0% 0%, var(--color-glow-rose-soft), var(--color-transparent) 70%),
     radial-gradient(50% 70% at 100% 100%, var(--color-glow-champagne-soft), var(--color-transparent) 70%),
-    var(--color-overlay-ink-50) !important;
+    var(--color-overlay-ink-50);
 }
 
 .sale-band .product-card {
-  background: var(--color-glass) !important;
+  background: var(--color-glass);
 }
 
 .store-story {
@@ -825,11 +820,11 @@ label > span {
   border-block: 1px solid var(--color-glass-edge);
   background:
     radial-gradient(40% 80% at 85% 50%, var(--color-glow-gold-soft), var(--color-transparent) 70%),
-    var(--color-graphite) !important;
+    var(--color-graphite);
 }
 
 .store-story p {
-  color: var(--color-on-dark-soft) !important;
+  color: var(--color-on-dark-soft);
 }
 
 .story-stats {
@@ -837,8 +832,8 @@ label > span {
 }
 
 .story-stats > div {
-  border: 1px solid var(--color-glass-edge) !important;
-  background: var(--color-glass) !important;
+  border: 1px solid var(--color-glass-edge);
+  background: var(--color-glass);
   backdrop-filter: blur(12px);
   box-shadow: var(--shadow-glass);
   animation: nb-float var(--dur-float) var(--ease-in-out) infinite;
@@ -850,53 +845,53 @@ label > span {
 .story-stats > div:nth-child(4) { animation-delay: -5.4s; }
 
 .story-stats > div:hover {
-  border-color: var(--color-glass-edge-strong) !important;
+  border-color: var(--color-glass-edge-strong);
   box-shadow: var(--shadow-lift);
 }
 
 .story-stats strong {
-  color: var(--color-transparent) !important;
+  color: var(--color-transparent);
   background: var(--gradient-gold-rich);
   -webkit-background-clip: text;
   background-clip: text;
 }
 
 .story-stats span {
-  color: var(--color-on-dark-soft) !important;
+  color: var(--color-on-dark-soft);
 }
 
 .benefit-grid > div {
-  border-color: var(--color-glass-edge) !important;
-  background: var(--color-glass) !important;
+  border-color: var(--color-glass-edge);
+  background: var(--color-glass);
   backdrop-filter: blur(12px);
   transition: transform var(--dur-long) var(--ease-spring), border-color var(--dur-short) var(--ease-out), box-shadow var(--dur-short) var(--ease-out);
 }
 
 .benefit-grid > div:hover {
-  border-color: var(--color-glass-edge-strong) !important;
+  border-color: var(--color-glass-edge-strong);
   box-shadow: var(--shadow-lift);
   transform: translateY(-6px);
 }
 
 .benefit-grid > div > svg {
-  color: var(--color-champagne) !important;
-  background: var(--color-cyan-soft) !important;
+  color: var(--color-champagne);
+  background: var(--color-cyan-soft);
   filter: drop-shadow(0 0 10px var(--color-glow-champagne));
 }
 
 .benefit-grid strong {
-  color: var(--color-ink) !important;
+  color: var(--color-ink);
 }
 
 /* ---------- Page heroes ---------- */
 .page-hero {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--color-glass-edge) !important;
+  border: 1px solid var(--color-glass-edge);
   background:
     radial-gradient(60% 120% at 100% 0%, var(--color-glow-champagne-soft), var(--color-transparent) 60%),
     radial-gradient(70% 140% at 0% 100%, var(--color-glow-gold), var(--color-transparent) 60%),
-    var(--color-graphite-blue) !important;
+    var(--color-graphite-blue);
   box-shadow: 0 30px 80px -40px var(--color-glow-gold), var(--shadow-glass);
 }
 
@@ -929,11 +924,11 @@ label > span {
 
 .page-hero p {
   position: relative;
-  color: var(--color-on-dark-soft) !important;
+  color: var(--color-on-dark-soft);
 }
 
 .page-hero > svg {
-  color: var(--color-champagne) !important;
+  color: var(--color-champagne);
   filter: drop-shadow(0 0 14px var(--color-glow-champagne));
 }
 
@@ -948,8 +943,8 @@ label > span {
 .detail-main-image,
 .gallery-main,
 .product-gallery-main {
-  background: var(--gradient-stage) !important;
-  border-color: var(--color-glass-edge) !important;
+  background: var(--gradient-stage);
+  border-color: var(--color-glass-edge);
   box-shadow: 0 30px 70px -30px var(--color-glow-gold);
 }
 
@@ -962,8 +957,8 @@ label > span {
 .spec-grid > div,
 .detail-specs > div,
 .quick-specs > div {
-  border-color: var(--color-glass-edge) !important;
-  background: var(--color-glass-light) !important;
+  border-color: var(--color-glass-edge);
+  background: var(--color-glass-light);
 }
 
 table,
@@ -978,8 +973,8 @@ table,
 
 .table thead th,
 table thead th {
-  color: var(--color-on-dark-soft) !important;
-  background: var(--color-paper-sunken) !important;
+  color: var(--color-on-dark-soft);
+  background: var(--color-paper-sunken);
 }
 
 .table tbody tr,
@@ -998,7 +993,7 @@ table tbody tr:hover {
   border-top: 1px solid var(--color-glass-edge);
   background:
     radial-gradient(40% 60% at 10% 0%, var(--color-glow-gold-soft), var(--color-transparent) 70%),
-    var(--color-graphite-deep) !important;
+    var(--color-graphite-deep);
 }
 
 .site-footer::before {
@@ -1013,12 +1008,12 @@ table tbody tr:hover {
 }
 
 .site-footer a:hover {
-  color: var(--color-champagne) !important;
+  color: var(--color-champagne);
 }
 
 .social-links a {
-  border: 1px solid var(--color-glass-edge) !important;
-  background: var(--color-glass) !important;
+  border: 1px solid var(--color-glass-edge);
+  background: var(--color-glass);
   transition: transform var(--dur-short) var(--ease-spring), box-shadow var(--dur-short) var(--ease-out);
 }
 
@@ -1029,7 +1024,7 @@ table tbody tr:hover {
 
 /* ---------- Auth ---------- */
 .auth-page {
-  background: var(--color-transparent) !important;
+  background: var(--color-transparent);
 }
 
 .auth-visual {
@@ -1038,7 +1033,7 @@ table tbody tr:hover {
   background:
     radial-gradient(50% 50% at 30% 30%, var(--color-glow-gold), var(--color-transparent) 70%),
     radial-gradient(40% 40% at 75% 75%, var(--color-glow-champagne), var(--color-transparent) 70%),
-    var(--color-graphite-blue) !important;
+    var(--color-graphite-blue);
   perspective: 900px;
 }
 
@@ -1068,41 +1063,41 @@ table tbody tr:hover {
 }
 
 .auth-visual svg {
-  color: var(--color-champagne) !important;
+  color: var(--color-champagne);
   filter: drop-shadow(0 0 22px var(--color-glow-champagne));
   animation: nb-float 6s var(--ease-in-out) infinite;
 }
 
 .auth-visual p {
-  color: var(--color-on-dark-soft) !important;
+  color: var(--color-on-dark-soft);
 }
 
 .auth-panel {
   border-left: 1px solid var(--color-glass-edge);
-  background: var(--color-glass-strong) !important;
+  background: var(--color-glass-strong);
   backdrop-filter: blur(24px);
 }
 
 .auth-form p,
 .auth-switch {
-  color: var(--color-ink-muted) !important;
+  color: var(--color-ink-muted);
 }
 
 .mock-accounts {
-  border: 1px dashed var(--color-glass-edge-strong) !important;
-  background: var(--color-glass-light) !important;
+  border: 1px dashed var(--color-glass-edge-strong);
+  background: var(--color-glass-light);
 }
 
 .mock-accounts button {
   padding: 8px 12px;
   border-radius: var(--radius-control);
-  color: var(--color-ink) !important;
-  border: 1px solid var(--color-glass-edge) !important;
-  background: var(--color-glass) !important;
+  color: var(--color-ink);
+  border: 1px solid var(--color-glass-edge);
+  background: var(--color-glass);
 }
 
 .mock-accounts button:hover {
-  border-color: var(--color-champagne) !important;
+  border-color: var(--color-champagne);
   box-shadow: 0 0 14px var(--color-glow-champagne-soft);
 }
 
@@ -1110,19 +1105,19 @@ table tbody tr:hover {
 .chat-toggle,
 .support-toggle {
   position: relative;
-  color: var(--color-on-gold) !important;
-  border: 0 !important;
-  background: var(--gradient-gold-rich) !important;
-  background-size: 200% 100% !important;
-  box-shadow: 0 14px 34px -10px var(--color-glow-gold), 0 0 0 1px var(--color-glass-highlight) inset !important;
+  color: var(--color-on-gold);
+  border: 0;
+  background: var(--gradient-gold-rich);
+  background-size: 200% 100%;
+  box-shadow: 0 14px 34px -10px var(--color-glow-gold), 0 0 0 1px var(--color-glass-highlight) inset;
   animation: nb-gradient-pan 6s var(--ease-in-out) infinite;
   transition: transform var(--dur-short) var(--ease-spring), box-shadow var(--dur-short) var(--ease-out);
 }
 
 .support-toggle {
-  color: var(--color-ink) !important;
-  background: var(--color-glass-strong) !important;
-  border: 1px solid var(--color-glass-edge-strong) !important;
+  color: var(--color-ink);
+  background: var(--color-glass-strong);
+  border: 1px solid var(--color-glass-edge-strong);
   backdrop-filter: blur(12px);
   animation: none;
 }
@@ -1150,13 +1145,13 @@ table tbody tr:hover {
 
 .chat-panel,
 .support-panel {
-  border: 1px solid var(--color-transparent) !important;
+  border: 1px solid var(--color-transparent);
   background:
     linear-gradient(var(--color-glass-strong), var(--color-glass-strong)) padding-box,
-    var(--gradient-border) border-box !important;
+    var(--gradient-border) border-box;
   backdrop-filter: blur(26px) saturate(1.4);
   -webkit-backdrop-filter: blur(26px) saturate(1.4);
-  box-shadow: 0 40px 80px -30px var(--color-shadow-deep), 0 0 60px -20px var(--color-glow-gold) !important;
+  box-shadow: 0 40px 80px -30px var(--color-shadow-deep), 0 0 60px -20px var(--color-glow-gold);
   animation: nb-spin-border 10s linear infinite, nb-pop-in 420ms var(--ease-spring);
   transform-origin: 100% 100%;
 }
@@ -1167,22 +1162,22 @@ table tbody tr:hover {
 }
 
 .chat-header {
-  border-bottom: 1px solid var(--color-glass-edge) !important;
-  background: linear-gradient(120deg, var(--color-glow-gold-soft), var(--color-glow-champagne-soft)) !important;
+  border-bottom: 1px solid var(--color-glass-edge);
+  background: linear-gradient(120deg, var(--color-glow-gold-soft), var(--color-glow-champagne-soft));
 }
 
 .chat-header small {
-  color: var(--color-on-dark-soft) !important;
+  color: var(--color-on-dark-soft);
 }
 
 .chat-header button {
-  color: var(--color-ink) !important;
+  color: var(--color-ink);
 }
 
 .chat-avatar {
   position: relative;
-  color: var(--color-on-gold) !important;
-  background: var(--gradient-gold-rich) !important;
+  color: var(--color-on-gold);
+  background: var(--gradient-gold-rich);
   box-shadow: 0 0 20px var(--color-glow-gold);
   animation: nb-float-soft 3.5s var(--ease-in-out) infinite;
 }
@@ -1201,7 +1196,7 @@ table tbody tr:hover {
 }
 
 .chat-messages {
-  background: var(--color-transparent) !important;
+  background: var(--color-transparent);
 }
 
 .chat-message {
@@ -1214,73 +1209,73 @@ table tbody tr:hover {
 }
 
 .chat-message.assistant .chat-bubble {
-  color: var(--color-ink) !important;
-  border: 1px solid var(--color-glass-edge) !important;
-  background: var(--color-glass) !important;
+  color: var(--color-ink);
+  border: 1px solid var(--color-glass-edge);
+  background: var(--color-glass);
 }
 
 .chat-message.user .chat-bubble {
-  color: var(--color-on-gold) !important;
-  border: 0 !important;
-  background: var(--gradient-gold) !important;
+  color: var(--color-on-gold);
+  border: 0;
+  background: var(--gradient-gold);
   box-shadow: 0 10px 24px -12px var(--color-glow-gold);
 }
 
 .chat-message.error .chat-bubble {
-  color: var(--color-danger-deep) !important;
-  border-color: var(--color-danger) !important;
-  background: var(--color-danger-frost) !important;
+  color: var(--color-danger-deep);
+  border-color: var(--color-danger);
+  background: var(--color-danger-frost);
 }
 
 .chat-quick button {
-  color: var(--color-on-dark-soft) !important;
-  border: 1px solid var(--color-glass-edge-strong) !important;
-  background: var(--color-glass-light) !important;
+  color: var(--color-on-dark-soft);
+  border: 1px solid var(--color-glass-edge-strong);
+  background: var(--color-glass-light);
   transition: transform var(--dur-short) var(--ease-spring), box-shadow var(--dur-short) var(--ease-out), color var(--dur-short) var(--ease-out);
 }
 
 .chat-quick button:hover {
-  color: var(--color-static-white) !important;
-  border-color: var(--color-champagne) !important;
+  color: var(--color-static-white);
+  border-color: var(--color-champagne);
   box-shadow: 0 0 16px var(--color-glow-champagne-soft);
   transform: translateX(4px);
 }
 
 .chat-typing span,
 .chat-typing i {
-  background: var(--color-champagne) !important;
+  background: var(--color-champagne);
   box-shadow: 0 0 8px var(--color-glow-champagne);
 }
 
 .chat-input {
-  border-top: 1px solid var(--color-glass-edge) !important;
-  background: var(--color-transparent) !important;
+  border-top: 1px solid var(--color-glass-edge);
+  background: var(--color-transparent);
 }
 
 .chat-input button {
-  border-radius: var(--radius-control) !important;
+  border-radius: var(--radius-control);
 }
 
 .chat-product-card {
-  border: 1px solid var(--color-glass-edge) !important;
-  background: var(--color-glass-light) !important;
+  border: 1px solid var(--color-glass-edge);
+  background: var(--color-glass-light);
   transition: transform var(--dur-short) var(--ease-spring), border-color var(--dur-short) var(--ease-out);
 }
 
 .chat-product-card:hover {
-  border-color: var(--color-glass-edge-strong) !important;
+  border-color: var(--color-glass-edge-strong);
   transform: translateY(-2px);
 }
 
 .chat-feedback button {
-  color: var(--color-ink-muted) !important;
+  color: var(--color-ink-muted);
 }
 
 .support-panel a,
 .support-panel > div {
-  color: var(--color-ink) !important;
-  border-color: var(--color-glass-edge) !important;
-  background: var(--color-glass-light) !important;
+  color: var(--color-ink);
+  border-color: var(--color-glass-edge);
+  background: var(--color-glass-light);
 }
 
 /* ---------- Status pills ---------- */
@@ -1293,12 +1288,12 @@ table tbody tr:hover {
 
 /* ---------- Toasts ---------- */
 .Toastify__toast {
-  color: var(--color-ink) !important;
+  color: var(--color-ink);
   border: 1px solid var(--color-glass-edge);
-  border-radius: var(--radius-surface) !important;
-  background: var(--color-glass-strong) !important;
+  border-radius: var(--radius-surface);
+  background: var(--color-glass-strong);
   backdrop-filter: blur(20px);
-  box-shadow: 0 20px 40px -20px var(--color-shadow-deep), 0 0 30px -12px var(--color-glow-gold) !important;
+  box-shadow: 0 20px 40px -20px var(--color-shadow-deep), 0 0 30px -12px var(--color-glow-gold);
 }
 
 /* ---------- Modals ---------- */
@@ -1319,7 +1314,7 @@ table tbody tr:hover {
   background:
     radial-gradient(80% 40% at 0% 0%, var(--color-glow-gold-soft), var(--color-transparent) 70%),
     radial-gradient(80% 40% at 100% 100%, var(--color-glow-champagne-soft), var(--color-transparent) 70%),
-    var(--color-graphite) !important;
+    var(--color-graphite);
 }
 
 .admin-sidebar nav a {
@@ -1328,14 +1323,14 @@ table tbody tr:hover {
 }
 
 .admin-sidebar nav a:hover {
-  color: var(--color-static-white) !important;
-  background: var(--color-glass-light) !important;
+  color: var(--color-static-white);
+  background: var(--color-glass-light);
   transform: translateX(4px);
 }
 
 .admin-sidebar nav a.active {
-  color: var(--color-on-gold) !important;
-  background: var(--gradient-gold) !important;
+  color: var(--color-on-gold);
+  background: var(--gradient-gold);
   box-shadow: 0 10px 26px -10px var(--color-glow-gold), 0 0 0 1px var(--color-glass-highlight) inset;
 }
 
@@ -1344,44 +1339,44 @@ table tbody tr:hover {
 }
 
 .admin-header {
-  border-bottom: 1px solid var(--color-glass-edge) !important;
-  background: var(--color-glass-strong) !important;
+  border-bottom: 1px solid var(--color-glass-edge);
+  background: var(--color-glass-strong);
   backdrop-filter: blur(20px);
 }
 
 .admin-header h1 {
-  color: var(--color-ink) !important;
+  color: var(--color-ink);
 }
 
 .admin-header button,
 .admin-search-button,
 .notification-button,
 .admin-menu-button {
-  color: var(--color-ink) !important;
-  border-color: var(--color-glass-edge) !important;
-  background: var(--color-glass) !important;
+  color: var(--color-ink);
+  border-color: var(--color-glass-edge);
+  background: var(--color-glass);
 }
 
 .dashboard-welcome {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--color-transparent) !important;
+  border: 1px solid var(--color-transparent);
   background:
     radial-gradient(60% 140% at 100% 0%, var(--color-glow-champagne-soft), var(--color-transparent) 60%),
     radial-gradient(60% 140% at 0% 100%, var(--color-glow-gold), var(--color-transparent) 60%),
     linear-gradient(var(--color-graphite-blue), var(--color-graphite-blue)) padding-box,
-    var(--gradient-border) border-box !important;
+    var(--gradient-border) border-box;
   animation: nb-spin-border 10s linear infinite;
 }
 
 .dashboard-welcome p {
-  color: var(--color-on-dark-soft) !important;
+  color: var(--color-on-dark-soft);
 }
 
 .dashboard-welcome .btn {
-  color: var(--color-on-gold) !important;
-  border: 0 !important;
-  background: var(--gradient-gold) !important;
+  color: var(--color-on-gold);
+  border: 0;
+  background: var(--gradient-gold);
   box-shadow: var(--shadow-gold);
 }
 
@@ -1392,12 +1387,12 @@ table tbody tr:hover {
 }
 
 .stat-card:hover {
-  border-color: var(--color-glass-edge-strong) !important;
+  border-color: var(--color-glass-edge-strong);
   box-shadow: var(--shadow-lift);
 }
 
 .stat-card strong {
-  color: var(--color-ink) !important;
+  color: var(--color-ink);
 }
 
 .stat-icon {
@@ -1409,13 +1404,13 @@ table tbody tr:hover {
 
 .admin-card,
 .admin-table-card {
-  border-radius: var(--radius-image) !important;
+  border-radius: var(--radius-image);
 }
 
 .admin-table-card table thead th,
 .data-table thead th {
-  color: var(--color-on-dark-soft) !important;
-  background: var(--color-paper-sunken) !important;
+  color: var(--color-on-dark-soft);
+  background: var(--color-paper-sunken);
 }
 
 .admin-sidebar-overlay {
@@ -1428,7 +1423,7 @@ table tbody tr:hover {
   translate: 0 34px;
   transition:
     opacity 700ms var(--ease-out) var(--nb-delay, 0ms),
-    translate 900ms var(--ease-out) var(--nb-delay, 0ms) !important;
+    translate 900ms var(--ease-out) var(--nb-delay, 0ms);
 }
 
 .nb-reveal.product-card,
@@ -1439,7 +1434,7 @@ table tbody tr:hover {
     translate 900ms var(--ease-spring) var(--nb-delay, 0ms),
     transform 500ms var(--ease-out),
     border-color var(--dur-short) var(--ease-out),
-    box-shadow var(--dur-long) var(--ease-out) !important;
+    box-shadow var(--dur-long) var(--ease-out);
 }
 
 .nb-reveal.is-in {
@@ -1471,8 +1466,8 @@ table tbody tr:hover {
 @media (max-width: 991.98px) {
   .mobile-menu-button,
   .header-action {
-    border: 1px solid var(--color-glass-edge) !important;
-    background: var(--color-glass) !important;
+    border: 1px solid var(--color-glass-edge);
+    background: var(--color-glass);
     box-shadow: var(--shadow-glass);
   }
 }
@@ -1489,29 +1484,29 @@ table tbody tr:hover {
 
 /* ---------- Small fixes for the dark canvas ---------- */
 .voucher-box form button {
-  color: var(--color-on-gold) !important;
+  color: var(--color-on-gold);
   border: 0;
-  background: var(--gradient-gold) !important;
+  background: var(--gradient-gold);
 }
 
 .secure-note {
-  color: var(--color-ink-muted) !important;
+  color: var(--color-ink-muted);
   border: 1px solid var(--color-glass-edge);
-  background: var(--color-glass-light) !important;
+  background: var(--color-glass-light);
 }
 
 .search-box {
-  border-color: var(--color-glass-edge) !important;
-  background: var(--color-glass) !important;
+  border-color: var(--color-glass-edge);
+  background: var(--color-glass);
   backdrop-filter: blur(var(--blur-glass));
 }
 
 .search-box input {
-  background: var(--color-transparent) !important;
+  background: var(--color-transparent);
 }
 
 .search-box:focus-within {
-  border-color: var(--color-gold-bright) !important;
+  border-color: var(--color-gold-bright);
   box-shadow: 0 0 0 3px var(--color-glow-gold-soft);
 }
 
@@ -1526,7 +1521,7 @@ table tbody tr:hover {
 
 .product-image-wrap img,
 .product-card:hover .product-image-wrap img {
-  transition: transform 700ms var(--ease-spring), filter var(--dur-long) var(--ease-luxe) !important;
+  transition: transform 700ms var(--ease-spring), filter var(--dur-long) var(--ease-luxe);
 }
 
 .hero-slide img {
@@ -1535,8 +1530,8 @@ table tbody tr:hover {
 
 .main-image {
   position: relative;
-  border: 1px solid var(--color-glass-edge) !important;
-  background: var(--gradient-stage) !important;
+  border: 1px solid var(--color-glass-edge);
+  background: var(--gradient-stage);
   box-shadow: 0 30px 70px -34px var(--color-glow-gold);
   perspective: 1000px;
 }
@@ -1552,7 +1547,7 @@ table tbody tr:hover {
 }
 
 .loading-state .spinner-border {
-  color: var(--color-gold) !important;
+  color: var(--color-gold);
   border-right-color: var(--color-transparent);
   filter: drop-shadow(0 0 10px var(--color-glow-gold));
 }
@@ -1588,7 +1583,7 @@ p,
 /* Product detail: the gallery wrapper drew a black block behind the thumbnails. */
 .gallery {
   border: 0;
-  background: var(--color-transparent) !important;
+  background: var(--color-transparent);
 }
 
 /* redesign.css gives every thumbnail image the sunken (near-black) fill; let the glass button show through. */
@@ -1661,9 +1656,9 @@ p,
 
 /* Chat: an empty input left the send button as a muddy half-transparent gold. */
 .chat-input button:disabled {
-  color: var(--color-ink-subtle) !important;
-  border: 1px solid var(--color-glass-edge) !important;
-  background: var(--color-glass-light) !important;
+  color: var(--color-ink-subtle);
+  border: 1px solid var(--color-glass-edge);
+  background: var(--color-glass-light);
   box-shadow: none;
   opacity: 1;
 }
@@ -1725,12 +1720,12 @@ p,
 /* Touch screens keep hover styles after a tap; reset every card hover effect back to its resting look. */
 @media (hover: none) {
   .product-card:hover .product-image-wrap img {
-    transform: none !important;
+    transform: none;
   }
 
   .product-card:hover {
-    border-color: var(--color-glass-edge) !important;
-    box-shadow: var(--shadow-glass) !important;
+    border-color: var(--color-glass-edge);
+    box-shadow: var(--shadow-glass);
   }
 
   .product-card:hover::before,
@@ -1744,7 +1739,7 @@ p,
   }
 
   .category-card:hover {
-    border-color: var(--color-glass-edge) !important;
+    border-color: var(--color-glass-edge);
     box-shadow: var(--shadow-glass);
   }
 

@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { safeInternalRedirect } from '../utils/authSession';
 import { USE_MOCK } from '../utils/constants';
 import SocialLoginButtons from '../components/common/SocialLoginButtons';
+import AuthShowcase from '../components/auth/AuthShowcase';
 import StoreBrand from '../components/common/StoreBrand';
 
 export default function Login() {
@@ -45,6 +46,7 @@ export default function Login() {
   return (
     <main className="auth-page">
       <div className="auth-visual">
+        <AuthShowcase />
         <div><FiShield /><h1>Mua sắm công nghệ<br />an tâm mỗi ngày</h1><p>Sản phẩm kiểm định, bảo hành rõ ràng và hỗ trợ tận tâm.</p></div>
       </div>
       <div className="auth-panel">

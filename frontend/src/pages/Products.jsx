@@ -7,6 +7,7 @@ import LoadError from '../components/common/LoadError';
 import Pagination from '../components/common/Pagination';
 import SearchBox from '../components/common/SearchBox';
 import ProductFilter from '../components/product/ProductFilter';
+import Phone3D from '../components/common/Phone3D';
 import ProductGrid from '../components/product/ProductGrid';
 import ProductSort from '../components/product/ProductSort';
 import { useDebounce } from '../hooks/useDebounce';
@@ -123,6 +124,11 @@ export default function Products() {
         <div className="page-hero small">
           <div><span>Khám phá thiết bị phù hợp</span><h1>Điện thoại chính hãng</h1></div>
           <p>So sánh dễ dàng, ưu đãi minh bạch và bảo hành tận tâm.</p>
+          <div className="page-hero-phones" aria-hidden="true">
+            <Phone3D tone="blue" ry={-30} rx={8} rz={-10} layers={6} />
+            <Phone3D tone="lime" ry={-18} rx={8} rz={0} layers={6} />
+            <Phone3D tone="pink" ry={-6} rx={8} rz={10} layers={6} />
+          </div>
         </div>
         <div className="catalog-toolbar">
           <SearchBox value={search} onChange={setSearch} placeholder="Tìm theo tên hoặc thương hiệu..." />
