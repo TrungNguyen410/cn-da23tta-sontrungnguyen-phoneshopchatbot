@@ -3328,7 +3328,7 @@ h4 {
     padding-right: 40px;
   }
 
-  .page-hero-phones {
+  .page-hero > .page-hero-phones {
     display: none;
   }
 
