@@ -2598,6 +2598,38 @@ p,
   cursor: wait;
 }
 
+/* Email already used by the other provider: point at the button that finishes the link. */
+.social-login-link-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border: 1px solid var(--color-champagne);
+  border-radius: var(--radius-control);
+  background: var(--color-glass);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+}
+
+.social-login-link-notice p {
+  flex: 1;
+  margin: 0;
+}
+
+.social-login-link-cancel {
+  flex: none;
+  border: 0;
+  background: none;
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+}
+
+.social-login-button.is-suggested {
+  border-color: var(--color-champagne);
+  box-shadow: 0 0 14px var(--color-glow-champagne-soft);
+}
+
 @media (max-width: 420px) {
   .social-login-buttons {
     grid-template-columns: minmax(0, 1fr);

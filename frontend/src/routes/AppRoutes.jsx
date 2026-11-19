@@ -79,6 +79,8 @@ export default function AppRoutes() {
           <Route path="/favorites" element={<Favorites />} />
           <Route path="/order-lookup" element={<OrderLookup />} />
           <Route path="/policies/:type" element={<PolicyPage />} />
+          <Route path="/privacy" element={<PolicyPage type="privacy" />} />
+          <Route path="/xoa-du-lieu" element={<PolicyPage type="data-deletion" />} />
           <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Route>

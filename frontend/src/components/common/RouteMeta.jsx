@@ -54,6 +54,14 @@ const exactRoutes = {
     title: 'Đăng ký',
     description: 'Tạo tài khoản PhoneShopAI và xác minh bằng mã OTP.',
   },
+  '/privacy': {
+    title: 'Chính sách quyền riêng tư',
+    description: 'PhoneShopAI thu thập, sử dụng và bảo vệ dữ liệu cá nhân của khách hàng như thế nào.',
+  },
+  '/xoa-du-lieu': {
+    title: 'Xóa dữ liệu người dùng',
+    description: 'Hướng dẫn yêu cầu xóa tài khoản và dữ liệu cá nhân tại PhoneShopAI, kể cả tài khoản Facebook/Google.',
+  },
   '/forgot-password': {
     title: 'Khôi phục mật khẩu',
     description: 'Khôi phục mật khẩu tài khoản PhoneShopAI bằng mã OTP.',

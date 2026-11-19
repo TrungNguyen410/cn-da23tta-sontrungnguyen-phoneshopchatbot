@@ -45,6 +45,8 @@ export default function Footer() {
           <Link to="/policies/returns">Đổi trả</Link>
           <Link to="/policies/shipping">Vận chuyển</Link>
           <Link to="/policies/payment">Thanh toán</Link>
+          <Link to="/privacy">Quyền riêng tư</Link>
+          <Link to="/xoa-du-lieu">Xóa dữ liệu</Link>
         </nav>
         <div className="footer-column footer-contact-line">
           <h2>Liên hệ</h2>

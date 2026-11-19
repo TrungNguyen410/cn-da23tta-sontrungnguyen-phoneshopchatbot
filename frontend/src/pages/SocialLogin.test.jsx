@@ -12,6 +12,7 @@ const auth = vi.hoisted(() => ({
   isAdmin: false,
 }));
 const firebaseAuth = vi.hoisted(() => ({
+  ACCOUNT_EXISTS_CODE: 'auth/account-exists-with-different-credential',
   loadFirebase: vi.fn(() => Promise.resolve()),
   signInWithProvider: vi.fn(),
 }));
@@ -53,7 +54,7 @@ describe('Google/Facebook buttons', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tiếp tục với Google' }));
 
     expect(await screen.findByText('Giỏ hàng')).toBeInTheDocument();
-    expect(firebaseAuth.signInWithProvider).toHaveBeenCalledWith('google');
+    expect(firebaseAuth.signInWithProvider).toHaveBeenCalledWith('google', { link: null });
     expect(auth.loginWithSocial).toHaveBeenCalledWith('google-id-token');
     expect(toast.success).toHaveBeenCalledWith('Chào mừng Phạm Quốc Huy');
   });
@@ -66,7 +67,7 @@ describe('Google/Facebook buttons', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tiếp tục với Facebook' }));
 
     expect(await screen.findByText('Trang chủ')).toBeInTheDocument();
-    expect(firebaseAuth.signInWithProvider).toHaveBeenCalledWith('facebook');
+    expect(firebaseAuth.signInWithProvider).toHaveBeenCalledWith('facebook', { link: null });
     expect(auth.register).not.toHaveBeenCalled();
   });
 
@@ -87,5 +88,32 @@ describe('Google/Facebook buttons', () => {
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Email này đã gắn với một tài khoản khác.'));
     expect(screen.getByRole('heading', { name: 'Đăng nhập tài khoản' })).toBeInTheDocument();
+  });
+
+  it('asks to continue with Google when the Facebook email already uses Google, then links both', async () => {
+    const accountExists = Object.assign(new Error('exists'), {
+      code: 'auth/account-exists-with-different-credential',
+      cancelled: false,
+      pendingCredential: { providerId: 'facebook.com' },
+      pendingProvider: 'facebook',
+      existingProvider: 'google',
+      email: 'khach@gmail.com',
+      friendlyMessage: 'Email khach@gmail.com đã được dùng để đăng nhập bằng Google.',
+    });
+    firebaseAuth.signInWithProvider.mockRejectedValueOnce(accountExists);
+    renderAt('/login');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tiếp tục với Facebook' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('khach@gmail.com đã được dùng để đăng nhập bằng Google');
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Tiếp tục với Google' })).toHaveClass('is-suggested');
+
+    firebaseAuth.signInWithProvider.mockResolvedValueOnce('google-id-token');
+    auth.loginWithSocial.mockResolvedValue(customerSession);
+    fireEvent.click(screen.getByRole('button', { name: 'Tiếp tục với Google' }));
+
+    expect(await screen.findByText('Trang chủ')).toBeInTheDocument();
+    expect(firebaseAuth.signInWithProvider).toHaveBeenLastCalledWith('google', { link: accountExists });
+    expect(toast.success).toHaveBeenCalledWith('Đã gộp Facebook vào tài khoản của bạn');
   });
 });

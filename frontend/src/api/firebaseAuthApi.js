@@ -28,11 +28,36 @@ export const firebaseErrorMessage = (error) => {
   return 'Không đăng nhập được. Vui lòng thử lại.';
 };
 
-const friendlyError = (error) => {
+export const ACCOUNT_EXISTS_CODE = 'auth/account-exists-with-different-credential';
+
+const PROVIDER_LABELS = { google: 'Google', facebook: 'Facebook' };
+const otherProvider = (provider) => (provider === 'google' ? 'facebook' : 'google');
+
+const friendlyError = (error, extra = {}) => {
   const wrapped = new Error(firebaseErrorMessage(error));
   wrapped.friendlyMessage = wrapped.message;
   wrapped.code = error?.code;
   wrapped.cancelled = CANCELLED_CODES.includes(error?.code);
+  Object.assign(wrapped, extra);
+  return wrapped;
+};
+
+// The email already has a Firebase user from the other provider (Firebase keeps one user per email).
+// Keep the credential the customer just approved so it can be linked after they sign in the first way.
+const accountExistsError = (error, authModule, provider) => {
+  const ProviderClass = provider === 'facebook' ? authModule.FacebookAuthProvider : authModule.GoogleAuthProvider;
+  const pendingCredential = ProviderClass.credentialFromError?.(error) || null;
+  const existingProvider = otherProvider(provider);
+  const email = error?.customData?.email || '';
+  const wrapped = friendlyError(error, {
+    pendingCredential,
+    pendingProvider: provider,
+    existingProvider,
+    email,
+  });
+  wrapped.message = `${email ? `Email ${email}` : 'Email này'} đã được dùng để đăng nhập bằng ${PROVIDER_LABELS[existingProvider]}. `
+    + `Hãy tiếp tục với ${PROVIDER_LABELS[existingProvider]} để gộp ${PROVIDER_LABELS[provider]} vào cùng tài khoản.`;
+  wrapped.friendlyMessage = wrapped.message;
   return wrapped;
 };
 
@@ -58,22 +83,25 @@ export const loadFirebase = () => {
   return firebasePromise;
 };
 
-const createProvider = (authModule, provider) => {
+const createProvider = (authModule, provider, { loginHint = '' } = {}) => {
   if (provider === 'google') {
     const google = new authModule.GoogleAuthProvider();
-    google.setCustomParameters({ prompt: 'select_account' });
+    google.setCustomParameters({ prompt: 'select_account', ...(loginHint ? { login_hint: loginHint } : {}) });
     return google;
   }
   if (provider === 'facebook') {
     const facebook = new authModule.FacebookAuthProvider();
     facebook.addScope('email');
+    facebook.addScope('public_profile');
     return facebook;
   }
   throw new Error(`Unknown sign-in provider: ${provider}`);
 };
 
 // Opens the Google/Facebook popup and returns the Firebase ID token our backend verifies.
-export const signInWithProvider = async (provider) => {
+// With `link`, the credential kept from an account-exists error is linked to the user who just signed in,
+// so both Google and Facebook open the same Firebase user (and the same shop account) from then on.
+export const signInWithProvider = async (provider, { link = null } = {}) => {
   let firebase;
   try {
     firebase = await loadFirebase();
@@ -82,9 +110,17 @@ export const signInWithProvider = async (provider) => {
   }
   const { auth, authModule } = firebase;
   try {
-    const credential = await authModule.signInWithPopup(auth, createProvider(authModule, provider));
+    const credential = await authModule.signInWithPopup(
+      auth,
+      createProvider(authModule, provider, { loginHint: link?.email }),
+    );
+    if (link?.pendingCredential) {
+      // Linking is a bonus: the customer is already signed in, so a failed link must not block the login.
+      await authModule.linkWithCredential(credential.user, link.pendingCredential).catch(() => {});
+    }
     return await credential.user.getIdToken();
   } catch (error) {
+    if (error?.code === ACCOUNT_EXISTS_CODE) throw accountExistsError(error, authModule, provider);
     throw friendlyError(error);
   } finally {
     await authModule.signOut(auth).catch(() => {});
